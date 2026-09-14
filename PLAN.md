@@ -265,10 +265,11 @@ stable-first so the cached prefix survives:
 
 Putting volatile state anywhere but last invalidates the whole prefix and costs ~40 s per turn.
 
-**Verified 2026-09-13 (`scripts/probes/cache.ts`):** oMLX caches in ~512-token blocks. A 15,214-token
-prompt: cold 11.5 s to first token; repeated, 14,336 tokens cached (28 × 512) and 1.24 s; same
-prefix with a new question or an appended turn, 0.93 s. Prompts under ~1k tokens get no cache
-hit, which doesn't matter at that size. The server stores each user turn *with* its snapshot in
+**Verified 2026-09-13 (`scripts/probes/cache.ts`):** oMLX caches in **2,048-token blocks** (every
+measurement is a multiple: 2,048, 4,096, 14,336 = 7×, 22,528 = 11×, 57,344 = 28×). A
+15,214-token prompt: cold 11.5 s to first token; repeated, 14,336 cached and 1.24 s; same prefix
+with a new question or an appended turn, 0.93 s. Anything past the last full block is prefilled
+again, so up to ~2k tokens of each prompt are uncached even when nothing changed. The server stores each user turn *with* its snapshot in
 history, so the next turn's prefix is byte-identical to what was sent.
 
 **Also:** pass `chat_template_kwargs: {"enable_thinking": false}` for quick lookups; reserve
@@ -354,6 +355,22 @@ one level of ingredients and uses, capped) and puts them in the uncached tail ne
 snapshot, with no extra model round trip. Retrieved lines stay in history like the snapshot.
 Lookup tools are a later fallback for what matching misses. Target tail: question + ≤ ~1.5k
 tokens of retrieved lines + snapshot.
+
+**Result (S02, 2026-09-13, `scripts/eval-grounding.ts`):** 10 questions (Gleba, maraxsis, Cerys,
+nicknames, research prerequisites and triggers, spoilage, machine speed, one nonexistent item),
+expected facts computed from the dump. Final runs with a replayed digest: 10/10 (all 30 factual
+checks passed across the last three runs), first token median ~1.6 s and max ≤ 2.2 s, warm
+follow-up 2.5–2.8 s, answers median ~70 tokens. What made the difference:
+- Computed "made in" crafters on recipe lines. The model otherwise confused `organic` with
+  `organic-or-assembling`.
+- Retrieving the technology that unlocks a matched item, and research triggers written as verbs
+  ("trigger: craft 1 biochamber").
+- Snapshot production lines only when the question is about rates or names a tracked item.
+- An 80-word limit that still requires every amount, machine, prerequisite and trigger.
+- Qwen's recommended sampling (temperature 0.7, top-p 0.8, top-k 20); oMLX defaults to 1.0.
+
+Follow-ups sit at 2.5–2.8 s because history past the last 2,048-token block is re-prefilled on
+every turn. Conversation trimming (FC-076) and block-aware prompt layout are the next levers.
 ---
 
 ## 7. Phases

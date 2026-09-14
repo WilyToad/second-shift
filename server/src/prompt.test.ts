@@ -18,6 +18,15 @@ test("snapshot is compact text with rounded rates", () => {
   expect(text).toContain("urgent alerts: none");
 });
 
+test("production lines only when the question is about rates or names a tracked item", () => {
+  const recipeQ = formatSnapshot(digest, 0, { question: "what's the recipe for carbon fiber?", items: ["carbon-fiber"] });
+  expect(recipeQ).not.toContain("produced/min");
+  expect(recipeQ).toContain("(production rates omitted");
+  expect(recipeQ).toContain("research: carbon-fiber 62%"); // header always present
+  expect(formatSnapshot(digest, 0, { question: "how much bioflux am I making?", items: ["bioflux"] })).toContain("gleba produced/min: bioflux 37.9");
+  expect(formatSnapshot(digest, 0, { question: "is bioflux ok", items: ["bioflux"] })).toContain("gleba rates/min for items asked about: bioflux 37.9");
+});
+
 test("messages keep a stable prefix: system, history as sent, then the new turn last", () => {
   const first = userTurn("why?", { snapshot: "state A" });
   const history = [first, { role: "assistant" as const, content: "because" }];

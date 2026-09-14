@@ -1,5 +1,6 @@
 // Factorio Companion server: game link + model + web chat on localhost.
 import chatPage from "../../displays/src/chat.html";
+import { DigestSchema } from "@companion/interfaces";
 import { GameLink } from "./game";
 import { OmlxClient, readOmlxApiKey, type ChatMessage } from "./model";
 import { buildMessages, formatSnapshot, systemPrompt, userTurn } from "./prompt";
@@ -13,8 +14,9 @@ export type ServerMessage =
   | { type: "user"; text: string }
   | { type: "token"; text: string }
   | { type: "done"; ttftMs?: number; totalMs: number; promptTokens?: number; cachedTokens?: number; completionTokens?: number }
-  | { type: "error"; message: string };
-export type ClientMessage = { type: "ask"; text: string; thinking?: boolean };
+  | { type: "error"; message: string }
+  | { type: "reset" };
+export type ClientMessage = { type: "ask"; text: string; thinking?: boolean } | { type: "reset" };
 
 const game = new GameLink({ pollMs: 2000, historySize: 1800, cacheDir: new URL("../../data/cache", import.meta.url).pathname });
 const model = new OmlxClient({ baseUrl: "http://127.0.0.1:8888", apiKey: await readOmlxApiKey(), model: MODEL });
@@ -40,6 +42,7 @@ const server = Bun.serve({
     message(_ws, raw) {
       const msg = JSON.parse(String(raw)) as ClientMessage;
       if (msg.type === "ask" && msg.text.trim()) busy = busy.then(() => answer(msg.text.trim(), msg.thinking ?? false));
+      if (msg.type === "reset") busy = busy.then(() => { history.length = 0; broadcast({ type: "reset" }); });
     },
   },
   development: process.env.NODE_ENV !== "production" && { hmr: true },
@@ -58,10 +61,17 @@ function statusMessage(): ServerMessage {
   };
 }
 
+// COMPANION_REPLAY_DIGEST=data/captures/digest.json: use a captured digest while the game isn't
+// connected, so offline evals see a realistic full-size prompt.
+const replayDigest = process.env.COMPANION_REPLAY_DIGEST
+  ? DigestSchema.parse(await Bun.file(process.env.COMPANION_REPLAY_DIGEST).json())
+  : null;
+
 async function answer(question: string, thinking: boolean): Promise<void> {
-  const snap = game.latest();
-  const recipes = retriever?.retrieve(question).lines ?? [];
-  const turn = userTurn(question, { recipes, snapshot: snap ? formatSnapshot(snap.digest, Date.now() - snap.receivedAt) : null });
+  const snap = game.latest() ?? (replayDigest ? { digest: replayDigest, receivedAt: Date.now() } : undefined);
+  const found = retriever?.retrieve(question);
+  const snapshot = snap ? formatSnapshot(snap.digest, Date.now() - snap.receivedAt, { question, items: found?.items ?? [] }) : null;
+  const turn = userTurn(question, { recipes: found?.lines ?? [], snapshot });
   broadcast({ type: "user", text: question });
   try {
     const result = await model.stream(buildMessages(system, history, turn), {

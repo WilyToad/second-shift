@@ -119,6 +119,10 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
   on its own and warms the model at startup.
 - `bun test`, `bun run typecheck`, `bun run check` (all of it), `bun run board` (sprint progress).
 - Captures for offline work go in `data/captures/` (gitignored).
+- `COMPANION_REPLAY_DIGEST=data/captures/digest.json bun run start` uses a captured digest while the
+  game is closed, so offline answers see a realistic prompt.
+- `bun scripts/eval-grounding.ts` (server running) runs the 10-question grounding check. Run it
+  after any change to retrieval, prompt wording or sampling; results land in `data/eval/`.
 
 ## Layout
 

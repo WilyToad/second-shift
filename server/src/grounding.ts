@@ -1,6 +1,6 @@
 // Compact text forms of the save's prototype data for the model. Every token here is prefill
 // cost, so formats are terse and consistent: one line per recipe, technology or machine.
-import type { Prototypes, Recipe } from "@companion/interfaces";
+import type { Prototypes, Recipe, Technology } from "@companion/interfaces";
 
 const num = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100));
 
@@ -28,7 +28,8 @@ export function craftersByCategory(p: Prototypes): Map<string, string[]> {
 export function recipeLine(name: string, r: Recipe, crafters?: Map<string, string[]>): string {
   const ins = r.ingredients.map((i) => `${amount(i)} ${i.name}`).join(", ") || "nothing";
   const outs = r.products.map((p) => `${amount(p)} ${p.name}`).join(", ") || "nothing";
-  const where = r.surface_conditions?.length ? ` [${r.surface_conditions.map((c) => `${c.property}${c.min !== undefined ? `>=${num(c.min)}` : ""}${c.max !== undefined ? `<=${num(c.max)}` : ""}`).join(" ")}]` : "";
+  const bound = (op: string, v: number | undefined) => (v === undefined || Math.abs(v) > 1e300 ? "" : `${op}${num(v)}`); // engine uses ±DBL_MAX for "no limit"
+  const where = r.surface_conditions?.length ? ` [${r.surface_conditions.map((c) => `${c.property}${bound(">=", c.min)}${bound("<=", c.max)}`).join(" ")}]` : "";
   const madeIn = crafters ? ` made in: ${(crafters.get(r.category) ?? []).join(", ") || "nothing in this save"}` : "";
   return `${name}: ${ins} -> ${outs} (${num(r.energy)}s ${r.category}${r.enabled ? "" : ", locked"})${where}${madeIn}`;
 }
@@ -37,11 +38,25 @@ export function formatRecipes(p: Prototypes, filter: (name: string, r: Recipe) =
   return Object.entries(p.recipes).filter(([n, r]) => filter(n, r)).sort(([a], [b]) => a.localeCompare(b)).map(([n, r]) => recipeLine(n, r)).join("\n");
 }
 
+/** "craft 100 bioflux", "mine maraxsis-coral", or the science cost "1000x(automation-science-pack 1) 30s". */
+export function techCost(t: Technology): string {
+  if (t.trigger) {
+    const trig = t.trigger as { type: string; item?: { name: string } | string; entity?: string; fluid?: string; count?: number; amount?: number };
+    const target = typeof trig.item === "string" ? trig.item : trig.item?.name ?? trig.entity ?? trig.fluid ?? "";
+    const qty = trig.count ?? trig.amount;
+    // "craft-item" -> "craft", "mine-entity" -> "mine": reads as "craft 1 biochamber", not "craft item 1 biochamber".
+    const verb = trig.type.replace(/-(item|entity|fluid)$/, "").replace(/-/g, " ");
+    return `trigger: ${verb}${qty ? ` ${num(qty)}` : ""}${target ? ` ${target}` : ""}`;
+  }
+  return `${t.count_formula ?? num(t.count)}x(${t.ingredients.map((i) => `${i.name} ${num(i.amount)}`).join(", ")}) ${num(t.seconds_per_unit)}s`;
+}
+
+export function techLine(name: string, t: Technology): string {
+  return `technology ${name}: needs ${t.prerequisites.join(", ") || "-"} | unlocks ${t.unlocks.join(", ") || "-"} | ${techCost(t)} | ${t.researched ? "researched" : "not researched"}`;
+}
+
 export function formatTechnologies(p: Prototypes): string {
-  return Object.entries(p.technologies).sort(([a], [b]) => a.localeCompare(b)).map(([name, t]) => {
-    const cost = t.trigger ? `trigger ${t.trigger.type}` : `${t.count_formula ?? num(t.count)}x(${t.ingredients.map((i) => `${i.name} ${num(i.amount)}`).join(", ")}) ${num(t.seconds_per_unit)}s`;
-    return `${name}: needs ${t.prerequisites.join(", ") || "-"} | unlocks ${t.unlocks.join(", ") || "-"} | ${cost}${t.researched ? " | researched" : ""}`;
-  }).join("\n");
+  return Object.entries(p.technologies).sort(([a], [b]) => a.localeCompare(b)).map(([name, t]) => techLine(name, t)).join("\n");
 }
 
 export function formatMachines(p: Prototypes): string {

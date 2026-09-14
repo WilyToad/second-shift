@@ -53,3 +53,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 - [ ] FC-072 Close the hosted game port to the LAN (macOS firewall or another approach)
 - [ ] FC-075 Detect a paused game or open menu in the digest
 - [ ] FC-076 Conversation trimming plan that limits cache invalidation
+  - Notes: warm follow-ups are 2.5–2.8 s because history past the last 2,048-token block is re-prefilled each turn (PLAN §6)
+- [ ] FC-077 Verify the character prototype dump in-game and refresh the prototype cache
+  - Acceptance: after launch, recipe lines show "by hand" from the character's real crafting categories; `data/captures/prototypes.json` refreshed

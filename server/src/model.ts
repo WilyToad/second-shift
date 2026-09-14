@@ -54,6 +54,8 @@ export class OmlxClient {
         stream_options: { include_usage: true },
         max_tokens: maxTokens,
         chat_template_kwargs: { enable_thinking: thinking },
+        // Qwen's recommended sampling; oMLX's default temperature (1.0) is too loose for factual answers.
+        ...(thinking ? { temperature: 0.6, top_p: 0.95, top_k: 20 } : { temperature: 0.7, top_p: 0.8, top_k: 20 }),
       }),
     });
     if (!res.ok || !res.body) throw new Error(`oMLX ${res.status}: ${await res.text()}`);

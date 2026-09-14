@@ -1,7 +1,7 @@
 // Picks the recipe and technology lines relevant to a question, in code, so the model gets the
 // save's real data without the whole 59k-token dump in the prompt (PLAN §6, FC-011).
 import type { Prototypes } from "@companion/interfaces";
-import { craftersByCategory, recipeLine } from "./grounding";
+import { craftersByCategory, recipeLine, techLine } from "./grounding";
 
 type Kind = "item" | "fluid" | "recipe" | "technology";
 type Entry = { kind: Kind; name: string };
@@ -34,6 +34,7 @@ export class RecipeRetriever {
   private readonly producers = new Map<string, string[]>();
   private readonly users = new Map<string, string[]>();
   private readonly crafters: Map<string, string[]>;
+  private readonly unlockedBy = new Map<string, string[]>();
 
   constructor(private readonly p: Prototypes) {
     this.crafters = craftersByCategory(p);
@@ -53,7 +54,12 @@ export class RecipeRetriever {
     for (const name of Object.keys(p.recipes)) addName(name, "recipe");
     for (const name of Object.keys(p.technologies)) addName(name, "technology");
     for (const [alias, name] of Object.entries(ALIASES)) if (p.items[name]) add(alias, { kind: "item", name });
+    // "agricultural science" -> agricultural-science-pack, for every science pack in the save.
+    for (const name of Object.keys(p.items)) if (name.endsWith("-science-pack")) add(name.slice(0, -"-pack".length), { kind: "item", name });
 
+    for (const [name, t] of Object.entries(p.technologies)) {
+      for (const recipe of t.unlocks) this.unlockedBy.set(recipe, [...(this.unlockedBy.get(recipe) ?? []), name]);
+    }
     for (const [name, r] of Object.entries(p.recipes)) {
       for (const out of r.products) this.producers.set(out.name, [...(this.producers.get(out.name) ?? []), name]);
       for (const inp of r.ingredients) this.users.set(inp.name, [...(this.users.get(inp.name) ?? []), name]);
@@ -79,36 +85,34 @@ export class RecipeRetriever {
   }
 
   /** Relevant lines for a question, capped. Returns the names it matched for transparency. */
-  retrieve(question: string, maxLines = 40): { matched: string[]; lines: string[] } {
+  retrieve(question: string, maxLines = 40): { matched: string[]; items: string[]; lines: string[] } {
     const entries = this.match(question);
     const recipes: string[] = [];
     const techs: string[] = [];
     const addRecipe = (name: string) => { if (this.p.recipes[name] && !recipes.includes(name)) recipes.push(name); };
+    const addTech = (name: string) => { if (this.p.technologies[name] && !techs.includes(name)) techs.push(name); };
 
     for (const e of entries) {
       if (e.kind === "recipe") addRecipe(e.name);
-      if (e.kind === "technology" && !techs.includes(e.name)) techs.push(e.name);
+      if (e.kind === "technology") addTech(e.name);
     }
     for (const e of entries.filter((x) => x.kind === "item" || x.kind === "fluid")) {
       const made = this.producers.get(e.name) ?? [];
       made.slice(0, 6).forEach(addRecipe);
       // One level down: how the main recipe's ingredients are made.
       const main = made.find((n) => n === e.name) ?? made[0];
+      // What research unlocks it, so "what do I need to research?" questions have the answer.
+      if (main) (this.unlockedBy.get(main) ?? []).slice(0, 2).forEach(addTech);
       for (const ing of main ? this.p.recipes[main]!.ingredients : []) (this.producers.get(ing.name) ?? []).slice(0, 2).forEach(addRecipe);
       (this.users.get(e.name) ?? []).slice(0, 4).forEach(addRecipe);
     }
     for (const t of techs) this.p.technologies[t]!.unlocks.slice(0, 5).forEach(addRecipe);
 
     const lines = [
-      ...techs.map((t) => techLine(t, this.p)),
+      ...techs.map((t) => techLine(t, this.p.technologies[t]!)),
       ...recipes.map((r) => recipeLine(r, this.p.recipes[r]!, this.crafters)),
     ].slice(0, maxLines);
-    return { matched: entries.map((e) => `${e.kind}:${e.name}`), lines };
+    const items = entries.filter((e) => e.kind === "item" || e.kind === "fluid").map((e) => e.name);
+    return { matched: entries.map((e) => `${e.kind}:${e.name}`), items, lines };
   }
-}
-
-function techLine(name: string, p: Prototypes): string {
-  const t = p.technologies[name]!;
-  const cost = t.trigger ? `trigger ${t.trigger.type}` : `${t.count_formula ?? t.count}x(${t.ingredients.map((i) => `${i.name} ${i.amount}`).join(", ")})`;
-  return `technology ${name}: needs ${t.prerequisites.join(", ") || "-"} | unlocks ${t.unlocks.join(", ") || "-"} | ${cost}${t.researched ? " | researched" : " | not researched"}`;
 }

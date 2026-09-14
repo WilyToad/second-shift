@@ -42,6 +42,10 @@ function onMessage(m: ServerMessage): void {
       current = null;
       break;
     }
+    case "reset":
+      thread.replaceChildren();
+      current = null;
+      break;
     case "error":
       add("error", m.message);
       current = null;

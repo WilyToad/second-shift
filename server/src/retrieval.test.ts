@@ -34,4 +34,7 @@ test.if(real !== null)("real save: Gleba and modded names resolve", () => {
   expect(line).toEndWith("made in: biochamber"); // category "organic" only, not "organic-or-assembling" machines
   expect(retriever.retrieve("how do I build a hydro plant").matched).toContain("item:maraxsis-hydro-plant");
   expect(retriever.retrieve("carbon fiber recipe").matched).toContain("item:carbon-fiber");
+  const agri = retriever.retrieve("What do I need before I can research agricultural science?");
+  expect(agri.matched).toContain("item:agricultural-science-pack");
+  expect(agri.lines[0]).toBe("technology agricultural-science-pack: needs artificial-soil, bacteria-cultivation, bioflux-processing | unlocks agricultural-science-pack | trigger: craft 100 bioflux | not researched");
 });
