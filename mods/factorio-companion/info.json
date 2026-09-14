@@ -1,0 +1,9 @@
+{
+  "name": "factorio-companion",
+  "version": "0.1.0",
+  "title": "Factorio Companion",
+  "author": "tcoleman",
+  "description": "Game state, queries and player-equivalent actions for a local AI companion, over RCON.",
+  "factorio_version": "2.0",
+  "dependencies": ["base >= 2.0"]
+}

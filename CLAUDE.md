@@ -49,7 +49,7 @@ No Vite. UI framework not chosen yet (PLAN §4).
 
 | Thing | Value |
 |---|---|
-| Game | Factorio 2.0.76, Steam, mac-arm64, Space Age |
+| Game | Factorio 2.0.77 (Steam auto-updates), mac-arm64, Space Age |
 | Factorio user dir | `~/Library/Application Support/factorio/` |
 | Mods dir | `…/factorio/mods/` (zips + `mod-list.json`) |
 | Mod output | `…/factorio/script-output/` (one-off dumps only; doesn't exist yet) |
@@ -86,7 +86,7 @@ Most Factorio Lua online (and in model training data) targets 1.1. In 2.0:
 
 The exact API for the installed version ships with the game:
 `…/factorio.app/Contents/doc-html/runtime-api.json` (and `prototype-api.json`). Check it before
-using an API from memory; online docs track the latest version, not necessarily 2.0.76.
+using an API from memory; online docs track the latest version, which may differ from the installed one.
 
 ## Useful Factorio CLI flags
 
@@ -103,11 +103,18 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
     unverified report of a macOS `send_udp` crash.
   - The game rewrites `config.ini` on exit. Edit it only with the game closed, or use `--config`.
 - Launching the binary directly makes Steam relaunch the game; arguments are kept.
-- `--dump-data` writes data.raw as JSON (including mods) to `script-output/` and exits.
-  Use it for offline prototype data.
 - `--dump-icon-sprites` writes every icon, modded ones included, as PNGs and exits.
   Use it as the web app's icon source.
 - `--benchmark`, `--benchmark-ticks`, `--benchmark-runs` measure UPS cost on a save copy.
+
+## Dev workflow
+
+- `bun run setup-rcon` (once, game closed) enables RCON in `config.ini`.
+- `bun run link-mod` (once, game closed) symlinks the mod into the Factorio mods folder.
+- `bun run launch -- --dev` hosts `data/saves/dev.zip` (a copy of the big save) privately with no
+  autosaves, waits for RCON and checks the mod answers. The mod code reloads only on game restart.
+- `bun test`, `bun run typecheck`.
+- Captures for offline work go in `data/captures/` (gitignored).
 
 ## Layout
 

@@ -66,7 +66,7 @@ OpenAI-compatible server. Review it for ideas and a possible name clash before b
 | Model is multimodal | `Qwen4ExpForConditionalGeneration` has `vision_config`, `image_token_id`, `vision_start/end_token_id` |
 | Tool calling works | 90 `finish_reason=tool_calls` completions already in `~/.omlx/logs/server.log` |
 | Model quality | 82.3% MMLU-Pro (n=300, paired) — best of the local models tested |
-| Game is moddable | Factorio 2.0.76 Steam mac-arm64, 21 mods enabled, modding already in use |
+| Game is moddable | Factorio 2.0.77 Steam mac-arm64 (auto-updated from 2.0.76 on 2026-09-13), 21 mods enabled, modding already in use |
 | Headroom | Flash-Next is 69.5 GB resident against a 118 GB ceiling |
 
 ---
@@ -467,10 +467,11 @@ server → web chat. oMLX model id: `Qwen3.8-Flash-Next-oQ4e-mtp`; API key read 
     charted; which entity settings can be changed)? Action checks must match exactly.
 11. **Character control vs player input.** Does the player's own movement override
     `walking_state` and `mining_state`? Should any player input cancel an agent action?
-12. **Prototype data source.** `--dump-data` gives prototype-stage `data.raw`. The runtime
-    `prototypes.*` API gives what's actually loaded in the save. They differ in shape. Now that
-    RCON replies can be MBs, test a `dump_prototypes` command on the real mod list; if it's fast
-    enough, use the runtime view only. Decide before writing the schema.
+12. ~~**Prototype data source.**~~ **Decided 2026-09-13: runtime view over RCON.** The mod's
+    `dump_prototypes` action on the 22 MB dev save with the full mod list returned 981 recipes,
+    402 items, 43 fluids, 342 technologies and 69 machines (incl. 115 maraxsis and 27 Cerys
+    recipes) as 0.44 MB in ~30 ms. It includes per-force state (recipe enabled, tech researched).
+    `--dump-data` isn't needed. Note: `helpers.table_to_json` writes empty arrays as `{}`.
 
 ---
 
@@ -487,3 +488,4 @@ server → web chat. oMLX model id: `Qwen3.8-Flash-Next-oQ4e-mtp`; API key read 
 | Scope creep into "AI plays the game on its own" | Acts only on request; no autonomous loops. |
 | Model emits wrong visual specs (bad layouts, fake entities) | Validate specs against `prototypes.json`; show checks on each component. |
 | Verbose specs make visual answers slow | Terse spec formats; measure tokens per component. |
+| Hosted game port reachable on the LAN | The client ignores `--bind` when hosting, so 34197 listens on all interfaces (macOS firewall is off). Mitigated by a random game password, no public/LAN listing, `max_players: 1`. RCON itself is bound to 127.0.0.1. Enabling the macOS firewall would close it. |
