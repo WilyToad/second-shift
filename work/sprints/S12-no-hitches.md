@@ -11,13 +11,12 @@
 - [x] FC-103 Cheaper prototype refresh when research completes
   - Acceptance: on research_finished the server asks the mod only for what that research changed (unlocked recipes' enabled flag, recipe productivity, the technology's researched state) and patches its cache; patched data equals a fresh full dump; game-side cost profiled < 1 ms; a full dump still happens when the mod list changes or a patch fails
   - New `research_state` action: for named technologies, their researched flag plus the recipes their effects unlock or boost (0.06 ms); for the whole force (1.4 ms, compact lists: a table per recipe made it 5.4 ms). The server patches its data on research events and patches the whole force on reconnect, so research done while the server was off is picked up too (before, a same-mods reconnect kept stale flags). Falls back to a full dump if the mod lacks the action. The system prompt isn't re-measured or re-warmed when research leaves it unchanged. `scripts/test-research.ts` 4/4 in-game: atomic-bomb and mining-productivity-3 (which boosts maraxsis sand extraction) patched in 524 ms with no dump, identical to a fresh full dump. The patch is in memory only; the cache file is rewritten only by full dumps
-- [ ] FC-072 Close the hosted game port to the LAN
-  - Acceptance: `bun run launch` hosts bound to 127.0.0.1 (checked with lsof); RCON and the player's own client still work
-  - **Blocked:** the GUI client ignores `--bind` when hosting (retried tonight: the log shows "Opening socket at 0.0.0.0:34197" with `--bind 127.0.0.1` in the arguments). Other options would change the player's config.ini or macOS firewall, which the overnight rules exclude. Already in place: a random game password, max_players 1 (not verified whether the host counts toward it), no LAN or public listing. Back to the backlog for the player to decide
 
 ## Notes
 
 Planned and activated 2026-09-14 overnight under the player's delegation. S11 measured a 26 ms prototype dump (about 1.5 frames at 60 UPS) on every research completion. FC-072 changes only the launch flags of the companion's own launcher, not macOS firewall settings.
+
+FC-072 moved back to the backlog. Blocked: the GUI client ignores `--bind` when hosting (retried tonight: the log shows "Opening socket at 0.0.0.0:34197" with `--bind 127.0.0.1` in the arguments). Other options would change the player's config.ini or macOS firewall, which the overnight rules exclude. Already in place: a random game password, max_players 1 (not verified whether the host counts toward it), no LAN or public listing. Back to the backlog for the player to decide
 
 ## Review
 
