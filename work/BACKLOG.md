@@ -7,11 +7,8 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 3 — Pleasant console and more actions
 
-- [ ] FC-043 `recipe_graph` component
-  - Acceptance: optional for this sprint. Recipe chain with stuck nodes highlighted, drawn from prototypes and status
 - [ ] FC-044 `layout_sketch` component with copyable blueprint string
 - [ ] FC-046 Blueprint selection tool in the mod
-- [ ] FC-047 Throughput analysis for builds and blueprints
 - [ ] FC-048 Template-based blueprint creation
 - [ ] FC-049 Screenshots and their game cost (PLAN §8 Q7)
 
