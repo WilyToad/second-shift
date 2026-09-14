@@ -127,6 +127,14 @@ export const TOOLS: ToolSpec[] = [
   {
     type: "function",
     function: {
+      name: "set_recipe",
+      description: "Ask the player to approve changing the recipe of the assembling machines in the last result. Nothing happens until they confirm.",
+      parameters: { type: "object", properties: { recipe: { type: "string", description: "What they should make, as the player said it." } }, required: ["recipe"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "queue_research",
       description: "Add a technology to the research queue.",
       parameters: { type: "object", properties: { technology: { type: "string", description: "Technology or the item it unlocks, as the player said it." } }, required: ["technology"] },
@@ -172,6 +180,7 @@ export function needsWorldTools(question: string, hasLastResult: boolean): boole
   if (/\b(near|nearby|around me|next to me|close to me|here|to my|on my|of me|in view|on screen|visible)\b/.test(q)) return true;
   if (/\b(find|search|look for|highlight|show me|where are|count|which)\b/.test(q)) return true;
   if (/\b(mark|unmark|deconstruct\w*|remove|delete|clear|cancel|upgrade\w*|queue|start research\w*|research it|tag|pin|camera|jump|take me|paste|place|build it)\b/.test(q)) return true;
+  if (/\b(set|switch|change)\b.*\b(to|recipe)\b/.test(q)) return true;
   if (/\bhow many\b/.test(q) && !/\b(need|needs|take|takes|require|requires|make|makes|per)\b/.test(q)) return true;
   if (hasLastResult && /\b(them|those|these|it|that)\b/.test(q)) return true;
   return false;
@@ -459,6 +468,8 @@ export class Agent {
           return this.proposeOnLastResult(call.function.name);
         case "mark_upgrade":
           return this.proposeOnLastResult("mark_upgrade", args.to ? String(args.to) : undefined);
+        case "set_recipe":
+          return this.proposeRecipe(String(args.recipe ?? ""));
         case "queue_research":
           return await this.queueResearch(String(args.technology ?? ""));
         case "map_action":
@@ -553,6 +564,35 @@ export class Agent {
     if (action === "mark_deconstruction") return this.card(`Mark ${n} ${last.label} for deconstruction?`, `The ${last.label} found ${last.where}, highlighted in-game. Construction robots remove them; Ctrl+Z in-game undoes the marks.`, applied("Marked"));
     if (action === "cancel_deconstruction") return this.card(`Cancel deconstruction marks on ${n} ${last.label}?`, `Removes deconstruction marks from the ${last.label} found ${last.where}.`, applied("Unmarked"));
     return this.card(`Mark ${n} ${last.label} for upgrade${to ? ` to ${to}` : ""}?`, `The ${last.label} found ${last.where}, like an upgrade planner. Robots swap them when the items are available; Ctrl+Z undoes the marks.`, applied("Marked for upgrade"));
+  }
+
+  /** The recipe a player means by "gears" or "iron gear wheels": a recipe of that name, else the usual recipe for that item. */
+  private resolveRecipe(text: string): string | null {
+    const protos = this.deps.prototypes();
+    if (!protos) return null;
+    if (protos.recipes[text]) return text;
+    if (this.planner?.source !== protos) this.planner = { source: protos, planner: new Planner(protos) };
+    for (const e of this.deps.retriever()?.match(text) ?? []) {
+      if (protos.recipes[e.name] && e.kind !== "technology") return e.name;
+      const usual = e.kind === "item" || e.kind === "fluid" ? this.planner.planner.recipeFor(e.name) : null;
+      if (usual) return usual;
+    }
+    return null;
+  }
+
+  private proposeRecipe(what: string): string {
+    const last = this.lastResult;
+    if (!last || this.now() - last.at > RESULT_TTL_MS) return "Error: there is no recent search result to act on. Use find_entities first.";
+    if (last.refs.length === 0) return `Error: the last search found no ${last.label}, so there's nothing to act on.`;
+    const recipe = this.resolveRecipe(what);
+    if (!recipe) return `Error: no recipe matching "${what}" in this save. Nothing was changed.`;
+    const entities = last.refs;
+    return this.card(`Set ${entities.length} ${last.label} to make ${recipe}?`, `The ${last.label} found ${last.where}, highlighted in-game. Ingredients inside them go to your inventory; anything that doesn't fit spills next to the machine.`, async () => {
+      const r = await this.deps.game.call("set_recipe", { entities, recipe });
+      const refused = Object.entries(r.rejected).map(([reason, count]) => `${count} ${reason.replace(/_/g, " ")}`).join(", ");
+      const items = r.returned || r.spilled ? `; ${r.returned} items back to your inventory${r.spilled ? `, ${r.spilled} spilled` : ""}` : "";
+      return `Set ${plural(r.done, "machine")} to ${recipe}${items}${refused ? `; refused: ${refused}` : ""}.`;
+    });
   }
 
   /** Small requests run right away only when the player's own words asked for them; otherwise they need a card. */

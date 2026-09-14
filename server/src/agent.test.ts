@@ -248,3 +248,31 @@ test("blueprint requests are told apart from plans", () => {
   expect(wantsBlueprint("How many assemblers for 120 gears per minute?")).toBe(false);
   expect(wantsBlueprint("Review this blueprint")).toBe(false);
 });
+
+test("changing a recipe goes through a card and names the recipe from the player's words", async () => {
+  const prototypes = PrototypesSchema.parse(rowPrototypes);
+  const machines = [{ name: "assembling-machine-2", x: 1.5, y: 1.5 }, { name: "assembling-machine-2", x: 4.5, y: 1.5 }];
+  const calls: { action: ActionName; args: any }[] = [];
+  const game: GameActions = {
+    latest: () => undefined,
+    async call(action: ActionName, args?: any): Promise<any> {
+      calls.push({ action, args });
+      if (action === "find_entities") return { surface: "nauvis", center: { x: 0, y: 0 }, direction: "around", radius: 32, area: { left_top: { x: -32, y: -32 }, right_bottom: { x: 32, y: 32 } }, count: 2, by_name: { "assembling-machine-2": 2 }, not_visible: 0, entities: machines, truncated: false };
+      if (action === "highlight") return { drawn: 2, seconds: 30 };
+      if (action === "set_recipe") return { done: 2, rejected: {}, returned: 20, spilled: 0 };
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  const events: ServerMessage[] = [];
+  const model = fakeModel([{ tool: "find_entities", args: { what: "assemblers" } }, { tool: "set_recipe", args: { recipe: "iron gear wheels" } }, { text: "Confirm in the card." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => new RecipeRetriever(prototypes), prototypes: () => prototypes, emit: (m) => events.push(m) });
+  await agent.ask("Set the assemblers around me to make iron gear wheels");
+  const card = events.find((e) => e.type === "approval");
+  if (card?.type !== "approval") throw new Error("no card");
+  expect(card.title).toBe("Set 2 assemblers to make iron-gear-wheel?");
+  expect(calls.some((c) => c.action === "set_recipe")).toBe(false);
+  await agent.approve(card.id);
+  expect(calls.find((c) => c.action === "set_recipe")?.args).toEqual({ entities: machines, recipe: "iron-gear-wheel" });
+  expect(events.at(-1)).toMatchObject({ type: "approval_result", status: "done", message: "Set 2 machines to iron-gear-wheel; 20 items back to your inventory." });
+});
+

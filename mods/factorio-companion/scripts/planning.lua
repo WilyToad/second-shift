@@ -125,6 +125,50 @@ return function(handlers)
     return { done = done, rejected = rejected, undo_items = player.undo_redo_stack.get_undo_item_count() }
   end
 
+  -- Map change (approval in the app): set the recipe of assembling machines, as the player could in the
+  -- machine's window (in reach or through remote view where they can see). What the machine held goes to
+  -- the player's inventory, and anything that doesn't fit spills at the machine, so no items appear or vanish.
+  handlers.set_recipe = function(args)
+    local player = require_player()
+    local targets = args.entities or {}
+    if #targets > MAX_TARGETS then reject("too_many", "At most " .. MAX_TARGETS .. " entities per action.") end
+    local recipe = player.force.recipes[args.recipe or ""]
+    if not recipe then reject("unknown_recipe", "No recipe named " .. tostring(args.recipe) .. ".") end
+    if recipe.hidden then reject("hidden_recipe", recipe.name .. " can't be chosen in a machine.") end
+    if not recipe.enabled then reject("not_unlocked", recipe.name .. " isn't unlocked yet.") end
+    local done, rejected, returned, spilled = 0, {}, 0, 0
+    for _, ref in ipairs(targets) do
+      local e = resolve(player, ref)
+      local reason = nil
+      if not (e and e.valid) then reason = "gone"
+      elseif e.force ~= player.force then reason = "not_yours"
+      elseif e.type ~= "assembling-machine" then reason = "not_an_assembler"
+      elseif e.prototype.fixed_recipe then reason = "fixed_recipe"
+      elseif not helmet.visible(player.force, e.surface, e.position) then reason = "not_visible"
+      elseif not (e.prototype.crafting_categories or {})[recipe.category] then reason = "wrong_category"
+      else
+        local current = e.get_recipe()
+        if current and current.name == recipe.name then reason = "same_recipe" end
+      end
+      if reason then
+        rejected[reason] = (rejected[reason] or 0) + 1
+      else
+        for _, item in pairs(e.set_recipe(recipe)) do
+          local stack = { name = item.name, count = item.count, quality = item.quality }
+          local moved = player.insert(stack)
+          returned = returned + moved
+          if moved < item.count then
+            stack.count = item.count - moved
+            e.surface.spill_item_stack({ position = e.position, stack = stack, enable_looted = true, force = player.force, allow_belts = false })
+            spilled = spilled + stack.count
+          end
+        end
+        done = done + 1
+      end
+    end
+    return { done = done, rejected = rejected, returned = returned, spilled = spilled }
+  end
+
   -- Map change (approval in the app): paste a blueprint as ghosts, like the player would.
   handlers.place_blueprint = function(args)
     local player = require_player()
