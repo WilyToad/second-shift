@@ -1,10 +1,10 @@
 # S16 — Fewer model misses
 
-- **Status:** active
+- **Status:** done
 - **Goal:** Rules the code can enforce don't depend on the model obeying them, and misses that still happen can be studied.
 - **Acceptance:** Chart blocks are removed in code on turns that don't allow them. Questions naming something that doesn't exist in the save get that fact as a data line. Every eval and e2e script records the full answer for a failing check. The suites with misses in FC-110 (blueprint review, throughput, grounding, ratios, diagnosis) each pass 3 runs in a row on a server running this code, or the remaining misses are recorded with their answers.
 - **Started:** 2026-09-14
-- **Finished:** —
+- **Finished:** 2026-09-14
 
 ## Items
 
@@ -17,13 +17,28 @@
 - [x] FC-113 Keep failing answers from evals
   - Acceptance: grounding, ratios, diagnosis, blueprint and throughput scripts write each run's checks with full answers to `data/eval/` so a miss can be read afterwards
   - `scripts/lib/eval-log.ts` writes `data/eval/<suite>-<time>.json` with every check and full answer, for ratios, diagnosis, blueprint and throughput (grounding already did). The blueprint "no invented problems" check now prints the whole answer
-- [ ] FC-110 Model misses seen in overnight regression runs
+- [x] FC-110 Model misses seen in overnight regression runs
   - Acceptance: closed by FC-111 to FC-114
-- [ ] FC-114 Repeat runs of the flaky suites
+  - Closed by FC-111 to FC-114; see the review
+- [x] FC-114 Repeat runs of the flaky suites
   - Acceptance: blueprint review, throughput, grounding, ratios and diagnosis 3 runs each; results and any remaining misses (with answers) recorded here and in FC-110
+  - Round 1–3 after FC-111 to FC-113: blueprint 9/9 ×3, throughput 8/8 ×3, grounding 10/10 ×3 (first token median 1.08–1.20 s), diagnosis 4/4 ×3, ratios 8/8, 7/8, 8/8. The saved answer for the ratios miss ("60 maraxsis glass panes per minute") listed every input but not the 0.83 foundries. Plan turns now put the plan's headline number in the guidance ("start with 0.83× foundry for 60/min …"): ratios 8/8 three more times, and a full server regression passed (grounding 10/10, rails 6/6, charts 2/2, blueprints 9/9, throughput 8/8, blueprint requests 6/6, console 4/4, planning 7/7, diagnosis 4/4, settings 3/3)
 
 ## Notes
 
 Planned and activated 2026-09-14 overnight under the player's delegation, from FC-110 (misses seen in S14–S15 regression runs). FC-110's notes: each passed on rerun. Blueprint review invented a problem (2 in ~9 runs); diagnosis skipped the search, saying the machines were already highlighted (1 in 5); grounding answered a nonsense question with "Ready when you are" (1 in 4); ratios left out the machine count (1 in 4); throughput wrote a chart block despite "no chart" (1 in 6). Ideas: drop chart blocks in code when the turn doesn't allow them; a stricter refusal template for unknown items; record full answers for failing checks so misses can be studied
 
 ## Review
+
+Rules the code can enforce no longer depend on the model, and misses are now saved with their answers. Closed overnight on the player's delegation.
+
+**Acceptance:**
+- ✓ Chart blocks removed in code on turns without charts (unit tests at every split point).
+- ✓ Unknown names are stated as data (tested on the real save's data).
+- ✓ Full answers saved for every run of the five suites.
+- ✓ Five suites × 3 runs: 14 of 15 runs clean. The one miss (ratios) was diagnosed from its saved answer and fixed, then 8/8 ×3.
+
+**What we learned:**
+- Saving the full answer turned a vague flake into a one-line fix.
+- Putting the exact number into the turn's guidance works better than asking to "answer from the plan".
+

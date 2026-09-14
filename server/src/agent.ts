@@ -312,17 +312,21 @@ export class Agent {
     const notes = [world ? "" : "no tool call is needed", chart ? "" : "no chart block"].filter(Boolean);
     // Blueprint requests are built in code; the model only explains the result (S14).
     const requested = !pasted.summaries.length && wantsBlueprint(question) ? this.blueprintFor(question, found?.items ?? []) : null;
+    // Rate targets get an exact plan computed in code; the model narrates it (S09).
+    const plan = requested ? null : this.planFor(question, found?.items ?? []);
+    const top = plan?.steps[0];
     const guided = requested
       ? `${noted}\n\n(${requested.build
         ? "A blueprint was built in code from the save's data and the player sees it with a copy button. In 60 words or fewer, using only the numbers in the generated blueprint line: what it makes, what to feed it on the input belt, that a pole must connect it to power, and that you can paste it as ghosts if they ask; no other calculations; no tool call (don't paste it until they ask); never write a blueprint string; no chart."
         : "The blueprint couldn't be built; in 40 words or fewer give the reason from the data and what request would work; no chart."})`
       : pasted.summaries.length
       ? `${noted}\n\n(Review from the checked summary in 90 words or fewer: lead with the total entity count and the main counts, then list every problem the checks found, or say they found none; for rates or bottlenecks use the throughput line's numbers; it isn't built, so offer no actions on its entities; no tool call or chart.)`
+      : top && notes.length
+      // The plan's own headline number goes in the guidance: answers sometimes listed inputs but skipped it (FC-114).
+      ? `${noted}\n\n(Answer from the computed plan in 80 words or fewer: start with ${top.machines}× ${top.machine} for ${plan!.perMinute}/min ${top.item}, then the inputs; ${notes.join(", ")}.)`
       : notes.length ? `${noted}\n\n(Answer from the data provided in 60 words or fewer; ${notes.join(", ")}.)` : noted;
     // Research questions get the live list of what can be queued right now (decided in code, not guessed).
     const researchLines = /\b(research\w*|tech\w*|unlock\w*|queue)\b/i.test(question) ? await this.researchOptions() : [];
-    // Rate targets get an exact plan computed in code; the model narrates it (S09).
-    const plan = requested ? null : this.planFor(question, found?.items ?? []);
     const planLines = plan ? [formatPlan(plan)] : requested ? [requested.line] : [];
     const unknown = pasted.summaries.length ? null : this.deps.retriever()?.unknownName(question);
     const unknownLines = unknown ? [`[save data: no item, fluid, recipe or building in this save is named "${unknown}"; if it's a nickname, ask which item they mean]`] : [];
