@@ -36,9 +36,10 @@
 - [x] FC-029 Helmet-rule test harness: every action fails when the player couldn't do it
   - Acceptance: scripted in-game checks on the dev save show `mark_deconstruction` refuses out-of-coverage targets and non-deconstructible entities
   - `bun scripts/test-helmet.ts`: 13/13 (find right/left, highlight, mark, undo item, already marked, cancel, character refused, unseen chunk refused, no destroy action)
-- [ ] FC-022 Measure large incoming RCON commands (blueprint-sized strings)
+- [x] FC-022 Measure large incoming RCON commands (blueprint-sized strings)
   - Notes: long commands may be split across ticks (PLAN §8 Q5)
   - Acceptance: measured time for 10 KB, 100 KB and 1 MB commands recorded in PLAN §8 Q5; limits written into the protocol
+  - Not segmented when hosting alone (1 MB arrives in ~32 ms), but JSON parsing costs ~14 ms per MB on the main thread. `MAX_COMMAND_BYTES = 48_000` enforced in `encodeCommand`
 
 ## Notes
 

@@ -505,6 +505,12 @@ judge by time to first token.
    - Long *incoming* RCON commands can be split across ticks (100 B/tick with remote peers) and
      overtaken by shorter ones. kovarex reports a 500k-character command took ~20 ms with no other
      players. **Measure with a large blueprint string before relying on it.**
+     **Measured 2026-09-14 (FC-022, `scripts/probes/inbound-size.ts`):** hosting alone, commands
+     aren't split. Round trip 17 ms for 10 KB, 14–21 ms for 100 KB, 32 ms for 1 MB, ~175 ms for 5 MB.
+     A small command sent right after a 1 MB one lands in the same tick. The real cost is JSON
+     parsing on the main thread: 0.16 ms per 10 KB, 1.5 ms per 100 KB, 14 ms per 1 MB, 71 ms per
+     5 MB. So commands are capped at 48 KB (`MAX_COMMAND_BYTES`), and larger payloads must be
+     split across ticks.
 
    **RCON trade-offs (accepted):**
    - Each session is hosted as a private multiplayer game (127.0.0.1, password, not public/LAN),

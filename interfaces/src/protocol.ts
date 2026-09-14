@@ -6,6 +6,15 @@ import { z } from "zod";
 
 export const PROTOCOL_VERSION = 1;
 
+/**
+ * Largest command the server sends. The mod parses JSON on the game's main thread: measured ~1.5 ms
+ * per 100 KB and 14 ms per 1 MB (FC-022), so 48 KB keeps a command under the 1 ms per-tick budget.
+ * Bigger payloads (large blueprints) must be split across ticks.
+ */
+export const MAX_COMMAND_BYTES = 48_000;
+
+export class CommandTooLargeError extends Error {}
+
 /** helpers.table_to_json writes an empty Lua table as {}; accept that wherever an array is expected. */
 export const luaArray = <T extends z.ZodType>(item: T) =>
   z.preprocess(
@@ -24,7 +33,10 @@ export const ReplySchema = z.object({
 export type Reply = z.infer<typeof ReplySchema>;
 
 export function encodeCommand(req: Request): string {
-  return `/companion ${JSON.stringify(req)}`;
+  const command = `/companion ${JSON.stringify(req)}`;
+  const bytes = Buffer.byteLength(command);
+  if (bytes > MAX_COMMAND_BYTES) throw new CommandTooLargeError(`Command for ${req.action} is ${bytes} bytes; the limit is ${MAX_COMMAND_BYTES}.`);
+  return command;
 }
 
 export function parseReply(raw: string): { reply: Reply; profile?: string } {

@@ -1,8 +1,12 @@
 import { expect, test } from "bun:test";
-import { DigestSchema, encodeCommand, parseReply } from "./index";
+import { DigestSchema, encodeCommand, MAX_COMMAND_BYTES, parseReply } from "./index";
 
 test("encodes a request as one /companion command", () => {
   expect(encodeCommand({ id: 3, action: "ping" })).toBe('/companion {"id":3,"action":"ping"}');
+});
+
+test("refuses commands over the size limit before they reach the game", () => {
+  expect(() => encodeCommand({ id: 1, action: "ping", args: { pad: "x".repeat(MAX_COMMAND_BYTES) } })).toThrow("the limit is");
 });
 
 test("parses a reply and the optional profile line", () => {
