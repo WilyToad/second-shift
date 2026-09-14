@@ -3,7 +3,7 @@
 // Uses mirrored mod folders in data/bench/, so the real mod-list.json is never touched.
 import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, copyFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { BINARY, MODS_DIR, USER_DIR, isFactorioRunning } from "./lib/factorio";
+import { MODS_DIR, USER_DIR, isFactorioRunning, spawnFactorio } from "./lib/factorio";
 
 const args = Bun.argv.slice(2);
 const flag = (name: string, fallback: number) => { const i = args.indexOf(name); return i >= 0 ? Number(args[i + 1]) : fallback; };
@@ -34,9 +34,10 @@ function mirrorMods(withCompanion: boolean): string {
 }
 
 async function bench(modDir: string): Promise<{ avg: number; min: number; max: number }[]> {
-  const proc = Bun.spawn([BINARY, "--benchmark", save, "--benchmark-ticks", String(ticks), "--benchmark-runs", String(runs), "--mod-directory", modDir, "--disable-audio"], { stdout: "pipe", stderr: "pipe" });
-  let out = await new Response(proc.stdout).text();
+  const logPath = join(benchDir, "benchmark-run.log");
+  const proc = spawnFactorio(["--benchmark", save, "--benchmark-ticks", String(ticks), "--benchmark-runs", String(runs), "--mod-directory", modDir, "--disable-audio"], { logPath });
   await proc.exited;
+  let out = await Bun.file(logPath).text();
   // If Steam relaunched the game, output lands in the log instead of our pipe.
   while (isFactorioRunning()) await Bun.sleep(1000);
   if (!/avg:/.test(out)) out = await Bun.file(join(USER_DIR, "factorio-current.log")).text();

@@ -1,4 +1,5 @@
 // Paths and helpers for the local Steam install of Factorio on macOS.
+import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +10,23 @@ export const SAVES_DIR = join(USER_DIR, "saves");
 export const APP_DIR = join(homedir(), "Library/Application Support/Steam/steamapps/common/Factorio/factorio.app");
 export const BINARY = join(APP_DIR, "Contents/MacOS/factorio");
 export const RUNTIME_API_JSON = join(APP_DIR, "Contents/doc-html/runtime-api.json");
+
+/** Factorio's Steam app id. */
+export const STEAM_APP_ID = "427520";
+
+/**
+ * Starts the Factorio binary without Steam's relaunch. Launched directly, the Steam API restarts the
+ * game through Steam, which shows a "Launch Game with custom arguments" confirmation every time.
+ * A steam_appid.txt in the working directory is the Steamworks-supported way to skip that restart;
+ * we keep it in data/steam-launch/ so the Steam install isn't modified. Steam must still be running.
+ */
+export function spawnFactorio(args: string[], opts: { logPath?: string; wait?: boolean } = {}) {
+  const dir = join(import.meta.dir, "../../data/steam-launch");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "steam_appid.txt"), STEAM_APP_ID);
+  const out = opts.logPath ? Bun.file(opts.logPath) : "ignore";
+  return Bun.spawn([BINARY, ...args], { cwd: dir, stdio: ["ignore", out, out] });
+}
 
 export function isFactorioRunning(): boolean {
   const r = Bun.spawnSync(["pgrep", "-f", "factorio.app/Contents/MacOS/factorio"]);

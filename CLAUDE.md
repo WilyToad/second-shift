@@ -102,7 +102,9 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
     silently dropped; round trip ~45 ms; packets are lost while paused or saving. There's an
     unverified report of a macOS `send_udp` crash.
   - The game rewrites `config.ini` on exit. Edit it only with the game closed, or use `--config`.
-- Launching the binary directly makes Steam relaunch the game; arguments are kept.
+- Launch Factorio through `spawnFactorio()` (`server/src/factorio.ts`). Launched directly, Steam restarts the
+  game and shows a "Launch Game with custom arguments" prompt every time. Starting it from a working directory
+  containing `steam_appid.txt` (427520) skips that restart. Steam must still be running.
 - `--dump-icon-sprites` writes every icon, modded ones included, as PNGs and exits.
   Use it as the web app's icon source.
 - `--benchmark`, `--benchmark-ticks`, `--benchmark-runs` measure UPS cost on a save copy.

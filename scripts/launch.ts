@@ -3,7 +3,7 @@
 //   --dev  no autosaves (use for save copies in data/ so your autosave slots aren't overwritten)
 import { existsSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { BINARY, isFactorioRunning, readRconSettings, waitForPort } from "./lib/factorio";
+import { isFactorioRunning, readRconSettings, spawnFactorio, waitForPort } from "./lib/factorio";
 import { RconClient } from "../server/src/rcon";
 
 const args = Bun.argv.slice(2);
@@ -45,9 +45,10 @@ if (!existsSync(settingsPath)) {
 }
 
 console.log(`Hosting ${save}${dev ? " (dev: no autosaves)" : ""}…`);
-// Steam relaunches the game as a new process; don't tie its lifetime to this script.
+// Started without Steam's relaunch (no "custom arguments" prompt); don't tie its lifetime to this script.
 // Note: the client ignores --bind when hosting; the game port listens on all interfaces (password-protected).
-Bun.spawn([BINARY, "--host", save, "--server-settings", settingsPath], { stdio: ["ignore", "ignore", "ignore"] }).unref();
+const launchLog = join(dataDir, "factorio-launch.log");
+spawnFactorio(["--host", save, "--server-settings", settingsPath], { logPath: launchLog }).unref();
 
 const t0 = Date.now();
 if (!(await waitForPort(rcon.host, rcon.port, 180_000))) {
@@ -60,5 +61,8 @@ client.close();
 if (!reply.ok) {
   console.error("RCON is up but the mod didn't answer:", reply);
   process.exit(1);
+}
+if (/requires game restart/i.test(await Bun.file(launchLog).text().catch(() => ""))) {
+  console.warn("Note: Steam relaunched the game anyway, so its launch prompt may have appeared.");
 }
 console.log(`Ready after ${((Date.now() - t0) / 1000).toFixed(1)} s: protocol ${reply.data.protocol}, mod ${reply.data.mod_version}, base ${reply.data.game_version}, tick ${reply.data.tick}`);
