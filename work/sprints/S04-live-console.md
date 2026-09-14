@@ -11,13 +11,15 @@
 - [x] FC-020 `events` action: ring buffer of urgent events with "since N" polling
   - Acceptance: server polls every ~250 ms; no event lost across polls; cost measured with the profiler
   - `scripts/events.lua`: urgent alert types sampled every 30 ticks (rises only) + `on_research_finished`, 200-event ring buffer. Poll costs 0.03–0.04 ms; research and destroyed-wall events arrived within 469 ms (`scripts/probes/events-ingame.ts`). Server reports gaps as `dropped`
-- [ ] FC-021 Alert feed in the web page
+- [x] FC-021 Alert feed in the web page
   - Acceptance: alerts appear within ~1 s of the event; severity, surface and count shown; no polling from the page
+  - Alert feed (newest first, severity stripe, surface, position, age) fed by `events` messages; recent events replayed to pages that connect later. `scripts/e2e-console.ts`: in-game alert reached the page in 307–424 ms
 - [x] FC-041 Choose a UI framework for the console
   - Acceptance: decision and reasoning recorded in PLAN §4; the chat page ported to it with no loss of function
   - Preact + @preact/signals (PLAN §4). Chat ported (`store.ts`, `chat.tsx`, `main.tsx`) with a "New conversation" button; happy-dom render test; rails e2e still 6/6
-- [ ] FC-040 Full web console per the mockup
+- [x] FC-040 Full web console per the mockup
   - Acceptance: three-column layout from the mockup (alerts | chat | live state), stacks on narrow screens; live state from the digest stream
+  - `console.tsx`: alerts | chat | live state (per-surface tabs, top produced with sparklines, science now/10 h with stall flag, research) from streamed digests and server-built series. DOM-tested with happy-dom; the narrow-screen layout isn't checked visually (no browser overnight)
 - [ ] FC-042 Visual component renderer and `rate_chart`
   - Acceptance: server keeps snapshot history per item; the model emits a terse `rate_chart` spec; the page draws it from history, not from model numbers
 

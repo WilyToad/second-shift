@@ -7,6 +7,7 @@ import type { ClientMessage, ServerMessage } from "./messages";
 import { OmlxClient, readOmlxApiKey } from "./model";
 import { buildMessages, systemPrompt, userTurn } from "./prompt";
 import { RecipeRetriever } from "./retrieval";
+import { buildSeries } from "./series";
 
 export type { ClientMessage, ServerMessage } from "./messages";
 
@@ -48,6 +49,11 @@ const server = Bun.serve({
     open(ws) {
       ws.subscribe("chat");
       ws.send(JSON.stringify(statusMessage()));
+      const latest = game.latest();
+      if (latest) {
+        ws.send(JSON.stringify({ type: "series", series: buildSeries(game.history()) } satisfies ServerMessage));
+        ws.send(JSON.stringify({ type: "digest", digest: latest.digest, receivedAt: latest.receivedAt } satisfies ServerMessage));
+      }
       const recent = game.events();
       if (recent.length) ws.send(JSON.stringify({ type: "events", events: recent } satisfies ServerMessage));
     },
@@ -89,7 +95,14 @@ async function warmUp(): Promise<void> {
   broadcast(statusMessage());
 }
 
-game.onStatus(() => broadcast(statusMessage()));
+let lastDigestSent: Snapshot | undefined;
+game.onStatus((s) => {
+  broadcast(statusMessage());
+  if (s.latest && s.latest !== lastDigestSent) {
+    lastDigestSent = s.latest;
+    broadcast({ type: "digest", digest: s.latest.digest, receivedAt: s.latest.receivedAt });
+  }
+});
 game.onEvents((events, dropped) => broadcast({ type: "events", events, ...(dropped ? { dropped } : {}) }));
 // New prototype data changes the system prompt, so rebuild retrieval and re-warm the cache.
 game.onPrototypes((p) => {

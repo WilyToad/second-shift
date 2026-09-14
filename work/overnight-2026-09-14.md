@@ -22,3 +22,6 @@ Times are commit times (local).
 - 23:33 S03 closed (review written; FC-027/FC-028 player checks pending). S04 "Live console" planned and activated under the night's delegation: FC-020, FC-021, FC-041, FC-040, FC-042.
 - FC-020 done: urgent events ring buffer in the mod, server polls every 250 ms, forwards to the page. In-game: research completion and a destroyed wall both arrived within 469 ms; poll cost 0.03–0.04 ms. Hosted-game quit doesn't save, so `data/saves/dev.zip` stays pristine (checked).
 - FC-041 done: Preact + signals chosen and the chat page ported (no feature loss, plus a "New conversation" button). DOM test via happy-dom; rails e2e still 6/6.
+- FC-040 + FC-021 done: three-column console (alerts | chat | live state) with sparklines and a stalled-science flag. In-game alert reached the page in 307–424 ms.
+- **Bug found and fixed:** after FC-020 the digest's production data was empty. `script.on_nth_tick(30, …)` in the events module silently replaced the rate refresher registered for the same interval. Added `util.on_nth_tick` (shared dispatcher) and a gotcha note in CLAUDE.md. The console e2e now requires non-empty production data.
+- **Review:** the page layout hasn't been looked at in a real browser. Please open http://127.0.0.1:5170 (it needs `bun run start` and the game hosted) and check how it looks at your monitor size.

@@ -68,7 +68,7 @@ return function(handlers)
     rate_cache[job.surface.name] = entry
   end
 
-  script.on_nth_tick(REFRESH_EVERY_TICKS, refresh_step)
+  util.on_nth_tick(REFRESH_EVERY_TICKS, refresh_step)
 
   handlers.digest = function()
     local force = game.forces.player

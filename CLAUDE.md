@@ -68,6 +68,8 @@ Most Factorio Lua online (and in model training data) targets 1.1. In 2.0:
 - `game.recipe_prototypes` / `game.technology_prototypes` / `game.item_prototypes` → `prototypes.recipe` / `prototypes.technology` / `prototypes.item`
 - `info.json` needs `"factorio_version": "2.0"`
 - Use `script.on_nth_tick` for periodic export. 60 ticks = 1 s.
+- `script.on_nth_tick(n, f)` and `script.on_event(e, f)` *replace* any earlier handler for the same n or event.
+  Register periodic work through `util.on_nth_tick` in the mod.
 - Lua gotcha: `x and f(x) or default` returns `default` whenever `f(x)` is nil or false. Use an explicit `if`.
 - `helpers.table_to_json` writes empty tables as `{}`. Parse replies through the `interfaces` schemas.
 

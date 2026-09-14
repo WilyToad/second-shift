@@ -1,6 +1,8 @@
 // Page state as signals, fed by the server's WebSocket. Components read these; only this file writes.
 import { signal, type Signal } from "@preact/signals";
+import type { Digest, GameEvent } from "@companion/interfaces";
 import type { ClientMessage, ServerMessage } from "../../server/src/messages";
+import type { Point, SeriesMap } from "../../server/src/series";
 
 export type ThreadItem =
   | { kind: "user"; key: number; text: string }
@@ -14,6 +16,13 @@ type Status = Extract<ServerMessage, { type: "status" }>;
 export const status = signal<Status | null>(null);
 export const connected = signal(false);
 export const thread = signal<ThreadItem[]>([]);
+export const events = signal<GameEvent[]>([]);
+export const droppedEvents = signal(0);
+export const digest = signal<{ digest: Digest; receivedAt: number } | null>(null);
+export const series = signal<SeriesMap>({});
+
+const MAX_EVENTS = 100;
+const MAX_POINTS = 360;
 
 let keys = 0;
 let streaming: Extract<ThreadItem, { kind: "agent" }> | null = null;
@@ -67,8 +76,27 @@ export function onMessage(m: ServerMessage): void {
       thread.value = [];
       streaming = null;
       break;
-    case "events":
-      break; // shown by the alert feed (FC-021)
+    case "events": {
+      const seen = new Set(events.value.map((e) => e.seq));
+      events.value = [...events.value, ...m.events.filter((e) => !seen.has(e.seq))].slice(-MAX_EVENTS);
+      if (m.dropped) droppedEvents.value += m.dropped;
+      break;
+    }
+    case "series":
+      series.value = m.series;
+      break;
+    case "digest": {
+      digest.value = { digest: m.digest, receivedAt: m.receivedAt };
+      // Extend the series with this snapshot, the same way the server builds them.
+      const next: SeriesMap = { ...series.value };
+      const add = (key: string, v: number) => { const pts: Point[] = [...(next[key] ?? []), { t: m.receivedAt, v }]; next[key] = pts.slice(-MAX_POINTS); };
+      for (const s of m.digest.surfaces) {
+        for (const r of s.produced) add(`${s.name}/produced/${r.name}`, r.per_minute);
+        for (const r of s.science) add(`${s.name}/science/${r.name}`, r.per_minute);
+      }
+      series.value = next;
+      break;
+    }
   }
 }
 

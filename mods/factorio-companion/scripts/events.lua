@@ -60,7 +60,7 @@ local function sample_alerts()
 end
 
 return function(handlers)
-  script.on_nth_tick(SAMPLE_EVERY_TICKS, sample_alerts)
+  util.on_nth_tick(SAMPLE_EVERY_TICKS, sample_alerts)
 
   script.on_event(defines.events.on_research_finished, function(e)
     if e.research.force.name ~= "player" then return end
