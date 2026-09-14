@@ -32,6 +32,42 @@ export type TurnRecord = {
 };
 
 const MAX_TOOL_ROUNDS = 3;
+/** Estimated history size that triggers compaction (FC-076). ~2.8 characters per token measured. */
+const HISTORY_BUDGET_TOKENS = 8000;
+const KEEP_RECENT_TURNS = 2;
+const CHARS_PER_TOKEN = 2.8;
+const TAIL_MARKERS = ["\n\n[recipes and technologies from this save]", "\n\n[game state", "\n\n(Answer from the data provided"];
+
+/** A user turn without its bulky, now-stale data: retrieved lines, snapshot and guidance notes. */
+export function compactUserContent(content: string): string {
+  const cut = Math.min(...TAIL_MARKERS.map((m) => content.indexOf(m)).filter((i) => i >= 0), content.length);
+  return content.slice(0, cut);
+}
+
+/**
+ * Compacts all but the most recent turns once history passes the budget. Older user turns keep only
+ * the question; older tool results keep their first sentence. Returns null when nothing needs doing.
+ */
+export function compactHistory(history: ChatMessage[], budgetTokens = HISTORY_BUDGET_TOKENS, keepTurns = KEEP_RECENT_TURNS): { history: ChatMessage[]; beforeTokens: number; afterTokens: number } | null {
+  const size = (msgs: ChatMessage[]) => Math.round(msgs.reduce((n, m) => n + m.content.length, 0) / CHARS_PER_TOKEN);
+  const beforeTokens = size(history);
+  if (beforeTokens <= budgetTokens) return null;
+  const userIdx = history.flatMap((m, i) => (m.role === "user" ? [i] : []));
+  const keepFrom = userIdx.length > keepTurns ? userIdx[userIdx.length - keepTurns]! : 0;
+  if (keepFrom === 0) return null;
+  const older = history.slice(0, keepFrom).map((m): ChatMessage => {
+    if (m.role === "user") return { ...m, content: compactUserContent(m.content) };
+    if (m.role === "tool") return { ...m, content: m.content.split(/(?<=\.)\s/)[0] ?? m.content };
+    return m;
+  });
+  const alreadyNoted = older[0]?.role === "user" && older[0].content.startsWith("[earlier turns compacted");
+  const note: ChatMessage[] = alreadyNoted ? [] : [{ role: "user", content: "[earlier turns compacted: recipe lines and game state removed to keep the conversation fast]" }, { role: "assistant", content: "Understood." }];
+  const next = [...note, ...older, ...history.slice(keepFrom)];
+  const afterTokens = size(next);
+  // Already compacted and the recent turns alone exceed the budget: nothing to gain, and rewriting would only break the cache.
+  if (afterTokens >= beforeTokens) return null;
+  return { history: next, beforeTokens, afterTokens };
+}
 const RESULT_TTL_MS = 10 * 60_000;
 const HIGHLIGHT_SECONDS = 60;
 
@@ -198,6 +234,7 @@ export class Agent {
           record.visibleTtftMs = ttftMs;
           record.totalMs = performance.now() - started;
           this.logTurn(record);
+          await this.compactIfNeeded();
           this.deps.emit({
             type: "done", ttftMs, totalMs: performance.now() - started,
             promptTokens: result.usage?.prompt_tokens, cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens, completionTokens: result.usage?.completion_tokens,
@@ -212,7 +249,25 @@ export class Agent {
     }
   }
 
+  /** Trims old turns past the budget, then re-warms the cache so the next question doesn't pay for it. */
+  private async compactIfNeeded(): Promise<void> {
+    const result = compactHistory(this.history);
+    if (!result) return;
+    this.history.splice(0, this.history.length, ...result.history);
+    const started = performance.now();
+    try {
+      await this.deps.model.stream(buildMessages(this.deps.system(), this.history, userTurn("Reply with OK.")), { maxTokens: 1, tools: TOOLS });
+    } catch {
+      // Warming is an optimization; the next question just pays the prefill instead.
+    }
+    this.logLine({ kind: "compaction", at: new Date(this.now()).toISOString(), beforeTokens: result.beforeTokens, afterTokens: result.afterTokens, warmMs: performance.now() - started });
+  }
+
   private logTurn(record: TurnRecord): void {
+    this.logLine(record);
+  }
+
+  private logLine(record: object): void {
     if (!this.deps.turnLog) return;
     try {
       mkdirSync(dirname(this.deps.turnLog), { recursive: true });

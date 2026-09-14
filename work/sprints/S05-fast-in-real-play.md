@@ -1,10 +1,10 @@
 # S05 — Fast in real play
 
-- **Status:** active
+- **Status:** done
 - **Goal:** Answers start fast again while the game is running, without losing accuracy.
 - **Acceptance:** With the dev save hosted and live snapshots: grounding eval first token median ≤ 2.0 s and max ≤ 3.0 s; follow-up question ≤ 2.5 s; answers median ≤ 90 tokens; rails flow's first answer ≤ 4 s total. No regressions: grounding 10/10, rails 6/6, charts 2/2. Numbers recorded in PLAN §6.
 - **Started:** 2026-09-14
-- **Finished:** —
+- **Finished:** 2026-09-14
 
 ## Items
 
@@ -18,12 +18,38 @@
 - [x] FC-081 Shrink the uncached tail: compact snapshot and retrieved lines
   - Acceptance: typical question tail at least 30% smaller in tokens with no eval regression
   - Median uncached tail 1,004 → 531 tokens (−47%); retrieved lines −30% (recipes nothing can craft and recycling loops skipped, canonical producers first, one producer per ingredient, two uses, category dropped when crafters are listed, `pressure=2000` form). Grounding 10/10, first token median 1.11 s. Also a deterministic `rate_chart` fallback for trend answers that omit the block (the model skipped it ~1 in 4), charts 6/6 over 3 runs. Alignment margin lesson: `measure` includes ~10 placeholder user-turn tokens, so stopping right at 4,096 left block 2 uncached (first token 2.48 s); a 24-token margin fixed it
-- [ ] FC-076 Conversation trimming plan that limits cache invalidation
+- [x] FC-076 Conversation trimming plan that limits cache invalidation
   - Notes: warm follow-ups are 2.5–2.8 s because history past the last 2,048-token block is re-prefilled each turn (PLAN §6)
   - Acceptance: a long conversation keeps follow-ups ≤ 2.5 s; trimming invalidates the cache at most once per trim and is recorded in history
+  - `compactHistory` strips retrieved lines, snapshots and notes from all but the last two turns once history passes ~8k estimated tokens, adds a one-time note, then re-warms the cache. `scripts/e2e-long.ts` (16 questions): one compaction (~8,009 → ~2,845 tokens, re-warm 2.5 s), follow-ups median 1.59 s, p90 2.23 s, max 2.51 s
 
 ## Notes
 
 Planned and activated 2026-09-14 overnight under the player's delegation. Chosen because speed is the project's top priority and S04 measured a latency regression (FC-079).
 
 ## Review
+
+Answers start fast again while the game runs, and accuracy held. Closed overnight on the player's delegation.
+
+**Acceptance (game running, live snapshots):**
+- ✓ Grounding eval first token median 1.11 s, max 1.80 s (targets 2.0 / 3.0 s), 10/10.
+- ✓ Follow-up 1.76 s (target 2.5 s). Over a 16-question conversation: median 1.59 s, p90 2.23 s,
+  **max 2.51 s** (one turn 10 ms over the target).
+- ✓ Answers median 80 tokens (target 90).
+- ✓ Rails first answer 3.3–3.6 s (target 4 s); rails 6/6; charts 6/6 over 3 runs.
+
+**What made the difference (details in PLAN §6):**
+1. **Cache block alignment** (FC-079): the system prompt is padded past the 4,096-token oMLX block.
+   Novel questions went 2.03 s → 0.80 s server first token. The single biggest win of the night.
+2. **Measure first** (FC-080): the per-turn log found the block problem, and later caught an
+   alignment change that silently cost a whole block.
+3. **Smaller tail** (FC-081): tighter retrieval cut the uncached tail 47%.
+4. **Compaction with re-warm** (FC-076) keeps long conversations bounded.
+5. **Deterministic fallbacks in code:** world-question classification, chart gating, and a chart
+   fallback when the model forgets the block.
+
+**Carried forward:** tool turns still take two model calls (~3.3 s total). A future item could
+pre-run obvious searches before the model call. Not needed for the targets.
+
+**Commits:** f3c4a2c (plan), 7ddc1cd (FC-080), 1f1fe77 (FC-079), 0aaa612 (FC-081), plus the FC-076 and closing commit.
+

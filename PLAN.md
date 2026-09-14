@@ -394,7 +394,14 @@ brought the same novel questions to **0.80 s**. The server now does this automat
 and whenever prototypes change (`alignToCacheBlock`, measured through oMLX, so the template's own
 tokens count). With a 60-word answer limit, the S05 suite with the game running: first token median
 1.23 s, max 1.92 s; follow-up 2.39 s; answers median 90 tokens; tool turns ~3.3 s (two model calls).
-Per-turn breakdowns: `data/eval/turns.jsonl` → `scripts/latency-report.ts`. Conversation trimming (FC-076) and block-aware prompt layout are the next levers.
+Per-turn breakdowns: `data/eval/turns.jsonl` → `scripts/latency-report.ts`.
+
+**Final S05 numbers (2026-09-14, game running):** after tighter retrieval (uncached tail 1,004 → 531
+tokens) and conversation compaction (history over ~8k estimated tokens loses old recipe lines and
+snapshots, then the cache is re-warmed), first token median 1.11 s and max 1.80 s; follow-ups in a
+16-question conversation median 1.59 s, p90 2.23 s, max 2.51 s. When aligning, the measured prefix
+includes the probe's placeholder user turn (~10 tokens), so alignment keeps a 24-token margin.
+Aligning exactly to 4,096 cost a whole block (first token 2.48 s). Conversation trimming (FC-076) and block-aware prompt layout are the next levers.
 ---
 
 ## 7. Phases

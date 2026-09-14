@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { ActionName } from "@companion/interfaces";
 import { DigestSchema } from "@companion/interfaces";
-import { Agent, fallbackChart, needsWorldTools, wantsChart, type GameActions } from "./agent";
+import { Agent, compactHistory, fallbackChart, needsWorldTools, wantsChart, type GameActions } from "./agent";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
 
@@ -114,4 +114,19 @@ test("fallback chart picks the asked-about item on the named surface", () => {
   expect(fallbackChart("Is my iron plate production on the factory floor holding steady?", ["iron-plate"], digest)).toContain("item=iron-plate surface=nauvis-factory-floor");
   expect(fallbackChart("is iron plate holding steady?", ["iron-plate"], digest)).toContain("surface=nauvis-factory-floor"); // busiest when not named and not on player's surface
   expect(fallbackChart("is bioflux steady?", ["bioflux"], digest)).toBeNull();
+});
+
+test("compaction strips stale data from older turns, keeps recent turns intact, and notes it once", () => {
+  const turn = (i: number): ChatMessage[] => [
+    { role: "user", content: `question ${i}\n\n[recipes and technologies from this save]\n${"recipe line\n".repeat(200)}\n\n[game state at tick ${i}]\n${"state\n".repeat(100)}` },
+    { role: "assistant", content: `answer ${i}` },
+  ];
+  const history = Array.from({ length: 12 }, (_, i) => turn(i)).flat();
+  const result = compactHistory(history, 2000, 2)!;
+  expect(result.afterTokens).toBeLessThan(result.beforeTokens / 3);
+  expect(result.history[0]!.content).toStartWith("[earlier turns compacted");
+  expect(result.history[2]).toEqual({ role: "user", content: "question 0" });
+  expect(result.history.at(-4)).toEqual(history.at(-4)); // second-to-last turn untouched
+  expect(result.history.at(-2)).toEqual(history.at(-2));
+  expect(compactHistory(result.history, 2000, 2)).toBeNull(); // nothing more to do right after
 });
