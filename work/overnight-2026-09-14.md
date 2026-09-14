@@ -48,3 +48,4 @@ Times are commit times (local).
 - S09 "Production planning" planned and activated (delegated): FC-094 ratio calculator, FC-095 plans in rate questions, FC-043 recipe_graph, FC-096 ratio eval (FC-047 folded in).
 - FC-094 done: ratio calculator from the save's recipes; the dump gained a raw-resource list after the first version expanded iron ore through asteroid crushing.
 - **S09 closed**: production planning. Ratio eval 8/8 twice against an independent reference (vanilla, Gleba, maraxsis); plans drawn as a recipe graph; all suites pass. Follow-ups 2.25–2.44 s, close to the 2.5 s target.
+- S10 "Accurate plans" planned and activated (delegated): FC-098 productivity in plans, FC-099 refresh on research, FC-100 eval reference with productivity, FC-075 paused detection.

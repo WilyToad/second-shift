@@ -8,7 +8,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 ## Phase 3 — Pleasant console and more actions
 
 - [ ] FC-097 Throughput analysis of a blueprint (machines vs belt and inserter limits)
-- [ ] FC-098 Modules, beacons and productivity bonuses in production plans
 - [ ] FC-044 `layout_sketch` component with copyable blueprint string
 - [ ] FC-046 Blueprint selection tool in the mod
 - [ ] FC-048 Template-based blueprint creation
@@ -35,4 +34,3 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 - [ ] FC-070 Find or build a heavier benchmark save (megabase scale)
 - [ ] FC-071 Resolve the "Factorio Companion" name clash with ob1-s/factorio-AI-coop
 - [ ] FC-072 Close the hosted game port to the LAN (macOS firewall or another approach)
-- [ ] FC-075 Detect a paused game or open menu in the digest
