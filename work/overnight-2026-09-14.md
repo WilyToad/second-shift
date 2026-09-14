@@ -5,7 +5,7 @@ Nothing is pushed; only the dev save copy runs; manual checks are left for the p
 
 ## For the player to review in the morning
 
-- [ ] FC-027: press Ctrl+Z in-game after an agent deconstruction mark and confirm the marks disappear
+- [x] FC-027: press Ctrl+Z in-game after an agent deconstruction mark and confirm the marks disappear (verified with the player: one Ctrl+Z removed all 4 marks)
 - [ ] FC-028: in remote view, try a deconstruction drag over fog of war (charted but not in radar range) and over unexplored map; tell me what the game allows
 - [ ] FC-092: when you search "near me" from remote view, should that mean where your character stands or where you're looking?
 - [ ] Visual check: open http://127.0.0.1:5170 (after `bun run launch -- --dev` and `bun run start`) and look at the console layout, the blueprint sketch card and the screenshot card at your monitor size

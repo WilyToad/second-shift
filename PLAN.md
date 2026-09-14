@@ -641,8 +641,11 @@ judge by time to first token.
 9. **Undo.** Do actions passed `player` / `undo_index` really land on the player's Ctrl+Z history,
    and does Ctrl+Z reverse them? Verify with deconstruction marks first.
    **2026-09-13:** yes for the history. `order_deconstruction(force, player, 0 then 1)` on 8 rails
-   added one undo item holding 8 `removed-entity` actions, like one planner drag. Waiting for the
-   player to confirm Ctrl+Z restores them.
+   added one undo item holding 8 `removed-entity` actions, like one planner drag.
+   **2026-09-14, player-verified:** one Ctrl+Z removed all 4 marks the mod had placed on belts to the
+   player's right (`scripts/check-undo.ts`). Two things to know: Ctrl+Z undoes the newest action first, so
+   anything the player did after the companion's marks is undone before them; and if construction robots
+   carry out the marks first, the undo entry becomes "put the removed entities back" (ghosts).
 10. **Exact remote-view rules.** What does 2.0 let a player do remotely (radar coverage vs merely
     charted; which entity settings can be changed)? Action checks must match exactly.
     **2026-09-13:** no authoritative source found. The API's `deconstruct_area` defaults to

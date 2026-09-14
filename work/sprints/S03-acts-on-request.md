@@ -24,9 +24,10 @@
 - [x] FC-026 `mark_deconstruction` / `cancel_deconstruction` attributed to the player
   - Acceptance: marks exactly the previewed entities; re-checks the helmet rule when it runs; rejects anything a player couldn't mark
   - Checks in `scripts/helmet.lua` (own force or neutral trees/rocks, not-deconstructable flag, minable, visible chunk); 0.14 ms for 8
-- [!] FC-027 Verify undo for agent actions (PLAN §8 Q9)
+- [x] FC-027 Verify undo for agent actions (PLAN §8 Q9)
   - Acceptance: the action appears on `player.undo_redo_stack`; the player confirms Ctrl+Z restores the marks
-  - Automated part verified: marking 8 rails adds one undo item with 8 `removed-entity` actions (same as one planner drag). Waiting for the player to press Ctrl+Z in-game
+  - Automated part verified: marking 8 rails adds one undo item with 8 `removed-entity` actions (same as one planner drag)
+  - Player-verified 2026-09-14: the mod marked the 4 belts to the player's right (outside robot coverage); one Ctrl+Z removed all 4 marks. A first attempt inside robot coverage showed the two catches noted in PLAN §8 Q9 (newer player actions undo first; robots can carry out marks before Ctrl+Z)
 - [x] FC-078 Model proposes actions through tool calls; "them" resolves to the last query result
   - Acceptance: the model calls a named action with arguments; the server validates it against the action list and the remembered query result before anything reaches the game
   - `server/src/agent.ts` (unit-tested with a fake model and game) and `scripts/e2e-rails.ts`: 6/6 with the real model and game. World questions are classified in code (`needsWorldTools`); the model otherwise called find_entities on 4/10 recipe questions
@@ -57,7 +58,7 @@ of war).
   (`scripts/e2e-rails.ts`, real model and game, 6/6).
 - ✓ "Mark them for deconstruction" → approval card, nothing marked until approval, then 8/8 marked.
 - ✓ The action lands on the player's undo stack as one item (8 `removed-entity` actions).
-  **Pending:** the player pressing Ctrl+Z.
+  ✓ Player-verified 2026-09-14: one Ctrl+Z removed the marks.
 - ✓ Refusals: "delete them instantly" (no such tool; model offers the planner route), the character,
   an entity in an unseen chunk (`scripts/test-helmet.ts`, 13/13).
 - ✓ Profiler: find 0.13 ms, highlight 0.10 ms, mark 0.14 ms for 8 entities.
