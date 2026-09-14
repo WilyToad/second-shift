@@ -1,6 +1,7 @@
 // FC-106 through the real server: a pasted build with a known answer. Needs bun run start + the dev save hosted.
 // Expected numbers come from the save's own data via blueprintThroughput, so research on the save can't break it.
 import { encodeCommand, parseReply, PrototypesSchema } from "../interfaces/src/index";
+import { asChecks, saveEvalRun } from "./lib/eval-log";
 import { BlueprintSchema, encodeBlueprintString } from "../server/src/blueprint";
 import { blueprintThroughput } from "../server/src/blueprint-throughput";
 import type { ServerMessage } from "../server/src/messages";
@@ -34,6 +35,7 @@ const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) 
 };
 await until((m) => m.type === "status" && m.model.state === "ready", 120_000);
 const results: [string, boolean, string][] = [];
+const answers: Record<string, string> = {};
 const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
 const has = (text: string, n: number) => new RegExp(`\\b${n.toLocaleString("en-US").replace(",", ",?")}\\b`).test(text);
 
@@ -46,12 +48,14 @@ for (let run = 1; run <= RUNS; run++) {
   await until((m) => m.type === "done" || m.type === "error", 120_000, from);
   const answer = got.slice(from).filter((m) => m.type === "token").map((m: any) => m.text).join("").trim();
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
+  answers[`run ${run}`] = answer;
   check(`run ${run}: circuits per minute (${circuits})`, has(answer, circuits), `${answer.slice(0, 500)} [${seconds} s]`);
   check(`run ${run}: copper and iron plate per minute (${copper}, ${iron})`, has(answer, copper) && has(answer, iron));
   check(`run ${run}: names the slow inserter`, t.limits.length > 0 && /inserter/i.test(answer));
   check(`run ${run}: no chart for a build that isn't running`, !answer.includes("```rate_chart"));
 }
 ws.close();
+await saveEvalRun("throughput", asChecks(results), answers);
 const failed = results.filter((r) => !r[1]).length;
 console.log(`\n${results.length - failed}/${results.length} passed`);
 process.exit(failed ? 1 : 0);

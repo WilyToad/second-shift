@@ -1,6 +1,7 @@
 // S06 acceptance through the real server: review a real blueprint and a deliberately broken copy.
 // Needs bun run start + the dev save hosted.
 import { blueprintsIn, decodeBlueprintString, encodeBlueprintString } from "../server/src/blueprint";
+import { asChecks, saveEvalRun } from "./lib/eval-log";
 import type { ServerMessage } from "../server/src/messages";
 import { connectDevGame } from "./lib/devgame";
 
@@ -55,7 +56,7 @@ check("original: the chat shows a placeholder, not the raw string", !good.user.i
 const sketch = got.find((m) => m.type === "blueprint" && m.blueprint.string === original);
 check("original: the page gets a layout sketch with the original string to copy", sketch?.type === "blueprint" && sketch.blueprint.sketch.length === bp.entities.length, sketch?.type === "blueprint" ? `${sketch.blueprint.sketch.length} entities drawn, ${sketch.blueprint.width}×${sketch.blueprint.height} tiles` : "no card");
 check(`original: answer has the entity total and the top count (${topName} ${topCount})`, good.answer.includes(String(bp.entities.length)) && good.answer.includes(String(topCount)), good.answer.trim().slice(0, 400));
-check("original: no invented problems", !/quantum|can't craft|cannot craft|\b(overlap|overlaps) (at|on)\b|problems? (found|:)|issues?:/i.test(good.answer), good.answer.trim().slice(0, 200));
+check("original: no invented problems", !/quantum|can't craft|cannot craft|\b(overlap|overlaps) (at|on)\b|problems? (found|:)|issues?:/i.test(good.answer), good.answer.trim());
 
 const bad = await ask(`Anything wrong with this one? ${brokenString}`);
 check("broken: names the unknown entity", /quantum-widget-assembler|quantum widget/i.test(bad.answer), bad.answer.trim().slice(0, 500));
@@ -65,6 +66,7 @@ check("broken: names the overlap", /overlap/i.test(bad.answer));
 const turns = (await Bun.file(new URL("../data/eval/turns.jsonl", import.meta.url)).text()).trim().split("\n").slice(-2).map((l) => JSON.parse(l));
 check("the raw strings never reached the model prompt", turns.every((t) => t.chars.question < 4000), `question sizes ${turns.map((t) => t.chars.question).join(", ")} chars (strings were ${original.length} and ${brokenString.length})`);
 ws.close();
+await saveEvalRun("blueprint", asChecks(results), { original: good.answer, broken: bad.answer });
 const failed = results.filter((r) => !r[1]).length;
 console.log(`\n${results.length - failed}/${results.length} passed`);
 process.exit(failed ? 1 : 0);

@@ -2,6 +2,7 @@
 // independent reference below (hardcoded recipe and machine per question, arithmetic from the dump),
 // not from server/src/planner.ts.
 import { PrototypesSchema } from "../interfaces/src/index";
+import { saveEvalRun } from "./lib/eval-log";
 import type { ServerMessage } from "../server/src/messages";
 
 const p = PrototypesSchema.parse((await Bun.file(new URL("../data/cache/prototypes.json", import.meta.url)).json()).data);
@@ -44,6 +45,8 @@ await until((m) => m.type === "status" && m.model.state === "ready", 120_000);
 
 const near = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.02 * Math.abs(b), 0.011);
 let passed = 0;
+const logged: { name: string; ok: boolean; detail: string }[] = [];
+const answers: Record<string, string> = {};
 for (const c of cases) {
   ws.send(JSON.stringify({ type: "reset" }));
   await until((m) => m.type === "reset", 5000, got.length);
@@ -61,8 +64,11 @@ for (const c of cases) {
   const planOk = !!planStep && planStep.machine === c.machine && near(planStep.machines, ref.machines);
   const ok = done?.type === "done" && machinesOk && inputOk && planOk;
   if (ok) passed++;
+  answers[c.question] = answer;
+  logged.push({ name: c.question, ok, detail: `reference ${ref.machines.toFixed(2)}× ${c.machine}, ${c.input} ${ref.inputRate.toFixed(1)}/min; machines ${machinesOk}, input ${inputOk}, plan ${planOk}` });
   console.log(`${ok ? "PASS" : "FAIL"}  ${c.question}\n      reference: ${ref.machines.toFixed(2)}× ${c.machine}, ${c.input} ${ref.inputRate.toFixed(1)}/min | plan: ${planStep ? `${planStep.machines}× ${planStep.machine}` : "none"} | answer ok: machines ${machinesOk}, input ${inputOk} [${done?.totalMs ? (done.totalMs / 1000).toFixed(1) : "?"} s]\n      ${answer.trim().replace(/\n+/g, " ").slice(0, 220)}`);
 }
 ws.close();
+await saveEvalRun("ratios", logged, answers);
 console.log(`\n${passed}/${cases.length} passed`);
 process.exit(passed === cases.length ? 0 : 1);

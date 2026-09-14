@@ -324,7 +324,9 @@ export class Agent {
     // Rate targets get an exact plan computed in code; the model narrates it (S09).
     const plan = requested ? null : this.planFor(question, found?.items ?? []);
     const planLines = plan ? [formatPlan(plan)] : requested ? [requested.line] : [];
-    const working: ChatMessage[] = [userTurn(guided, { recipes: [...planLines, ...researchLines, ...(found?.lines ?? [])], snapshot })];
+    const unknown = pasted.summaries.length ? null : this.deps.retriever()?.unknownName(question);
+    const unknownLines = unknown ? [`[save data: no item, fluid, recipe or building in this save is named "${unknown}"; if it's a nickname, ask which item they mean]`] : [];
+    const working: ChatMessage[] = [userTurn(guided, { recipes: [...unknownLines, ...planLines, ...researchLines, ...(found?.lines ?? [])], snapshot })];
     const record: TurnRecord = {
       at: new Date(this.now()).toISOString(), question, world, chart, rounds: [], totalMs: 0,
       chars: {

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { rowPrototypes } from "./fixtures/row-prototypes";
 import { PrototypesSchema, type Prototypes } from "@companion/interfaces";
 import { RecipeRetriever } from "./retrieval";
 
@@ -40,3 +41,15 @@ test.if(real !== null)("real save: Gleba and modded names resolve", () => {
   expect(agri.matched).toContain("item:agricultural-science-pack");
   expect(agri.lines[0]).toBe("technology agricultural-science-pack: needs artificial-soil, bacteria-cultivation, bioflux-processing | unlocks agricultural-science-pack | trigger: craft 100 bioflux | not researched");
 });
+
+test("recipe questions naming something that isn't in the save are recognised", () => {
+  const r = new RecipeRetriever(PrototypesSchema.parse(rowPrototypes));
+  expect(r.unknownName("How do I craft a quantum widget?")).toBe("quantum widget");
+  expect(r.unknownName("What's the recipe for flux capacitors")).toBe("flux capacitors");
+  expect(r.unknownName("what does a warp drive need")).toBe("warp drive");
+  expect(r.unknownName("How do I craft iron gear wheels?")).toBeNull();
+  expect(r.unknownName("How do I craft gear wheels for the mall?")).toBeNull(); // "gear" names something
+  expect(r.unknownName("Can you make it faster?")).toBeNull();
+  expect(r.unknownName("How many assemblers do I have?")).toBeNull();
+});
+

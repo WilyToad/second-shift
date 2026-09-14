@@ -1,10 +1,12 @@
 // FC-086: diagnosis scenario on the hosted dev save, through the real server (bun run start).
 // Builds starved and output-blocked assemblers near the player, then asks why they're stuck.
 import type { ServerMessage } from "../server/src/messages";
+import { asChecks, saveEvalRun } from "./lib/eval-log";
 import { connectDevGame } from "./lib/devgame";
 
 const dev = await connectDevGame();
 const results: [string, boolean, string][] = [];
+const answers: Record<string, string> = {};
 const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
 
 // Test tooling: 4 starved (no inputs) and 2 output-blocked iron gear assemblers.
@@ -74,11 +76,14 @@ try {
   const q2 = await ask("Show me the stuck iron gear wheel assemblers.");
   const count = Number(q2.tool?.summary?.match(/(\d+) iron-gear-wheel machines not working on (\w+)/)?.[1] ?? 0);
   check("find_stuck_machines highlights at least the 6 scenario machines", count >= 6 && /Highlighted/.test(q2.tool?.summary ?? ""), q2.tool?.summary ?? `no tool call; answer: ${q2.answer.trim()}`);
+  answers.why = q1.answer;
+  answers.show = q2.answer;
   ws.close();
 } finally {
   await dev.sc(`for _, e in pairs(storage.diag or {}) do if e.valid then e.destroy({ raise_destroy = true }) end end storage.diag = nil rcon.print("cleaned")`);
   dev.rcon.close();
 }
+await saveEvalRun("diagnosis", asChecks(results), answers);
 const failed = results.filter((r) => !r[1]).length;
 console.log(`\n${results.length - failed}/${results.length} passed`);
 process.exit(failed ? 1 : 0);

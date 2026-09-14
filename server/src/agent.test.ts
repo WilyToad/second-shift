@@ -289,3 +289,12 @@ test("a chart block on a turn without charts never reaches the page or the histo
   expect(shown).toBe("Gears take 2 iron plates.\n\n");
   expect(agent.history.at(-1)!.content).toBe("Gears take 2 iron plates.");
 });
+
+test("a recipe question about something not in the save gets that as data", async () => {
+  const prototypes = PrototypesSchema.parse(rowPrototypes);
+  const model = fakeModel([{ text: "There's no quantum widget in this save." }]);
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => new RecipeRetriever(prototypes), prototypes: () => prototypes, emit: () => {} });
+  await agent.ask("How do I craft a quantum widget?");
+  expect(model.seen[0]!.at(-1)!.content).toContain('[save data: no item, fluid, recipe or building in this save is named "quantum widget"');
+});
+

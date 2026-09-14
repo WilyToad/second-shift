@@ -9,6 +9,7 @@ type Entry = { kind: Kind; name: string };
 /** Player nicknames for common items. */
 const ALIASES: Record<string, string> = {
   "green circuit": "electronic-circuit", "red circuit": "advanced-circuit", "blue circuit": "processing-unit",
+  "green chip": "electronic-circuit", "red chip": "advanced-circuit", "blue chip": "processing-unit",
   "red science": "automation-science-pack", "green science": "logistic-science-pack", "blue science": "chemical-science-pack",
   "purple science": "production-science-pack", "yellow science": "utility-science-pack", "white science": "space-science-pack",
   "black science": "military-science-pack", "gray science": "military-science-pack", "grey science": "military-science-pack",
@@ -38,6 +39,7 @@ export class RecipeRetriever {
   private readonly users = new Map<string, string[]>();
   private readonly crafters: Map<string, string[]>;
   private readonly unlockedBy = new Map<string, string[]>();
+  private nameWords: Set<string> | null = null;
 
   constructor(private readonly p: Prototypes) {
     this.crafters = craftersByCategory(p);
@@ -85,6 +87,25 @@ export class RecipeRetriever {
       }
     }
     return found;
+  }
+
+  /**
+   * The thing a recipe question names ("how do I craft a quantum widget?", "recipe for X", "what does X need")
+   * when not one of its words matches anything in the save, so the model can be told it doesn't exist (FC-112).
+   */
+  unknownName(question: string): string | null {
+    const m = /\b(?:craft|recipe for|make an?|build an?)\s+(?:an?\s+|the\s+|some\s+)?([a-z][a-z' -]{2,40}?)\s*(?:[?.!,]|$|\s+(?:per|in|with|for|from|on)\b)/i.exec(question)
+      ?? /\bwhat (?:does|do) (?:an?\s+|the\s+)?([a-z][a-z' -]{2,40}?) (?:need|take|require)s?\b/i.exec(question);
+    const phrase = m?.[1]?.trim();
+    if (!phrase || /^(it|them|that|this|those|these|more|one)$/i.test(phrase)) return null;
+    if (this.match(phrase).length > 0) return null;
+    // The last word names the thing ("quantum widget" → widget). If it appears in any name in the save
+    // ("gear wheels" → iron-gear-wheel), the player probably means that thing, just phrased differently.
+    this.nameWords ??= new Set([this.p.recipes, this.p.items, this.p.fluids, this.p.entities, this.p.technologies, this.p.machines].flatMap((group) => Object.keys(group)).flatMap((name) => name.split("-")));
+    const words = phrase.toLowerCase().split(/[\s-]+/).filter((w) => w.length > 2 && !/^(the|and|for|some|more)$/.test(w));
+    const head = words.at(-1);
+    if (!head || this.nameWords.has(head) || this.nameWords.has(singular(head))) return null;
+    return phrase;
   }
 
   /** Technologies the player might mean: named ones, then those unlocking a named item's recipe. */

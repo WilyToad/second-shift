@@ -11,10 +11,12 @@
 - [x] FC-111 Remove disallowed chart blocks in code
   - Acceptance: a streaming filter drops `rate_chart` blocks, including fences split across tokens, when the turn doesn't allow charts; the page and history never see them; unit tests over every split point
   - `server/src/stream-filter.ts`: holds back text only while it could still become ```` ```rate_chart ````, drops the block through its closing fence, and passes other code and inline backticks through. Unit tests split a real answer at every character, plus one token per character; an agent test checks that neither the page nor the history sees the block. Turns that allow charts are unchanged (the server's fallback chart still applies)
-- [ ] FC-112 Say when a named thing doesn't exist
+- [x] FC-112 Say when a named thing doesn't exist
   - Acceptance: "craft/make/recipe for X" where X matches nothing in the save adds a `[save data: nothing named "X" in this save]` line; unit test; grounding's negative case passes 3 runs
-- [ ] FC-113 Keep failing answers from evals
+  - `RecipeRetriever.unknownName`: the phrase after "craft / recipe for / make a / build a" or in "what does X need" is unknown when it matches nothing and its last word appears in no name in the save, so "gear wheels for the mall" still counts as known. The line reads `[save data: no item, fluid, recipe or building in this save is named "X"; if it's a nickname, ask which item they mean]`. On the real save's data, "quantum widget", "flux capacitor", "warp drive" and "blue chips" were flagged, and 13 real phrasings were not. "blue chips" is slang, so green/red/blue "chip" aliases were added. Unit and agent tests
+- [x] FC-113 Keep failing answers from evals
   - Acceptance: grounding, ratios, diagnosis, blueprint and throughput scripts write each run's checks with full answers to `data/eval/` so a miss can be read afterwards
+  - `scripts/lib/eval-log.ts` writes `data/eval/<suite>-<time>.json` with every check and full answer, for ratios, diagnosis, blueprint and throughput (grounding already did). The blueprint "no invented problems" check now prints the whole answer
 - [ ] FC-110 Model misses seen in overnight regression runs
   - Acceptance: closed by FC-111 to FC-114
 - [ ] FC-114 Repeat runs of the flaky suites
