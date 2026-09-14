@@ -31,6 +31,5 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
   - Notes: `player.position` is the remote-view position; searches and pastes "here" should probably use the character's `physical_position` unless the player means where they're looking. Decide with the player
 - [ ] FC-093 Entity settings actions (recipe, train stop limits, filters) from FC-045
 
-- [ ] FC-070 Find or build a heavier benchmark save (megabase scale)
 - [ ] FC-071 Resolve the "Factorio Companion" name clash with ob1-s/factorio-AI-coop
 - [ ] FC-072 Close the hosted game port to the LAN (macOS firewall or another approach)

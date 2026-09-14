@@ -50,3 +50,4 @@ Times are commit times (local).
 - **S09 closed**: production planning. Ratio eval 8/8 twice against an independent reference (vanilla, Gleba, maraxsis); plans drawn as a recipe graph; all suites pass. Follow-ups 2.25–2.44 s, close to the 2.5 s target.
 - S10 "Accurate plans" planned and activated (delegated): FC-098 productivity in plans, FC-099 refresh on research, FC-100 eval reference with productivity, FC-075 paused detection.
 - **S10 closed**: plans include built-in and researched productivity (dump v5), recipe data refreshes when research completes (0.5 s), paused game shown. The latency check caught snapshot bloat on planning questions (follow-ups ~3 s); fixed, now 1.55–1.73 s. All suites pass.
+- S11 "Megabase scale" planned and activated (delegated): FC-070 synthetic megabase in the running dev game, FC-101 profile every mod path at scale, FC-102 fix what's over budget.
