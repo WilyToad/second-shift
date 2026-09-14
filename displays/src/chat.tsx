@@ -1,6 +1,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
+import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 
 function AgentText({ text }: { text: string }) {
@@ -28,8 +29,8 @@ function Item({ item }: { item: ThreadItem }) {
           {item.images.value.map((shot) => (
             <div class="msg" key={shot.url}>
               <figure class="vis shot">
-                <img src={shot.url} alt={shot.caption} loading="lazy" />
-                <figcaption class="vis-note">{shot.caption}<span class="tag"> · screenshot</span></figcaption>
+                <img src={shot.url} alt={plainName(shot.caption)} loading="lazy" />
+                <figcaption class="vis-note">{plainName(shot.caption)}<span class="tag"> · screenshot</span></figcaption>
               </figure>
             </div>
           ))}

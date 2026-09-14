@@ -2,6 +2,7 @@
 import type { GameEvent } from "@companion/interfaces";
 import { useSignal } from "@preact/signals";
 import type { Point } from "../../server/src/series";
+import { RichName } from "./rich-text";
 import { digest, droppedEvents, events, series } from "./store";
 
 const round = (n: number) => (n >= 100 ? Math.round(n).toLocaleString() : String(Math.round(n * 10) / 10));
@@ -34,7 +35,7 @@ export function AlertFeed() {
           <li key={e.seq} class="alert" data-sev={e.severity}>
             <span class="stripe" />
             <div class="alert-body">
-              <div class="alert-meta"><span>{e.surface ?? ""}{e.position ? ` · ${e.position.x}, ${e.position.y}` : ""}</span><span class="num">{ago(e.tick, now)}</span></div>
+              <div class="alert-meta"><span>{e.surface ? <RichName text={e.surface} /> : ""}{e.position ? ` · ${e.position.x}, ${e.position.y}` : ""}</span><span class="num">{ago(e.tick, now)}</span></div>
               <div class="alert-text">{describe(e)}</div>
             </div>
           </li>
@@ -72,7 +73,7 @@ export function LivePanel() {
         <div class="panel-head"><span class="label">Live state</span><span class="label-sub num">tick {d.tick.toLocaleString()}</span></div>
         <div class="surface-tabs" role="tablist">
           {surfaces.map((s) => (
-            <button key={s.name} role="tab" aria-selected={s === current} onClick={() => (chosen.value = s.name)}>{s.platform ?? words(s.name)}</button>
+            <button key={s.name} role="tab" aria-selected={s === current} onClick={() => (chosen.value = s.name)}>{s.platform ? <RichName text={s.platform} /> : words(s.name)}</button>
           ))}
         </div>
         {current && (

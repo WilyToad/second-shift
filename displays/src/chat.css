@@ -116,3 +116,4 @@ button.cancel { background: transparent; color: var(--muted); border: 1px solid 
 .queue { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
 .queue li::before { content: "then "; color: var(--faint); }
 .shot img { display: block; width: 100%; max-width: 100%; height: auto; border-bottom: 1px solid var(--seam); image-rendering: auto; }
+.rt-icon { display: inline-block; min-width: 1.3em; margin-right: 0.3em; padding: 0 0.25em; border: 1px solid var(--seam); border-radius: 3px; background: var(--inset); color: var(--agent); font: 600 0.85em var(--mono); text-align: center; line-height: 1.35; }

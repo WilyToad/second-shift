@@ -1,6 +1,7 @@
 // Visual components the agent can put in an answer as terse fenced specs (PLAN §3 visual component
 // library). The model only names what to draw; the data comes from the page's recorded history.
 import { useSignal } from "@preact/signals";
+import { plainName } from "./rich-text";
 import type { BlueprintCard } from "../../server/src/messages";
 import type { Plan } from "../../server/src/planner";
 import type { Point } from "../../server/src/series";
@@ -47,9 +48,9 @@ export function RateChart({ spec }: { spec: RateChartSpec }) {
   const all = series.value[key] ?? [];
   const cutoff = (all.at(-1)?.t ?? 0) - spec.windowMin * 60_000;
   const points: Point[] = all.filter((p) => p.t >= cutoff);
-  const title = `${spec.item.replace(/-/g, " ")} on ${spec.surface}, per minute`;
+  const title = `${spec.item.replace(/-/g, " ")} on ${plainName(spec.surface)}, per minute`;
   if (points.length < 2) {
-    return <figure class="vis"><figcaption class="vis-head">{title}</figcaption><div class="vis-empty">No recorded history for {spec.item} on {spec.surface} yet.</div></figure>;
+    return <figure class="vis"><figcaption class="vis-head">{title}</figcaption><div class="vis-empty">No recorded history for {spec.item} on {plainName(spec.surface)} yet.</div></figure>;
   }
   const t0 = points[0]!.t, t1 = points.at(-1)!.t;
   const max = Math.max(...points.map((p) => p.v), 1) * 1.15;
