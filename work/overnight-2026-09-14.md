@@ -7,6 +7,26 @@ Nothing is pushed; only the dev save copy runs; manual checks are left for the p
 
 - [ ] FC-027: press Ctrl+Z in-game after an agent deconstruction mark and confirm the marks disappear
 - [ ] FC-028: in remote view, try a deconstruction drag over fog of war (charted but not in radar range) and over unexplored map; tell me what the game allows
+- [ ] FC-092: when you search "near me" from remote view, should that mean where your character stands or where you're looking?
+- [ ] Visual check: open http://127.0.0.1:5170 (after `bun run launch -- --dev` and `bun run start`) and look at the console layout, the blueprint sketch card and the screenshot card at your monitor size
+- [ ] FC-115: click "Show the companion a build" on the shortcut bar, drag over a build, and check the review appears in the page
+- [ ] FC-093 note: when you change a machine's recipe by hand in remote view, do its ingredients go to your inventory? The companion assumes they do
+- [ ] FC-072: the hosted game's port 34197 listens on all interfaces (`--bind` is ignored when hosting); it's password-protected with max_players 1. Decide whether to add a macOS firewall rule
+
+## Summary of the night (S11–S19)
+
+Stopped at 06:55 as planned, with Factorio and the server closed. Nine sprints closed, all committed, nothing pushed:
+- **S11 Megabase scale:** at 25,000 machines, `find_machines` went from 5.9 ms to 0.79 ms; every per-tick path stays flat.
+- **S12 No hitches:** research completion no longer triggers a 26 ms full dump (now 0.06 ms).
+- **S13 Blueprint throughput:** pasted blueprints get per-minute flows, belt load and slow inserters.
+- **S14 Blueprints on request:** "a blueprint for 120 gears/min" gives a checked, copyable, pasteable build, measured in-game within 1%.
+- **S15 Machine settings:** change machine recipes under the helmet rule; sketches for pasted blueprints.
+- **S16 Fewer model misses:** chart rules enforced in code, unknown names stated as data, full answers saved for every eval.
+- **S17 Show the companion a build:** in-game selection tool → automatic review (hands-on check pending, FC-115).
+- **S18 Picks up where you left off:** the conversation survives restarts and reloads.
+- **S19 Show me:** screenshots on request, at no measurable game cost.
+
+Mod cost after all this (benchmark, before S15–S19's small additions): 0.082 ms/tick. Open performance items: FC-103 is done; FC-104 (one-time scan's surface listing ticks, 6–7 ms once per save).
 
 ## Log
 
