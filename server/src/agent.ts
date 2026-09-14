@@ -1,5 +1,7 @@
 // The agent loop: retrieval + snapshot → model → tools → answer, with approvals for map changes.
 // Looks run immediately; map changes wait for the player to confirm a card in the web page.
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import type { ActionArgs, ActionData, ActionName, EntityRef, FindEntitiesResult, Prototypes } from "@companion/interfaces";
 import { resolveEntityFilter } from "./entities";
 import type { Snapshot } from "./game";
@@ -16,6 +18,18 @@ export interface GameActions {
 type MapAction = "mark_deconstruction" | "cancel_deconstruction";
 type Pending = { id: string; action: MapAction; entities: EntityRef[]; title: string };
 type LastResult = { refs: EntityRef[]; label: string; count: number; at: number; where: string };
+
+/** One answered question, for latency analysis (FC-080). Section sizes are characters. */
+export type TurnRecord = {
+  at: string;
+  question: string;
+  world: boolean;
+  chart: boolean;
+  chars: { system: number; history: number; question: number; retrieved: number; snapshot: number };
+  rounds: { promptTokens?: number; cachedTokens?: number; serverTtftS?: number; completionTokens?: number; ms: number; toolCalls: number }[];
+  visibleTtftMs?: number;
+  totalMs: number;
+};
 
 const MAX_TOOL_ROUNDS = 3;
 const RESULT_TTL_MS = 10 * 60_000;
@@ -94,6 +108,8 @@ export class Agent {
       fallbackSnapshot?: () => Snapshot | undefined;
       emit: (m: ServerMessage) => void;
       now?: () => number;
+      /** Appends a JSON line per answered question (FC-080). */
+      turnLog?: string;
     },
   ) {}
 
@@ -123,6 +139,16 @@ export class Agent {
     const notes = [world ? "" : "no tool call is needed", chart ? "" : "no chart block"].filter(Boolean);
     const guided = notes.length ? `${noted}\n\n(Answer from the data provided in 80 words or fewer; ${notes.join(", ")}.)` : noted;
     const working: ChatMessage[] = [userTurn(guided, { recipes: found?.lines ?? [], snapshot })];
+    const record: TurnRecord = {
+      at: new Date(this.now()).toISOString(), question, world, chart, rounds: [], totalMs: 0,
+      chars: {
+        system: this.deps.system().length,
+        history: this.history.reduce((n, m) => n + m.content.length, 0),
+        question: guided.length,
+        retrieved: (found?.lines ?? []).join("\n").length,
+        snapshot: snapshot?.length ?? 0,
+      },
+    };
     this.deps.emit({ type: "user", text: question });
 
     let ttftMs: number | undefined;
@@ -137,9 +163,17 @@ export class Agent {
             this.deps.emit({ type: "token", text });
           },
         });
+        record.rounds.push({
+          promptTokens: result.usage?.prompt_tokens, cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens,
+          serverTtftS: result.usage?.time_to_first_token, completionTokens: result.usage?.completion_tokens,
+          ms: result.totalMs, toolCalls: result.toolCalls.length,
+        });
         if (result.toolCalls.length === 0) {
           working.push({ role: "assistant", content: result.text });
           this.history.push(...working);
+          record.visibleTtftMs = ttftMs;
+          record.totalMs = performance.now() - started;
+          this.logTurn(record);
           this.deps.emit({
             type: "done", ttftMs, totalMs: performance.now() - started,
             promptTokens: result.usage?.prompt_tokens, cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens, completionTokens: result.usage?.completion_tokens,
@@ -151,6 +185,16 @@ export class Agent {
       }
     } catch (e) {
       this.deps.emit({ type: "error", message: (e as Error).message });
+    }
+  }
+
+  private logTurn(record: TurnRecord): void {
+    if (!this.deps.turnLog) return;
+    try {
+      mkdirSync(dirname(this.deps.turnLog), { recursive: true });
+      appendFileSync(this.deps.turnLog, JSON.stringify(record) + "\n");
+    } catch {
+      // Logging must never break answering.
     }
   }
 

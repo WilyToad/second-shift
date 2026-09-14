@@ -35,6 +35,7 @@ const agent = new Agent({
   prototypes: () => game.prototypes()?.data ?? null,
   fallbackSnapshot: (): Snapshot | undefined => (replayDigest ? { digest: replayDigest, receivedAt: Date.now() } : undefined),
   emit: (m) => broadcast(m),
+  turnLog: process.env.COMPANION_TURN_LOG ?? new URL("../../data/eval/turns.jsonl", import.meta.url).pathname,
 });
 
 const server = Bun.serve({

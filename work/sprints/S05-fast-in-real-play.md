@@ -8,8 +8,9 @@
 
 ## Items
 
-- [ ] FC-080 Per-turn latency breakdown
+- [x] FC-080 Per-turn latency breakdown
   - Acceptance: each answer records prompt section sizes (system, history, retrieved lines, snapshot, notes), cached tokens, server and visible first-token times and tool rounds to `data/eval/turns.jsonl`; a script summarizes where the time goes
+  - `data/eval/turns.jsonl` + `scripts/latency-report.ts`. First findings: single-call answers median 1.11 s, two-call (tool) 3.36 s; ~0.35 s constant between server and visible first token; the stable prefix (~3.7k tokens) spans a 2,048-token block, so novel questions re-read ~1.7k stable tokens (1.8–2.0 s). Repeated eval questions hit 4,096 cached because the same text was asked earlier, which flatters the eval
 - [ ] FC-079 Get first-token latency back under target with the game running
   - Notes: S04 measured median ~2.6–2.9 s, max ~4.1 s, answers ~110 tokens (S02: ~1.6 s, ~70 tokens, game closed). Suspects: bigger system prompt (tools + chart rule), live snapshot tail, 2,048-token block alignment, GPU contention (~12%)
   - Acceptance: the S05 acceptance numbers above, measured with the game running
