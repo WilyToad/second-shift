@@ -4,9 +4,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 2 — Acting on request
 
-- [ ] FC-030 Blueprint string encoder/decoder in TypeScript
-- [ ] FC-031 Blueprint checker: entities exist, no overlaps, recipe fits machine
-- [ ] FC-032 Review a blueprint pasted into chat
 
 ## Phase 3 — Pleasant console and more actions
 
