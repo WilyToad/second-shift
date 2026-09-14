@@ -14,8 +14,9 @@
 - [x] FC-082 Entity sizes and collision boxes in the prototype dump
   - Acceptance: every buildable entity has type, tile size and collision box; schema-validated; dump size and time recorded
   - 167 buildable entities with type, tile size and collision box; dump 0.46 MB, Lua ~23 ms (one-off, noted in PLAN). The prototype cache is now keyed on a `DUMP_VERSION` from the mod, so shape changes refresh it (it had silently kept the old shape)
-- [ ] FC-031 Blueprint checker: entities exist, no overlaps, recipe fits machine
+- [x] FC-031 Blueprint checker: entities exist, no overlaps, recipe fits machine
   - Acceptance: flags unknown entities, overlapping footprints and recipes a machine can't craft; passes a real blueprint from the save
+  - `server/src/blueprint-check.ts`: unknown entities, footprint overlaps (collision boxes rotated for cardinal directions; rails and signals skipped, since they use their own collision layers and diagonals), unknown or uncraftable recipes; counts, recipes and size. The real 49-entity blueprint passes with no issues
 - [ ] FC-032 Review a blueprint pasted into chat
   - Acceptance: a pasted string is replaced by a compact summary before the model sees it; the answer's counts and issues match the checker
 
