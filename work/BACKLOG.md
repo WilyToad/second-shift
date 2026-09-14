@@ -25,4 +25,3 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 - [ ] FC-104 Registry scan outlier ticks
   - Notes: S11 megabase rescan: median 0.11 ms, p95 0.40 ms per tick, but listing a big surface's chunks takes one ~7 ms tick (Nauvis, 11,844 chunks) and a few ticks reach 1–2 ms while registry tables grow. Runs once per save. A chunk iterator kept across ticks would fix the listing tick but can't be a module-local (desync); check whether a LuaChunkIterator can be kept in `storage` (the docs don't say it can't) without writing to the player's saves. Benchmark 2026-09-14: the listing ticks are 7.5 ms (tick 0) and 6.5 ms (tick 741) on the dev save; everything else in the scan stays under 2.6 ms
 
-- [ ] FC-071 Resolve the "Factorio Companion" name clash with ob1-s/factorio-AI-coop

@@ -1,0 +1,51 @@
+/*
+ * Second Shift design tokens: the one source for colour, type and shape.
+ * Loaded by the web console (displays/src/chat.css) and the website (website/src/site.css).
+ * See brand/BRAND.md for how to use them. Change a value here, never a copy of it.
+ */
+@font-face { font-family: "Big Shoulders Display"; src: url("./fonts/big-shoulders-display.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Titillium Web"; src: url("./fonts/titillium-web-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Titillium Web"; src: url("./fonts/titillium-web-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Titillium Web"; src: url("./fonts/titillium-web-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("./fonts/ibm-plex-mono-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("./fonts/ibm-plex-mono-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+
+:root {
+  color-scheme: dark;
+
+  /* Steel: grounds and surfaces, darkest to lightest. Warm, like painted metal under work lights. */
+  --ground: #1c1a18;   /* Night steel: page ground */
+  --inset: #151412;    /* Sump: inputs, wells, code */
+  --panel: #25221f;    /* Plate: panels and cards */
+  --panel-2: #2e2a26;  /* Raised plate: hover, selected, the player's own messages */
+  --seam: #3a352f;     /* Seam: borders and dividers */
+
+  /* Ink */
+  --text: #ebe5d9;     /* Paper: body text and the helmet */
+  --muted: #a39b8e;    /* Dust: secondary text and labels */
+  --faint: #70695f;    /* Ash: metadata, placeholders */
+
+  /* Visor cyan is the companion. Use it only for what the companion says, proposes or does. */
+  --agent: #7cc4d8;
+  --agent-deep: #256f85;              /* the visor on light grounds (GitHub light mode) */
+  --agent-dim: rgba(124, 196, 216, 0.12);
+  --on-agent: #10232a;                /* text on a cyan button */
+
+  /* Signals: state only, never decoration. */
+  --amber: #eaa13c;    /* Warning: needs a look soon */
+  --crit: #e8685a;     /* Critical: attacks, failures, refusals */
+  --ok: #86bf5b;       /* Done, powered, healthy */
+
+  /* Type */
+  --display: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --ui: "Titillium Web", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Type scale (1.25, from 15 px body) */
+  --fs-meta: 12px; --fs-small: 13px; --fs-body: 15px; --fs-lead: 19px;
+  --fs-h3: 23px; --fs-h2: 29px; --fs-h1: 46px; --fs-hero: 72px;
+
+  /* Shape: small radii, 1 px seams. Machined, not bubbly. */
+  --radius: 4px; --radius-sm: 3px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px; --space-12: 48px;
+}

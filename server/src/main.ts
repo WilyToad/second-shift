@@ -1,4 +1,4 @@
-// Factorio Companion server: game link + model + web chat on localhost.
+// Second Shift server: game link + model + web chat on localhost.
 import chatPage from "../../displays/src/chat.html";
 import { DigestSchema } from "@companion/interfaces";
 import { Agent, fileSession, SELECTED_PREFIX, TOOLS } from "./agent";
@@ -165,4 +165,4 @@ game.onPrototypes((p) => {
 await game.loadCachedPrototypes();
 game.start();
 if (!game.prototypes()) busy = busy.then(warmUp);
-console.log(`Factorio Companion on http://127.0.0.1:${PORT}`);
+console.log(`Second Shift on http://127.0.0.1:${PORT}`);

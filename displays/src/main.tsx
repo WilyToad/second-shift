@@ -3,6 +3,17 @@ import { Composer, Thread } from "./chat";
 import { AlertFeed, LivePanel } from "./console";
 import { connect, connected, status } from "./store";
 
+/** The Second Shift mark (brand/logo/mark.svg), drawn from the tokens so it follows the theme. */
+function Mark() {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M19 6h26l13 13v26L45 58H19L6 45V19z" fill="var(--text)" />
+      <path d="M12 24h19l-3 15H12z" fill="var(--seam)" />
+      <path d="M35 24h17v15H32z" fill="var(--agent)" />
+    </svg>
+  );
+}
+
 function Header() {
   const s = status.value;
   const game = !connected.value
@@ -14,7 +25,7 @@ function Header() {
   const model = s?.model.state ?? "loading";
   return (
     <header class="topbar">
-      <strong class="brand">Factorio Companion</strong>
+      <strong class="brand"><Mark />Second Shift</strong>
       <span class="status">
         <span class={`pill ${game.cls}`}>{game.text}</span>
         <span class={`pill ${model === "ready" ? "ok" : model === "error" ? "crit" : "warn"}`}>model: {model}</span>

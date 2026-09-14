@@ -29,8 +29,8 @@ mkdirSync(dataDir, { recursive: true });
 const settingsPath = join(dataDir, dev ? "server-settings.dev.json" : "server-settings.json");
 if (!existsSync(settingsPath)) {
   await Bun.write(settingsPath, JSON.stringify({
-    name: "factorio-companion",
-    description: "Private local game for Factorio Companion",
+    name: "second-shift",
+    description: "Private local game for Second Shift",
     visibility: { public: false, lan: false },
     require_user_verification: false,
     max_players: 1,

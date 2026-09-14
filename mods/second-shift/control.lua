@@ -1,4 +1,4 @@
--- Factorio Companion: queries and player-equivalent actions for the companion app.
+-- Second Shift: queries and player-equivalent actions for the companion app.
 -- Everything goes through one RCON command: /companion {"id":..,"action":..,"args":{..}}.
 -- The reply is one JSON line via rcon.print: {"id":..,"ok":true,"data":..} or {"id":..,"ok":false,"error":{..}}.
 
@@ -16,7 +16,7 @@ handlers.info = function()
   return {
     protocol = PROTOCOL,
     dump_version = DUMP_VERSION,
-    mod_version = script.active_mods["factorio-companion"],
+    mod_version = script.active_mods["second-shift"],
     game_version = script.active_mods["base"],
     tick = game.tick,
     mods = script.active_mods,
@@ -53,11 +53,11 @@ local function dispatch(parameter)
   return { id = req.id, ok = true, data = result }
 end
 
-commands.add_command("companion", "Factorio Companion API (used by the companion app over RCON)", function(command)
+commands.add_command("companion", "Second Shift API (used by the Second Shift app over RCON)", function(command)
   if command.player_index then
     -- Only the app may call the API; a player typing it gets a hint instead.
     local player = game.get_player(command.player_index)
-    if player then player.print("/companion is used by the Factorio Companion app.") end
+    if player then player.print("/companion is used by the Second Shift app.") end
     return
   end
   -- {"profile":true} appends a second line with the handler's Lua time (LuaProfiler can't be read as a number).

@@ -1,4 +1,4 @@
-# Factorio Companion
+# Second Shift (formerly Factorio Companion)
 
 A local AI companion for a live Factorio game: a mod exports game state and performs
 player-equivalent actions, and an agent loop answers questions and acts on request, using a
@@ -152,8 +152,9 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 
 ## Layout
 
-- `mods/factorio-companion/`: the Lua mod (`info.json`, `control.lua`). During development,
-  link it into the Factorio mods dir as `factorio-companion` rather than copying it.
+- `mods/second-shift/`: the Lua mod (`info.json`, `control.lua`). During development,
+  link it into the Factorio mods dir as `second-shift` rather than copying it (`bun run link-mod`).
+- `brand/`: the brand and style guide (`BRAND.md`), shared design tokens and fonts, logos. The console and the website load `brand/tokens.css`; follow the guide for anything user-facing.
 - `interfaces/`: the game↔agent contract: transport, state schema, query/tool definitions, component specs.
   A change to the state shape must update the schema and the mod together.
 - `server/`: agent loop, oMLX client, prompt assembly.

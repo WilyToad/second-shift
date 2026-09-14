@@ -1,4 +1,4 @@
-# Factorio Companion — Plan
+# Second Shift — Plan
 
 A local AI companion that watches a Factorio game, advises the player in real time, and acts
 on request the way the player's own character could. It runs entirely on this machine

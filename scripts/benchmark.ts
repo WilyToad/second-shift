@@ -10,7 +10,7 @@ const flag = (name: string, fallback: number) => { const i = args.indexOf(name);
 const ticks = flag("--ticks", 1800);
 const runs = flag("--runs", 3);
 const save = resolve(args.find((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--")) ?? join(import.meta.dir, "../data/saves/dev.zip"));
-const repoMod = resolve(import.meta.dir, "../mods/factorio-companion");
+const repoMod = resolve(import.meta.dir, "../mods/second-shift");
 const benchDir = resolve(import.meta.dir, "../data/bench");
 
 if (isFactorioRunning()) { console.error("Close Factorio first."); process.exit(1); }
@@ -21,14 +21,14 @@ function mirrorMods(withCompanion: boolean): string {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   for (const entry of readdirSync(MODS_DIR)) {
-    if (entry === "mod-list.json" || entry === "factorio-companion") continue;
+    if (entry === "mod-list.json" || entry === "second-shift") continue;
     if (entry === "mod-settings.dat") copyFileSync(join(MODS_DIR, entry), join(dir, entry));
     else symlinkSync(join(MODS_DIR, entry), join(dir, entry));
   }
-  if (withCompanion) symlinkSync(repoMod, join(dir, "factorio-companion"), "dir");
+  if (withCompanion) symlinkSync(repoMod, join(dir, "second-shift"), "dir");
   const list = JSON.parse(require("node:fs").readFileSync(join(MODS_DIR, "mod-list.json"), "utf8")) as { mods: { name: string; enabled: boolean }[] };
-  list.mods = list.mods.filter((m) => m.name !== "factorio-companion");
-  if (withCompanion) list.mods.push({ name: "factorio-companion", enabled: true });
+  list.mods = list.mods.filter((m) => m.name !== "second-shift");
+  if (withCompanion) list.mods.push({ name: "second-shift", enabled: true });
   require("node:fs").writeFileSync(join(dir, "mod-list.json"), JSON.stringify(list, null, 2));
   return dir;
 }

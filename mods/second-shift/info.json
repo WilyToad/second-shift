@@ -1,0 +1,10 @@
+{
+  "name": "second-shift",
+  "version": "0.1.0",
+  "title": "Second Shift",
+  "author": "WilyToad",
+  "homepage": "https://github.com/WilyToad/second-shift",
+  "description": "A second engineer in your helmet: game state, questions and player-equivalent actions for the Second Shift companion app, over RCON. Needs the app from the homepage.",
+  "factorio_version": "2.0",
+  "dependencies": ["base >= 2.0"]
+}
