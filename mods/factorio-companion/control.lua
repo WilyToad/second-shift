@@ -24,6 +24,7 @@ end
 require("scripts.prototypes")(handlers)
 require("scripts.digest")(handlers)
 require("scripts.actions")(handlers)
+require("scripts.events")(handlers)
 
 local function fail(id, code, message)
   return { id = id, ok = false, error = { code = code, message = message } }

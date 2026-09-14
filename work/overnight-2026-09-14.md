@@ -20,3 +20,4 @@ Times are commit times (local).
 - **Review:** first-token times with the game running (median 2.56 s, max 3.61 s) are a bit above S02's game-closed numbers. Worth a look at whether that's acceptable in real play.
 - 23:32 FC-022 done: incoming RCON commands aren't split when hosting alone (1 MB in ~32 ms), but the mod's JSON parse costs ~14 ms/MB on the main thread. Protocol now caps commands at 48 KB. Large blueprints will need chunking (noted for FC-030+).
 - 23:33 S03 closed (review written; FC-027/FC-028 player checks pending). S04 "Live console" planned and activated under the night's delegation: FC-020, FC-021, FC-041, FC-040, FC-042.
+- FC-020 done: urgent events ring buffer in the mod, server polls every 250 ms, forwards to the page. In-game: research completion and a destroyed wall both arrived within 469 ms; poll cost 0.03–0.04 ms. Hosted-game quit doesn't save, so `data/saves/dev.zip` stays pristine (checked).

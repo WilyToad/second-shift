@@ -25,6 +25,7 @@ function fakeGame() {
           if (req.action === "info") data = { protocol: 1, mod_version: "0.1.0", game_version: "2.0.77", tick: 1, mods: state.mods, players: 1 };
           if (req.action === "dump_prototypes") { state.dumps++; data = prototypes; }
           if (req.action === "digest") data = digest;
+          if (req.action === "events") data = { seq: 0, oldest: 1, events: {} };
           sock.write(encodePacket(p.id, 0, JSON.stringify({ id: req.id, ok: true, data })));
         }
       },

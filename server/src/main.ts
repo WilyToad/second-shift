@@ -48,6 +48,8 @@ const server = Bun.serve({
     open(ws) {
       ws.subscribe("chat");
       ws.send(JSON.stringify(statusMessage()));
+      const recent = game.events();
+      if (recent.length) ws.send(JSON.stringify({ type: "events", events: recent } satisfies ServerMessage));
     },
     message(_ws, raw) {
       const msg = JSON.parse(String(raw)) as ClientMessage;
@@ -88,6 +90,7 @@ async function warmUp(): Promise<void> {
 }
 
 game.onStatus(() => broadcast(statusMessage()));
+game.onEvents((events, dropped) => broadcast({ type: "events", events, ...(dropped ? { dropped } : {}) }));
 // New prototype data changes the system prompt, so rebuild retrieval and re-warm the cache.
 game.onPrototypes((p) => {
   system = systemPrompt(p.data);

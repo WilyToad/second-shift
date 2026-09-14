@@ -51,6 +51,22 @@ const ApplyResultSchema = z.object({
   undo_items: z.number(),
 });
 
+export const GameEventSchema = z.object({
+  seq: z.number(),
+  tick: z.number(),
+  kind: z.enum(["alert", "research_finished"]),
+  severity: z.enum(["critical", "warning", "info"]),
+  type: z.string().optional(),
+  count: z.number().optional(),
+  surface: z.string().optional(),
+  entity: z.string().optional(),
+  position: PositionSchema.optional(),
+  research: z.string().optional(),
+});
+export type GameEvent = z.infer<typeof GameEventSchema>;
+
+export const EventsSchema = z.object({ seq: z.number(), oldest: z.number(), events: luaArray(GameEventSchema) });
+
 export const actions = {
   ping: { args: z.object({}), data: z.object({ tick: z.number() }) },
   info: { args: z.object({}), data: InfoSchema },
@@ -61,6 +77,7 @@ export const actions = {
   clear_highlight: { args: z.object({}), data: z.object({ cleared: z.number() }), kind: "look" },
   mark_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
   cancel_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
+  events: { args: z.object({ since: z.number().default(0) }), data: EventsSchema, kind: "look" },
 } as const;
 
 export type ActionName = keyof typeof actions;

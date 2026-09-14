@@ -1,7 +1,7 @@
 // Link to the running game: RCON connection with reconnect, typed mod actions, and a digest poller.
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { actions, encodeCommand, parseReply, PrototypesSchema, type ActionArgs, type ActionData, type ActionName, type Digest, type Prototypes } from "@companion/interfaces";
+import { actions, encodeCommand, parseReply, PrototypesSchema, type ActionArgs, type ActionData, type ActionName, type Digest, type GameEvent, type Prototypes } from "@companion/interfaces";
 import { RconClient } from "./rcon";
 import { readRconSettings, type RconSettings } from "./factorio";
 
@@ -16,14 +16,33 @@ export class ModError extends Error {
 export class GameLink {
   private rcon: RconClient | null = null;
   private nextId = 1;
-  private history: Snapshot[] = [];
+  private historyStore: Snapshot[] = [];
   private lastError: string | undefined;
   private stopped = false;
   private listeners = new Set<(s: GameStatus) => void>();
   private prototypeListeners = new Set<(p: LoadedPrototypes) => void>();
+  private eventListeners = new Set<(e: GameEvent[], dropped: number) => void>();
+  private eventSeq: number | null = null;
+  private recentEvents: GameEvent[] = [];
   private loaded: LoadedPrototypes | null = null;
 
-  constructor(private readonly opts: { pollMs: number; historySize: number; cacheDir: string; settings?: () => Promise<RconSettings | null> }) {}
+  constructor(private readonly opts: { pollMs: number; eventPollMs?: number; historySize: number; cacheDir: string; settings?: () => Promise<RconSettings | null> }) {}
+
+  /** New urgent events as they arrive (alert feed). */
+  onEvents(fn: (e: GameEvent[], dropped: number) => void): () => void {
+    this.eventListeners.add(fn);
+    return () => this.eventListeners.delete(fn);
+  }
+
+  /** The last events seen, for pages that connect later. */
+  events(): GameEvent[] {
+    return [...this.recentEvents];
+  }
+
+  /** Snapshot history, oldest first (for charts). */
+  history(): Snapshot[] {
+    return [...this.historyStore];
+  }
 
   /** Recipe data from the last game session, so the server can ground answers before the game connects. */
   async loadCachedPrototypes(): Promise<LoadedPrototypes | null> {
@@ -69,11 +88,36 @@ export class GameLink {
   disconnect(): void {
     this.rcon?.close();
     this.rcon = null;
+    this.eventSeq = null;
   }
 
   /** Keeps trying to connect in the background; the server works without the game. */
   start(): void {
     void this.loop();
+    void this.eventLoop();
+  }
+
+  /** Polls "events since N" on its own cadence so alerts arrive fast without a bigger digest poll. */
+  private async eventLoop(): Promise<void> {
+    while (!this.stopped) {
+      if (this.rcon) {
+        try {
+          const r = await this.call("events", { since: this.eventSeq ?? 0 });
+          // First poll after (re)connect: remember where we are without replaying old events.
+          if (this.eventSeq === null || r.seq < this.eventSeq) this.eventSeq = r.seq;
+          else if (r.events.length) {
+            // The mod keeps 200 events; if more happened between polls the oldest are gone.
+            const dropped = Math.max(0, r.oldest - (this.eventSeq + 1));
+            this.eventSeq = r.seq;
+            this.recentEvents = [...this.recentEvents, ...r.events].slice(-50);
+            for (const fn of this.eventListeners) fn(r.events, dropped);
+          }
+        } catch {
+          // The digest loop owns reconnects; just try again next tick.
+        }
+      }
+      await Bun.sleep(this.opts.eventPollMs ?? 250);
+    }
   }
 
   stop(): void {
@@ -87,11 +131,11 @@ export class GameLink {
   }
 
   status(): GameStatus {
-    return { connected: this.rcon !== null, lastError: this.lastError, latest: this.history.at(-1) };
+    return { connected: this.rcon !== null, lastError: this.lastError, latest: this.historyStore.at(-1) };
   }
 
   latest(): Snapshot | undefined {
-    return this.history.at(-1);
+    return this.historyStore.at(-1);
   }
 
   async call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>> {
@@ -128,12 +172,12 @@ export class GameLink {
       }
       try {
         const digest = await this.call("digest");
-        this.history.push({ digest, receivedAt: Date.now() });
-        if (this.history.length > this.opts.historySize) this.history.shift();
+        this.historyStore.push({ digest, receivedAt: Date.now() });
+        if (this.historyStore.length > this.opts.historySize) this.historyStore.shift();
         this.emit();
       } catch (e) {
         this.lastError = (e as Error).message;
-        if (!(e instanceof ModError)) { this.rcon?.close(); this.rcon = null; }
+        if (!(e instanceof ModError)) { this.rcon?.close(); this.rcon = null; this.eventSeq = null; }
         this.emit();
       }
       await Bun.sleep(this.opts.pollMs);

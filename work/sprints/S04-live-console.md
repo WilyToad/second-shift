@@ -8,8 +8,9 @@
 
 ## Items
 
-- [ ] FC-020 `events` action: ring buffer of urgent events with "since N" polling
+- [x] FC-020 `events` action: ring buffer of urgent events with "since N" polling
   - Acceptance: server polls every ~250 ms; no event lost across polls; cost measured with the profiler
+  - `scripts/events.lua`: urgent alert types sampled every 30 ticks (rises only) + `on_research_finished`, 200-event ring buffer. Poll costs 0.03–0.04 ms; research and destroyed-wall events arrived within 469 ms (`scripts/probes/events-ingame.ts`). Server reports gaps as `dropped`
 - [ ] FC-021 Alert feed in the web page
   - Acceptance: alerts appear within ~1 s of the event; severity, surface and count shown; no polling from the page
 - [ ] FC-041 Choose a UI framework for the console

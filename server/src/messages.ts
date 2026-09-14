@@ -1,4 +1,5 @@
 // WebSocket messages between the server and the web page.
+import type { GameEvent } from "@companion/interfaces";
 
 export type ServerMessage =
   | { type: "status"; game: { connected: boolean; tick?: number; ageMs?: number; error?: string }; model: { state: "loading" | "ready" | "error"; error?: string } }
@@ -9,6 +10,7 @@ export type ServerMessage =
   | { type: "approval"; id: string; title: string; detail: string }
   | { type: "approval_result"; id: string; status: "done" | "declined" | "failed" | "expired"; message: string }
   | { type: "error"; message: string }
+  | { type: "events"; events: GameEvent[]; dropped?: number }
   | { type: "reset" };
 
 export type ClientMessage =
