@@ -24,6 +24,9 @@ return function(handlers)
           enabled = fr ~= nil and fr.enabled,
           surface_conditions = r.surface_conditions,
           maximum_productivity = r.maximum_productivity,
+          -- Explicit boolean: `x and true or nil` would turn false into nil.
+          allows_productivity = (r.allowed_effects ~= nil and r.allowed_effects.productivity == true),
+          productivity_bonus = (fr ~= nil and fr.productivity_bonus > 0) and fr.productivity_bonus or nil,
         }
       end
     end
@@ -83,6 +86,10 @@ return function(handlers)
           energy_usage = try(function() return e.energy_usage end),
           mining_speed = try(function() return e.mining_speed end),
           belt_speed = try(function() return e.belt_speed end),
+          base_productivity = try(function()
+            local p = e.effect_receiver and e.effect_receiver.base_effect and e.effect_receiver.base_effect.productivity
+            return (p and p > 0) and p or nil
+          end),
         }
       end
     end

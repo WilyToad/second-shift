@@ -37,8 +37,8 @@ test("recipe graph draws steps, raw inputs and edges from a computed plan", asyn
     item: "electronic-circuit", perMinute: 120, notes: ["no modules"],
     raw: { "iron-plate": 120, "copper-plate": 180 },
     steps: [
-      { item: "electronic-circuit", recipe: "electronic-circuit", machine: "assembling-machine-2", machineSpeed: 0.75, unlocked: true, perMinute: 120, machines: 1.33, inputs: ["iron-plate", "copper-cable"] },
-      { item: "copper-cable", recipe: "copper-cable", machine: "assembling-machine-2", machineSpeed: 0.75, unlocked: true, perMinute: 360, machines: 2, inputs: ["copper-plate"] },
+      { item: "electronic-circuit", recipe: "electronic-circuit", machine: "assembling-machine-2", machineSpeed: 0.75, productivity: 0, unlocked: true, perMinute: 120, machines: 1.33, inputs: ["iron-plate", "copper-cable"] },
+      { item: "copper-cable", recipe: "copper-cable", machine: "assembling-machine-2", machineSpeed: 0.75, productivity: 0, unlocked: true, perMinute: 360, machines: 2, inputs: ["copper-plate"] },
     ],
   }} />, root);
   expect(root.querySelectorAll(".graph-node").length).toBe(4);

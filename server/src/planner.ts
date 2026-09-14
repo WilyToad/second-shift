@@ -1,18 +1,27 @@
 // Production ratios computed in code from the save's recipes and machine speeds (S09, use case #2).
-// Assumes no modules, beacons or productivity bonuses; byproducts are ignored.
+// Applies built-in machine productivity and researched recipe productivity; no modules or beacons;
+// byproducts are ignored.
 import type { Prototypes, Recipe } from "@companion/interfaces";
 import { craftersByCategory } from "./grounding";
 
-export type PlanStep = { item: string; recipe: string; machine: string; machineSpeed: number; unlocked: boolean; perMinute: number; machines: number; inputs: string[] };
+export type PlanStep = { item: string; recipe: string; machine: string; machineSpeed: number; productivity: number; unlocked: boolean; perMinute: number; machines: number; inputs: string[] };
 export type Plan = { item: string; perMinute: number; steps: PlanStep[]; raw: Record<string, number>; notes: string[] };
 
 const round = (n: number, digits = 2) => Math.round(n * 10 ** digits) / 10 ** digits;
 
-function outputPerCraft(recipe: Recipe, item: string): number {
+/** Expected output of `item` per craft; productivity multiplies all but the part marked ignored_by_productivity. */
+function outputPerCraft(recipe: Recipe, item: string, productivity = 0): number {
   return recipe.products.filter((p) => p.name === item).reduce((n, p) => {
     const amount = p.amount ?? ((p.amount_min ?? 0) + (p.amount_max ?? 0)) / 2;
-    return n + amount * (p.probability ?? 1);
+    const ignored = Math.min(Number((p as { ignored_by_productivity?: number }).ignored_by_productivity ?? 0), amount);
+    return n + ((amount - ignored) * (1 + productivity) + ignored) * (p.probability ?? 1);
   }, 0);
+}
+
+/** Productivity for a recipe in a machine: built-in machine bonus + researched recipe bonus, capped. */
+export function productivityFor(recipe: Recipe, machineBase: number): number {
+  if (recipe.allows_productivity === false) return 0;
+  return Math.min(machineBase + (recipe.productivity_bonus ?? 0), recipe.maximum_productivity);
 }
 
 export class Planner {
@@ -43,9 +52,9 @@ export class Planner {
   }
 
   /** Fastest machine for a recipe category, preferring ones whose own recipe is unlocked. */
-  machineFor(category: string): { name: string; speed: number; unlocked: boolean } | null {
+  machineFor(category: string): { name: string; speed: number; productivity: number; unlocked: boolean } | null {
     const options = (this.crafters.get(category) ?? []).filter((c) => c !== "by hand").map((name) => ({
-      name, speed: this.p.machines[name]?.crafting_speed ?? 1, unlocked: this.p.recipes[name]?.enabled ?? true,
+      name, speed: this.p.machines[name]?.crafting_speed ?? 1, productivity: this.p.machines[name]?.base_productivity ?? 0, unlocked: this.p.recipes[name]?.enabled ?? true,
     }));
     const unlocked = options.filter((o) => o.unlocked);
     return (unlocked.length ? unlocked : options).sort((a, b) => b.speed - a.speed)[0] ?? null;
@@ -54,7 +63,7 @@ export class Planner {
   plan(item: string, perMinute: number, maxDepth = 8): Plan {
     const rates = new Map<string, number>(); // intermediate item -> total per minute
     const raw: Record<string, number> = {};
-    const notes = new Set<string>(["no modules, beacons or productivity bonuses assumed; byproducts ignored"]);
+    const notes = new Set<string>(["built-in and researched productivity applied; no modules or beacons; byproducts ignored"]);
     const order: string[] = [];
     const inputs = new Map<string, Set<string>>();
 
@@ -68,7 +77,8 @@ export class Planner {
       rates.set(name, (rates.get(name) ?? 0) + rate);
       if (!order.includes(name)) order.push(name);
       const recipe = this.p.recipes[recipeName]!;
-      const craftsPerMinute = rate / outputPerCraft(recipe, name);
+      const prod = productivityFor(recipe, this.machineFor(recipe.category)?.productivity ?? 0);
+      const craftsPerMinute = rate / outputPerCraft(recipe, name, prod);
       for (const ing of recipe.ingredients) {
         // Catalysts (e.g. filters returned by the recipe) only cost what isn't given back.
         const net = ing.amount - outputPerCraft(recipe, ing.name);
@@ -85,17 +95,18 @@ export class Planner {
       const recipe = this.p.recipes[recipeName]!;
       const machine = this.machineFor(recipe.category)!;
       const rate = rates.get(name)!;
-      const perMachine = (60 * machine.speed / recipe.energy) * outputPerCraft(recipe, name);
+      const productivity = productivityFor(recipe, machine.productivity);
+      const perMachine = (60 * machine.speed / recipe.energy) * outputPerCraft(recipe, name, productivity);
       if (!machine.unlocked) notes.add(`${machine.name} isn't unlocked yet`);
       if (!recipe.enabled) notes.add(`recipe ${recipeName} isn't unlocked yet`);
-      return { item: name, recipe: recipeName, machine: machine.name, machineSpeed: machine.speed, unlocked: machine.unlocked && recipe.enabled, perMinute: round(rate), machines: round(rate / perMachine), inputs: [...(inputs.get(name) ?? [])] };
+      return { item: name, recipe: recipeName, machine: machine.name, machineSpeed: machine.speed, productivity: round(productivity), unlocked: machine.unlocked && recipe.enabled, perMinute: round(rate), machines: round(rate / perMachine), inputs: [...(inputs.get(name) ?? [])] };
     });
     return { item, perMinute, steps, raw: Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, round(v)])), notes: [...notes] };
   }
 }
 
 export function formatPlan(plan: Plan): string {
-  const steps = plan.steps.map((s) => `${s.item} ${s.perMinute}/min: ${s.machines}× ${s.machine}${s.recipe !== s.item ? ` (recipe ${s.recipe})` : ""}`).join("; ");
+  const steps = plan.steps.map((s) => `${s.item} ${s.perMinute}/min: ${s.machines}× ${s.machine}${s.productivity ? ` (+${Math.round(s.productivity * 100)}% productivity)` : ""}${s.recipe !== s.item ? ` (recipe ${s.recipe})` : ""}`).join("; ");
   const raw = Object.entries(plan.raw).map(([k, v]) => `${k} ${v}`).join(", ");
   return `plan for ${plan.perMinute}/min ${plan.item} (computed): ${steps} | raw inputs/min: ${raw || "none"} | ${plan.notes.join("; ")}`;
 }

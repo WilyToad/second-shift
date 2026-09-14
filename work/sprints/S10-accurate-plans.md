@@ -8,8 +8,9 @@
 
 ## Items
 
-- [ ] FC-098 Modules, beacons and productivity bonuses in production plans
+- [x] FC-098 Modules, beacons and productivity bonuses in production plans
   - Acceptance: machine base productivity and per-force recipe productivity in the dump; planner applies them (capped at the recipe's maximum, ignoring products marked ignored_by_productivity); modules and beacons stay out and are stated
+  - Dump v5: machine `base_productivity` (foundry, biochamber, electromagnetic plant +50%), recipe `productivity_bonus` (e.g. steel +30% researched) and `allows_productivity` (173 of 981 recipes). Planner applies min(machine + research, max), leaving ignored_by_productivity parts alone; 60 bioflux/min now needs 0.5 biochambers (was 0.75). Caught a Lua `x and true or nil` that hid `false`
 - [ ] FC-099 Refresh recipe data when research completes
   - Acceptance: a research_finished event refetches prototypes; unlock state and productivity bonuses update within seconds; no refetch otherwise
 - [ ] FC-100 Productivity in the ratio eval's independent reference

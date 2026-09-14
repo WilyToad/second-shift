@@ -30,6 +30,8 @@ export const RecipeSchema = z.strictObject({
   enabled: z.boolean(),
   maximum_productivity: z.number(),
   surface_conditions: luaArray(SurfaceConditionSchema).optional(),
+  allows_productivity: z.boolean().optional(),
+  productivity_bonus: z.number().optional(), // researched, per force
 });
 
 export const ItemSchema = z.strictObject({
@@ -63,6 +65,7 @@ export const MachineSchema = z.strictObject({
   energy_usage: z.number().optional(),
   mining_speed: z.number().optional(),
   belt_speed: z.number().optional(),
+  base_productivity: z.number().optional(), // e.g. foundry, electromagnetic plant, biochamber: 0.5
 });
 
 /** A buildable entity's footprint: tile size and collision box [left, top, right, bottom] around its position. */

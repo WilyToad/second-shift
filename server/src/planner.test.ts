@@ -52,3 +52,15 @@ test("catalysts only count what the recipe doesn't return, and raw resources sto
   expect(plan.raw.brine).toBe(6000); // 60 crafts/min * 100, not expanded (raw)
   expect(plan.steps.find((s) => s.item === "filter")!.perMinute).toBe(6); // 60 crafts * (1 - 0.9)
 });
+
+test("built-in machine productivity and researched recipe productivity reduce inputs and machines", () => {
+  const q = PrototypesSchema.parse({
+    recipes: { bioflux: { category: "organic", energy: 6, enabled: true, maximum_productivity: 3, allows_productivity: true, productivity_bonus: 0.1, ingredients: [{ type: "item", name: "mash", amount: 15 }], products: [{ type: "item", name: "bioflux", amount: 4 }] } },
+    items: {}, fluids: {}, technologies: {}, entities: {}, raw_resources: ["mash"],
+    machines: { biochamber: { type: "assembling-machine", size: [3, 3], crafting_categories: ["organic"], crafting_speed: 2, base_productivity: 0.5 } },
+  });
+  const plan = new Planner(q).plan("bioflux", 60);
+  // +60% productivity: 4 * 1.6 = 6.4 per craft; 60/6.4 = 9.375 crafts/min; per machine 20 crafts/min -> 0.47 machines
+  expect(plan.steps[0]).toMatchObject({ machine: "biochamber", productivity: 0.6, machines: 0.47 });
+  expect(plan.raw.mash).toBe(140.63); // 9.375 * 15
+});
