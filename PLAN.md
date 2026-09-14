@@ -355,6 +355,14 @@ What changed to get there (FC-102):
   and a few scan ticks reach 1–2 ms while the registry tables grow past 8k and 16k entries. Both happen
   once per save. The 26 ms prototype dump on every research completion is a visible one-frame hitch (FC-103).
 
+**With the mod (2026-09-14, after S11–S14, `bun scripts/benchmark.ts`, no player connected):** without
+0.614 ms/tick, with 0.696 ms/tick, so **0.082 ms/tick** (1,800 ticks × 3 runs). Per-tick script time
+(`scripts/probes/bench-ticks.ts`, `--benchmark-verbose`): 0.088 ms average with the mod vs 0.014 without; only 3
+of 1,800 ticks over 1 ms, all from the one-time registry scan starting on a save without a registry:
+7.5 ms at tick 0 and 6.5 ms at tick 741 (listing a big surface's chunks), 2.6 ms at tick 1340. The
+benchmark's 1,800 ticks don't reach the end of that scan, so the steady-state cost is lower than the
+average (polling alone profiles at 0.055 ms/tick). FC-104 tracks the listing ticks.
+
 **Measure every mod change** with `factorio --benchmark <save copy> --benchmark-ticks N`,
 with and without the companion mod, and watch the in-game time-usage debug view (F4 →
 show-time-usage). Proposed budget: under 0.1 ms per tick on average, no single tick over 1 ms.
