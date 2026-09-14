@@ -9,6 +9,46 @@ return function(handlers)
     "boiler", "generator", "reactor", "agricultural-tower", "character",
   }
 
+  -- What research can change: enabled recipes, recipe productivity bonuses and researched technologies.
+  -- The server patches its cached dump with this instead of dumping everything again (~26 ms).
+  -- With `technologies`, only those technologies and the recipes their effects touch (~0.05 ms; used
+  -- after research completes). Without, the whole force (~1.3 ms, 1,404 recipes; used on connect,
+  -- where it also catches recipes other mods enabled from scripts).
+  handlers.research_state = function(args)
+    local force = game.forces.player
+    -- Compact on purpose: a table per recipe made the whole-force reply 5.4 ms instead of 1.3 ms.
+    local enabled, bonus, researched = {}, {}, {}
+    local function recipe(name, fr)
+      if fr.enabled then enabled[#enabled + 1] = name end
+      local b = fr.productivity_bonus
+      if b > 0 then bonus[name] = b end
+    end
+    local function technology(name, ft)
+      if ft.researched then researched[#researched + 1] = name end
+    end
+    if not args.technologies then
+      for name, fr in pairs(force.recipes) do recipe(name, fr) end
+      for name, ft in pairs(force.technologies) do technology(name, ft) end
+      return { enabled_recipes = enabled, productivity_bonus = bonus, researched_technologies = researched }
+    end
+    local recipes, technologies = {}, {}
+    for _, name in ipairs(args.technologies) do
+      local ft = force.technologies[name]
+      if ft then
+        technologies[#technologies + 1] = name
+        technology(name, ft)
+        for _, effect in pairs(ft.prototype.effects or {}) do
+          local fr = (effect.type == "unlock-recipe" or effect.type == "change-recipe-productivity") and force.recipes[effect.recipe] or nil
+          if fr then
+            recipes[#recipes + 1] = effect.recipe
+            recipe(effect.recipe, fr)
+          end
+        end
+      end
+    end
+    return { recipes = recipes, technologies = technologies, enabled_recipes = enabled, productivity_bonus = bonus, researched_technologies = researched }
+  end
+
   handlers.dump_prototypes = function()
     local force = game.forces.player
 

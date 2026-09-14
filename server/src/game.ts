@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { actions, encodeCommand, parseReply, PrototypesSchema, type ActionArgs, type ActionData, type ActionName, type Digest, type GameEvent, type Prototypes } from "@companion/interfaces";
 import { RconClient } from "./rcon";
 import { readRconSettings, type RconSettings } from "./factorio";
+import { applyResearchState } from "./research";
 
 export type Snapshot = { digest: Digest; receivedAt: number };
 export type LoadedPrototypes = { modsKey: string; data: Prototypes; source: "game" | "cache" };
@@ -24,7 +25,8 @@ export class GameLink {
   private eventListeners = new Set<(e: GameEvent[], dropped: number) => void>();
   private eventSeq: number | null = null;
   private recentEvents: GameEvent[] = [];
-  private refreshRequested = false;
+  /** Technologies finished since the last poll; their effects get patched into the cached prototypes. */
+  private finishedResearch = new Set<string>();
   private loaded: LoadedPrototypes | null = null;
 
   constructor(private readonly opts: { pollMs: number; eventPollMs?: number; historySize: number; cacheDir: string; settings?: () => Promise<RconSettings | null> }) {}
@@ -72,19 +74,39 @@ export class GameLink {
     for (const fn of this.prototypeListeners) fn(p);
   }
 
-  /** Refetches prototype data when the mod list or dump format changed, or when `force` is set
-   * (a research completed, so recipe unlocks and productivity bonuses changed). */
+  /** Refetches prototype data when the mod list or dump format changed, or when `force` is set.
+   * With the same mods, the cache only needs research progress since it was written: patched cheaply. */
   private async syncPrototypes(force = false): Promise<void> {
     const info = await this.call("info");
     // The mod list plus the dump format: either changing means the cached prototypes are stale.
     const modsKey = String(Bun.hash(JSON.stringify([info.dump_version, ...Object.entries(info.mods).sort()])));
-    if (!force && this.loaded?.modsKey === modsKey) return;
+    if (!force && this.loaded?.modsKey === modsKey) {
+      await this.patchResearch();
+      return;
+    }
     const started = performance.now();
     const data = await this.call("dump_prototypes");
     mkdirSync(this.opts.cacheDir, { recursive: true });
     await Bun.write(join(this.opts.cacheDir, "prototypes.json"), JSON.stringify({ modsKey, data }));
     console.log(`Loaded prototypes from the game (${Object.keys(data.recipes).length} recipes, ${(performance.now() - started).toFixed(0)} ms).`);
     this.setPrototypes({ modsKey, data, source: "game" });
+  }
+
+  /** Applies research state to the loaded prototypes: for the given technologies (~0.08 ms in the game)
+   * or the whole force (~1.3 ms, on connect). A full dump costs ~26 ms, a dropped frame. */
+  private async patchResearch(technologies?: string[]): Promise<void> {
+    if (!this.loaded) return this.syncPrototypes(true);
+    let state;
+    try {
+      state = await this.call("research_state", technologies ? { technologies } : {});
+    } catch (e) {
+      if (!(e instanceof ModError)) throw e;
+      return this.syncPrototypes(true); // an older mod without research_state
+    }
+    const { data, changed } = applyResearchState(this.loaded.data, state);
+    if (!changed.length) return;
+    console.log(`Research changed ${changed.length} recipe and technology entries (${changed.slice(0, 3).join(", ")}${changed.length > 3 ? ", …" : ""}).`);
+    this.setPrototypes({ ...this.loaded, data });
   }
 
   /** Drops the connection; the loop reconnects (and re-checks the mod list). */
@@ -114,7 +136,7 @@ export class GameLink {
             this.eventSeq = r.seq;
             this.recentEvents = [...this.recentEvents, ...r.events].slice(-50);
             for (const fn of this.eventListeners) fn(r.events, dropped);
-            if (r.events.some((e) => e.kind === "research_finished")) this.refreshRequested = true;
+            for (const e of r.events) if (e.kind === "research_finished" && e.research) this.finishedResearch.add(e.research);
           }
         } catch {
           // The digest loop owns reconnects; just try again next tick.
@@ -175,9 +197,10 @@ export class GameLink {
         }
       }
       try {
-        if (this.refreshRequested) {
-          this.refreshRequested = false;
-          await this.syncPrototypes(true);
+        if (this.finishedResearch.size) {
+          const names = [...this.finishedResearch].slice(0, 100);
+          for (const name of names) this.finishedResearch.delete(name);
+          await this.patchResearch(names);
         }
         const digest = await this.call("digest");
         this.historyStore.push({ digest, receivedAt: Date.now() });

@@ -46,7 +46,8 @@ if (!existsSync(settingsPath)) {
 
 console.log(`Hosting ${save}${dev ? " (dev: no autosaves)" : ""}…`);
 // Started without Steam's relaunch (no "custom arguments" prompt); don't tie its lifetime to this script.
-// Note: the client ignores --bind when hosting; the game port listens on all interfaces (password-protected).
+// Note: the client ignores --bind when hosting (rechecked 2026-09-14: still 0.0.0.0:34197). The port is
+// protected by a random password, max_players 1 and no LAN or public listing.
 const launchLog = join(dataDir, "factorio-launch.log");
 spawnFactorio(["--host", save, "--server-settings", settingsPath], { logPath: launchLog }).unref();
 

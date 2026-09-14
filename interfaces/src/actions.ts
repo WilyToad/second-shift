@@ -78,6 +78,19 @@ export const actions = {
   info: { args: z.object({}), data: InfoSchema },
   digest: { args: z.object({}), data: DigestSchema },
   dump_prototypes: { args: z.object({}), data: PrototypesSchema },
+  research_state: {
+    // Without technologies: the whole force. With: those technologies and the recipes their effects
+    // touch, listed in `recipes`/`technologies` (the scope the other fields describe).
+    args: z.object({ technologies: z.array(z.string()).max(100).optional() }),
+    data: z.object({
+      recipes: luaArray(z.string()).optional(),
+      technologies: luaArray(z.string()).optional(),
+      enabled_recipes: luaArray(z.string()),
+      productivity_bonus: z.record(z.string(), z.number()), // only non-zero bonuses
+      researched_technologies: luaArray(z.string()),
+    }),
+    kind: "look",
+  },
   find_entities: { args: FindEntitiesArgsSchema, data: FindEntitiesSchema, kind: "look" },
   highlight: { args: TargetsSchema.extend({ seconds: z.number().positive().max(300).default(30) }), data: z.object({ drawn: z.number(), seconds: z.number() }), kind: "look" },
   clear_highlight: { args: z.object({}), data: z.object({ cleared: z.number() }), kind: "look" },

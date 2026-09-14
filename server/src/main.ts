@@ -20,6 +20,7 @@ const model = new OmlxClient({ baseUrl: "http://127.0.0.1:8888", apiKey: await r
 let modelState: { state: "loading" | "ready" | "error"; error?: string } = { state: "loading" };
 let busy: Promise<void> = Promise.resolve();
 let system = systemPrompt(null);
+let alignedBase: string | null = null; // the base prompt `system` was last aligned from
 let retriever: RecipeRetriever | null = null;
 
 // COMPANION_REPLAY_DIGEST=data/captures/digest.json: use a captured digest while the game isn't
@@ -112,6 +113,9 @@ game.onPrototypes((p) => {
   console.log(`Grounding on ${Object.keys(p.data.recipes).length} recipes (${p.source}).`);
   busy = busy.then(async () => {
     const base = systemPrompt(p.data);
+    // Research only flips enabled and researched flags, which the system prompt doesn't show: the
+    // aligned prompt and the model's cache are still good, so skip re-measuring and re-warming.
+    if (base === alignedBase) return;
     system = base;
     try {
       const categories = [...craftersByCategory(p.data)].sort(([a], [b]) => a.localeCompare(b)).map(([c, crafters]) => `crafting category ${c}: ${crafters.join(", ")}`);
@@ -120,6 +124,7 @@ game.onPrototypes((p) => {
       const measure = async (s: string) => (await model.stream(buildMessages(s, [], { role: "user", content: "." }), { tools: TOOLS, maxTokens: 1 })).usage?.prompt_tokens ?? 0;
       const aligned = await alignToCacheBlock(base, [...categories, ...techTree], measure, "[save data: reference (crafting categories and the technology tree)]");
       system = aligned.system;
+      alignedBase = base;
       console.log(`System prompt aligned to the cache: ${aligned.tokens} tokens (block boundary ${aligned.target}).`);
     } catch (e) {
       console.warn("Couldn't align the system prompt to the cache:", (e as Error).message);

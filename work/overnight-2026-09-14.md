@@ -54,4 +54,9 @@ Times are commit times (local).
 - **S11 closed** (megabase scale): test tooling builds 25,000 machines in the running dev game (nothing saved). `find_machines` was 5.9 ms per call at that size; now 0.79 ms (per-chunk index with status counts). Per-tick costs stay flat (polling 0.05 ms, rate refresh 0.05 ms, alerts 0.04 ms). All suites pass; blueprint e2e was 7/8 once (model invented a problem in a clean blueprint) and 8/8 on rerun. Table in PLAN §5.
 - Caught before committing: my first scan fix kept a chunk iterator in a module-local, which would desync a multiplayer peer that loads mid-scan. Scan progress is back in `storage`. The cost is one ~7 ms tick to list Nauvis's chunks, once per save (FC-104).
 - New backlog: FC-103 (the 26 ms prototype dump runs on every research completion, one dropped frame), FC-104 (scan outlier ticks).
+- S12 "No hitches" planned and activated (delegated): FC-103 research refresh without a full dump, FC-072 hosted game bound to localhost.
+- FC-103 done: research completion now patches recipe data with a targeted `research_state` query (0.06 ms in the game) instead of a 26 ms full dump; verified identical to a full dump in-game. Also fixed: reconnecting with the same mods kept stale research flags from the cache.
+- FC-072 blocked: the GUI client ignores `--bind` when hosting (rechecked). The remaining options touch your config.ini or macOS firewall, so it's back in the backlog for you.
+- **S12 closed** (no hitches): all suites pass.
+- **Review:** FC-072, the hosted dev game's port 34197 is open on all interfaces. It's password-protected with max_players 1. If you want it closed, a macOS firewall rule for Factorio is the likely route; your call.
 
