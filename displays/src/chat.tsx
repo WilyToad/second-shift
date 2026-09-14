@@ -59,15 +59,27 @@ function Item({ item }: { item: ThreadItem }) {
   }
 }
 
+const FOLLOW_SLACK_PX = 48;
+
 export function Thread() {
   const ref = useRef<HTMLElement>(null);
-  // Streaming tokens update text nodes directly (no re-render), so follow DOM changes to keep scrolled down.
+  // Streaming tokens update text nodes directly (no re-render), so follow DOM changes to keep scrolled down, but only
+  // while the player is at the bottom: charts redraw on every snapshot, and following those pulled the player back
+  // down whenever they scrolled up to read. A new question from the player always jumps to the bottom.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const follow = new MutationObserver(() => { el.scrollTop = el.scrollHeight; });
+    let stuck = true;
+    const onScroll = () => { stuck = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_SLACK_PX; };
+    const follow = new MutationObserver((records) => {
+      const asked = records.some((r) => [...r.addedNodes].some((n) => (n as HTMLElement).classList?.contains("user")));
+      if (!stuck && !asked) return;
+      el.scrollTop = el.scrollHeight;
+      stuck = true;
+    });
+    el.addEventListener("scroll", onScroll, { passive: true });
     follow.observe(el, { childList: true, subtree: true, characterData: true });
-    return () => follow.disconnect();
+    return () => { follow.disconnect(); el.removeEventListener("scroll", onScroll); };
   }, []);
   return (
     <main id="thread" aria-live="polite" ref={ref}>

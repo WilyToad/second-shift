@@ -26,6 +26,10 @@
   - Acceptance: the player reviews the console layout, blueprint sketch card (copy and import), screenshot card and charts at their monitor size; anything wrong gets fixed
   - Player review: console layout good; blueprint card worked (copied string imported in-game); screenshot card and science chart worked. One problem: a space platform tab showed raw rich text, `[virtual-signal=signal-1]Rocket One`. Fixed with `displays/src/rich-text.tsx`: icon tags become small badges ("1 Rocket One"), and color/font tags keep only their text, in platform tabs, alert locations, chart titles and screenshot captions. The raw name stays in data for charts and prompts. Unit test; display suite passes; console e2e 4/4
 
+- [x] FC-118 Chat keeps jumping to the bottom while reading older messages
+  - Acceptance: scrolling up in the chat stays put through streaming answers and chart redraws; new content is followed only when already at the bottom; a new question jumps to the bottom
+  - Reported by the player. The thread followed every DOM change, and charts redraw on each snapshot (every 2 s). It now follows only while within 48 px of the bottom, or when a new question is added. Display test with fixed geometry (follows at the bottom, stays at 100 px through new tokens, jumps on a new question)
+
 ## Notes
 
 Started 2026-09-14 morning with the player. FC-027 (Ctrl+Z) and FC-028 (fog of war) were verified first and recorded in S03. FC-115 (the selection shortcut) was verified next and recorded in S17.

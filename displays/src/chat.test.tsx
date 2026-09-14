@@ -122,3 +122,37 @@ test("a screenshot shows as an image with its caption", async () => {
   expect(img.getAttribute("alt")).toBe("Your spot: 64 tiles across around (9, 0) on gleba");
 });
 
+test("the thread follows new content only while scrolled to the bottom; a new question always jumps down", async () => {
+  const { render } = await import("preact");
+  const { Thread } = await import("./chat");
+  const { onMessage } = await import("./store");
+  onMessage({ type: "reset" });
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  render(<Thread />, root);
+  await new Promise((r) => setTimeout(r, 10));
+  const el = root.querySelector("#thread") as unknown as HTMLElement;
+  // happy-dom has no layout: give the thread a fixed geometry.
+  let height = 1000;
+  Object.defineProperty(el, "scrollHeight", { get: () => height, configurable: true });
+  Object.defineProperty(el, "clientHeight", { get: () => 200, configurable: true });
+  const settle = () => new Promise((r) => setTimeout(r, 20));
+
+  onMessage({ type: "user", text: "first" });
+  onMessage({ type: "token", text: "answer" });
+  await settle();
+  expect(el.scrollTop).toBe(1000); // at the bottom: follows
+
+  el.scrollTop = 100; // the player scrolls up to read
+  el.dispatchEvent(new window.Event("scroll") as unknown as Event);
+  height = 1400;
+  onMessage({ type: "token", text: " more" }); // streaming or a chart redraw
+  onMessage({ type: "done", totalMs: 1 });
+  await settle();
+  expect(el.scrollTop).toBe(100); // stays where the player is reading
+
+  onMessage({ type: "user", text: "second question" });
+  await settle();
+  expect(el.scrollTop).toBe(1400); // their own question jumps to the bottom
+});
+
