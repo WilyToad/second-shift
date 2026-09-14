@@ -79,7 +79,7 @@ function statusMessage(): ServerMessage {
   const s = game.status();
   return {
     type: "status",
-    game: { connected: s.connected, tick: s.latest?.digest.tick, ageMs: s.latest ? Date.now() - s.latest.receivedAt : undefined, error: s.connected ? undefined : s.lastError },
+    game: { connected: s.connected, tick: s.latest?.digest.tick, ageMs: s.latest ? Date.now() - s.latest.receivedAt : undefined, paused: s.latest?.digest.paused, error: s.connected ? undefined : s.lastError },
     model: modelState,
   };
 }

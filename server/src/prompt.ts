@@ -57,17 +57,18 @@ export function diagnose(digest: Digest): string[] {
 }
 
 const MACHINE_QUESTION = /\b(slow|stuck|bottleneck\w*|why|problem\w*|broken|idle|starv\w*|backed up|back(ing)? up|not working|blocked|jam\w*|full)\b/i;
-const RATE_QUESTION = /\b(rate|rates|per minute|\/min|output|throughput|production|produc\w*|making|consum\w*|science|bottleneck|slow|stalled|how much|how many)\b/i;
+const RATE_QUESTION = /\b(rate|rates|per minute|\/min|output|throughput|production|produc\w*|making|consum\w*|science|bottleneck|slow|stalled)\b/i;
 
 /**
  * Compact text form of a digest; kept small because it's the uncached tail of every prompt.
  * Production lines are included only when the question is about rates or names an item the
  * digest tracks (`items`: prototype names matched in the question). Pass no options for everything.
  */
-export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { question: string; items: string[] }): string {
-  const wantsRates = !relevance || RATE_QUESTION.test(relevance.question);
+export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { question: string; items: string[]; planned?: boolean }): string {
+  // A computed plan already answers rate targets; only lines for the planned items stay (S10 latency).
+  const wantsRates = !relevance || (!relevance.planned && RATE_QUESTION.test(relevance.question));
   const mentioned = new Set(relevance?.items ?? []);
-  const lines = [`[game state at tick ${digest.tick}, ${Math.round(ageMs / 1000)} s old]`];
+  const lines = [`[game state at tick ${digest.tick}, ${Math.round(ageMs / 1000)} s old${digest.paused ? ", game is PAUSED: rates and machine status are frozen" : ""}]`];
   if (digest.player) lines.push(`player: ${digest.player.name} on ${digest.player.surface} at (${digest.player.position.x}, ${digest.player.position.y})`);
   const r = digest.research;
   lines.push(`research: ${r.current ? `${r.current} ${Math.round(r.progress * 100)}%` : "nothing researching"}${r.queue.length > 1 ? `; queued: ${r.queue.slice(1).join(", ")}` : ""}`);
@@ -88,7 +89,7 @@ export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { ques
 
   // Machine status from the mod's registry (FC-085): only for slowness/rate questions, filtered to asked-about items.
   const m = digest.machines;
-  if (m && (!relevance || MACHINE_QUESTION.test(relevance.question) || RATE_QUESTION.test(relevance.question))) {
+  if (m && (!relevance || (!relevance.planned && (MACHINE_QUESTION.test(relevance.question) || RATE_QUESTION.test(relevance.question))))) {
     // A question naming a surface ("factory floor", "gleba") only gets that surface's lines. When both
     // "nauvis" and "nauvis-factory-floor" match, the more specific one wins.
     const q = relevance?.question.toLowerCase().replace(/[-_]/g, " ") ?? "";

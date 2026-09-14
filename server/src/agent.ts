@@ -258,7 +258,8 @@ export class Agent {
     if (pasted.raws.length) this.lastBlueprint = { raw: pasted.raws.at(-1)!, at: this.now() };
     const snap = this.deps.game.latest() ?? this.deps.fallbackSnapshot?.();
     const found = this.deps.retriever()?.retrieve(question);
-    const snapshot = snap ? formatSnapshot(snap.digest, this.now() - snap.receivedAt, { question, items: found?.items ?? [] }) : null;
+    const plannedTarget = parseTarget(question) !== null;
+    const snapshot = snap ? formatSnapshot(snap.digest, this.now() - snap.receivedAt, { question, items: found?.items ?? [], planned: plannedTarget }) : null;
     // Outcomes of approvals since the last turn go in front of the question, keeping history append-only.
     const withBlueprints = pasted.summaries.length ? `${question}\n\n${pasted.summaries.join("\n\n")}` : question;
     const noted = this.notes.length ? `[since your last reply: ${this.notes.join("; ")}]\n\n${withBlueprints}` : withBlueprints;

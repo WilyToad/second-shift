@@ -4,7 +4,7 @@ import type { Plan } from "./planner";
 import type { SeriesMap } from "./series";
 
 export type ServerMessage =
-  | { type: "status"; game: { connected: boolean; tick?: number; ageMs?: number; error?: string }; model: { state: "loading" | "ready" | "error"; error?: string } }
+  | { type: "status"; game: { connected: boolean; tick?: number; ageMs?: number; paused?: boolean; error?: string }; model: { state: "loading" | "ready" | "error"; error?: string } }
   | { type: "user"; text: string }
   | { type: "token"; text: string }
   | { type: "tool"; summary: string }

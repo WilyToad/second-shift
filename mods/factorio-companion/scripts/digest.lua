@@ -127,6 +127,7 @@ return function(handlers)
 
     return {
       tick = game.tick,
+      paused = game.tick_paused,
       machines = { progress = machines.progress(), stuck = stuck },
       player = player and {
         name = player.name,

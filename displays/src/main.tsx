@@ -8,6 +8,7 @@ function Header() {
   const game = !connected.value
     ? { text: "server: reconnecting…", cls: "crit" }
     : !s ? { text: "game: connecting…", cls: "warn" }
+    : s.game.connected && s.game.paused ? { text: "game paused", cls: "warn" }
     : s.game.connected ? { text: `game linked · snapshot ${s.game.ageMs !== undefined ? `${Math.round(s.game.ageMs / 1000)} s old` : "waiting"}`, cls: "ok" }
     : { text: `game: not connected${s.game.error ? ` (${s.game.error})` : ""}`, cls: "warn" };
   const model = s?.model.state ?? "loading";

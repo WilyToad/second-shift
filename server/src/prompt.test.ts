@@ -107,3 +107,20 @@ test("alignment converges when reference lines tokenize differently from the sys
   expect(aligned.tokens).toBeGreaterThanOrEqual(4096 + 24);
   expect(aligned.tokens).toBeLessThan(4096 + 24 + 40);
 });
+
+test("a paused game is called out in the snapshot header", () => {
+  const d = DigestSchema.parse({ tick: 7, paused: true, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {} });
+  expect(formatSnapshot(d, 0)).toStartWith("[game state at tick 7, 0 s old, game is PAUSED: rates and machine status are frozen]");
+});
+
+test("planned rate questions skip machine and production blocks", () => {
+  const d = DigestSchema.parse({
+    tick: 1, research: { progress: 0, queue: {} }, alerts: {},
+    surfaces: [{ name: "gleba", produced: [{ name: "bioflux", per_minute: 38 }, { name: "jelly", per_minute: 90 }], consumed: {}, science: {}, age_ticks: 0 }],
+    machines: { progress: { machines: 10, scanned: true, refresh_ticks: 60 }, stuck: [{ surface: "gleba", recipes: [{ recipe: "bioflux", total: 4, stuck: 2, statuses: { full_output: 2 } }] }] },
+  });
+  const text = formatSnapshot(d, 0, { question: "how many biochambers for 60 bioflux per minute?", items: ["bioflux"], planned: true });
+  expect(text).not.toContain("stuck machines");
+  expect(text).toContain("gleba rates/min for items asked about: bioflux 38");
+  expect(text).not.toContain("jelly");
+});
