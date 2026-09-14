@@ -73,6 +73,7 @@ Most Factorio Lua online (and in model training data) targets 1.1. In 2.0:
 - Use `script.on_nth_tick` for periodic export. 60 ticks = 1 s.
 - `script.on_nth_tick(n, f)` and `script.on_event(e, f)` *replace* any earlier handler for the same n or event.
   Register periodic work through `util.on_nth_tick` in the mod.
+- `require` only works while the mod loads (main chunk), never inside handlers. Require modules at the top.
 - Lua gotcha: `x and f(x) or default` returns `default` whenever `f(x)` is nil or false. Use an explicit `if`.
 - Bump `DUMP_VERSION` in `control.lua` whenever `dump_prototypes` changes shape; the server's prototype cache is keyed on it.
 - `helpers.table_to_json` writes empty tables as `{}`. Parse replies through the `interfaces` schemas.

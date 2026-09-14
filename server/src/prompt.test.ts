@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { DigestSchema } from "@companion/interfaces";
-import { alignToCacheBlock, buildMessages, formatSnapshot, systemPrompt, userTurn } from "./prompt";
+import { alignToCacheBlock, buildMessages, diagnose, formatSnapshot, systemPrompt, userTurn } from "./prompt";
 
 const digest = DigestSchema.parse({
   tick: 100, player: { name: "p", surface: "gleba", position: { x: 1, y: 2 } },
@@ -49,4 +49,51 @@ test("stable prefix is padded with reference lines until it crosses the next cac
   expect(aligned.tokens).toBeGreaterThanOrEqual(4096 + 24); // clears the boundary despite the probe's user-turn tokens
   expect(aligned.tokens).toBeLessThan(4096 + 64); // just past the boundary, not a whole extra block
   expect(aligned.system.startsWith(system)).toBe(true);
+});
+
+test("stuck machine lines appear for slowness questions, filtered to the asked-about item", () => {
+  const d = DigestSchema.parse({
+    tick: 1, research: { progress: 0, queue: {} }, alerts: {}, surfaces: {},
+    machines: { progress: { machines: 100, scanned: true, refresh_ticks: 120 }, stuck: [{ surface: "nauvis", recipes: [
+      { recipe: "iron-gear-wheel", total: 20, stuck: 8, statuses: { item_ingredient_shortage: 6, full_output: 2 } },
+      { recipe: "mining iron-ore", total: 50, stuck: 40, statuses: { waiting_for_space_in_destination: 40 } },
+    ] }] },
+  });
+  const slow = formatSnapshot(d, 0, { question: "why are my iron gear wheels slow?", items: ["iron-gear-wheel"] });
+  expect(slow).toContain("nauvis stuck machines (stuck/total by recipe): iron-gear-wheel 8/20 (item ingredient shortage 6, full output 2)");
+  expect(slow).not.toContain("mining iron-ore");
+  expect(slow).toContain("(machine status covers 100 machines, refreshed every 2 s)");
+  expect(formatSnapshot(d, 0, { question: "what's the recipe for iron gear wheels?", items: ["iron-gear-wheel"] })).not.toContain("stuck machines");
+});
+
+test("diagnosis hints: stopped research backing up science, and output-blocked surfaces", () => {
+  const d = DigestSchema.parse({
+    tick: 1, research: { progress: 0, queue: {} }, alerts: {}, surfaces: {},
+    machines: { progress: { machines: 500, scanned: true, refresh_ticks: 120 }, stuck: [
+      { surface: "nauvis-factory-floor", recipes: [
+        { recipe: "iron-plate", total: 240, stuck: 218, statuses: { full_output: 218 } },
+        { recipe: "(research)", total: 47, stuck: 47, statuses: { no_research_in_progress: 47 } },
+      ] },
+      { surface: "nauvis", recipes: [{ recipe: "automation-science-pack", total: 14, stuck: 14, statuses: { full_output: 14 } }] },
+    ] },
+  });
+  const hints = diagnose(d);
+  expect(hints[0]).toBe("root cause: research has stopped: 47 labs are idle with nothing queued, so science assemblers (automation-science-pack on nauvis) have full output and everything upstream backs up");
+  expect(hints).toContain("symptom on nauvis-factory-floor: most stuck machines are output-blocked (218 of 265): products aren't being taken away downstream");
+});
+
+test("a question naming a surface only gets that surface's machine lines, plus root causes", () => {
+  const d = DigestSchema.parse({
+    tick: 1, research: { progress: 0, queue: {} }, alerts: {}, surfaces: {},
+    machines: { progress: { machines: 500, scanned: true, refresh_ticks: 120 }, stuck: [
+      { surface: "nauvis", recipes: [{ recipe: "mining iron-ore", total: 50, stuck: 40, statuses: { waiting_for_space_in_destination: 40 } }, { recipe: "(research)", total: 10, stuck: 10, statuses: { no_research_in_progress: 10 } }] },
+      { surface: "nauvis-factory-floor", recipes: [{ recipe: "iron-plate", total: 240, stuck: 218, statuses: { full_output: 218 } }] },
+      { surface: "gleba", recipes: [{ recipe: "yumako-processing", total: 9, stuck: 3, statuses: { item_ingredient_shortage: 3 } }] },
+    ] },
+  });
+  const text = formatSnapshot(d, 0, { question: "Why is my Nauvis factory floor so slow?", items: [] });
+  expect(text).toContain("nauvis-factory-floor stuck machines");
+  expect(text).not.toContain("gleba stuck machines");
+  expect(text).toContain("root cause: research has stopped");
+  expect(text).not.toContain("symptom on nauvis:");
 });

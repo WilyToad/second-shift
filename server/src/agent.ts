@@ -92,6 +92,21 @@ export const TOOLS: ToolSpec[] = [
   {
     type: "function",
     function: {
+      name: "find_stuck_machines",
+      description: "List and highlight machines that aren't working for a recipe or item (from the live status registry). Use when the player asks which machines are stuck or wants to see them.",
+      parameters: {
+        type: "object",
+        properties: {
+          what: { type: "string", description: "Recipe or item as the player said it: iron gear wheels, bioflux, iron ore (for drills), ..." },
+          surface: { type: "string", description: "Surface name if not the player's current one." },
+        },
+        required: ["what"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "mark_deconstruction",
       description: "Ask the player to approve marking the last result for deconstruction (like a deconstruction planner drag; robots do the work; Ctrl+Z undoes it). Nothing happens until they confirm.",
       parameters: { type: "object", properties: {} },
@@ -115,7 +130,7 @@ export const TOOLS: ToolSpec[] = [
 export function needsWorldTools(question: string, hasLastResult: boolean): boolean {
   const q = question.toLowerCase();
   if (/\b(near|nearby|around me|next to me|close to me|here|to my|on my|of me|in view|on screen|visible)\b/.test(q)) return true;
-  if (/\b(find|search|look for|highlight|show me|where are|count)\b/.test(q)) return true;
+  if (/\b(find|search|look for|highlight|show me|where are|count|which)\b/.test(q)) return true;
   if (/\b(mark|unmark|deconstruct\w*|remove|delete|clear|cancel)\b/.test(q)) return true;
   if (/\bhow many\b/.test(q) && !/\b(need|needs|take|takes|require|requires|make|makes|per)\b/.test(q)) return true;
   if (hasLastResult && /\b(them|those|these|it|that)\b/.test(q)) return true;
@@ -295,6 +310,8 @@ export class Agent {
       switch (call.function.name) {
         case "find_entities":
           return await this.find(args);
+        case "find_stuck_machines":
+          return await this.findStuck(args);
         case "mark_deconstruction":
         case "cancel_deconstruction":
           return this.propose(call.function.name);
@@ -326,6 +343,37 @@ export class Agent {
       r.truncated ? `Only the first ${r.entities.length} are remembered.` : "",
       r.count ? `They are highlighted in-game for ${HIGHLIGHT_SECONDS} s and remembered as the last result.` : "",
     ].filter(Boolean).join(" ");
+  }
+
+  private async findStuck(args: Record<string, unknown>): Promise<string> {
+    const what = String(args.what ?? "");
+    const digest = this.deps.game.latest()?.digest;
+    if (!digest?.machines) return "Machine status isn't available yet (the game isn't connected or the registry is still starting).";
+    const names = new Set(this.deps.retriever()?.match(what).map((e) => e.name) ?? []);
+    const wanted = String(args.surface ?? "");
+    const candidates = digest.machines.stuck
+      .filter((s) => !wanted || s.surface === wanted)
+      .flatMap((s) => s.recipes.map((r) => ({ surface: s.surface, recipe: r.recipe })))
+      .filter((c) => [...names].some((n) => c.recipe === n || c.recipe === `mining ${n}`) || c.recipe.replace(/-/g, " ").includes(what.toLowerCase().replace(/s$/, "")));
+    if (!candidates.length) return `No stuck machines for "${what}" in the current status data${wanted ? ` on ${wanted}` : ""}.`;
+    // Prefer the player's surface, where results can be highlighted.
+    const here = digest.player?.surface;
+    candidates.sort((a, b) => Number(b.surface === here) - Number(a.surface === here));
+    const parts: string[] = [];
+    let refs: EntityRef[] = [];
+    for (const c of candidates.slice(0, 2)) {
+      const r = await this.deps.game.call("find_machines", { recipe: c.recipe, surface: c.surface });
+      const statuses = Object.entries(r.by_status).map(([st, n]) => `${st.replace(/_/g, " ")} ${n}`).join(", ");
+      parts.push(`${r.count} ${c.recipe} machines not working on ${c.surface}${statuses ? ` (${statuses})` : ""}${r.not_visible ? `, ${r.not_visible} more in chunks the player can't see` : ""}${r.same_surface ? "" : " (not highlighted: the player is on another surface)"}`);
+      if (r.same_surface) refs = [...refs, ...r.entities];
+    }
+    if (refs.length) {
+      await this.deps.game.call("highlight", { entities: refs.slice(0, 1000), seconds: HIGHLIGHT_SECONDS });
+      this.lastResult = { refs, label: `stuck ${what}`, count: refs.length, at: this.now(), where: `on ${here}` };
+    }
+    const summary = `${parts.join("; ")}.${refs.length ? ` Highlighted in-game for ${HIGHLIGHT_SECONDS} s.` : ""}`;
+    this.deps.emit({ type: "tool", summary });
+    return summary;
   }
 
   private propose(action: MapAction): string {

@@ -4,8 +4,21 @@ import { luaArray } from "./protocol";
 
 export const RateSchema = z.object({ name: z.string(), per_minute: z.number() });
 
+const lookup = (v: unknown) => (Array.isArray(v) ? {} : v);
+
+export const StuckRecipeSchema = z.object({
+  recipe: z.string(),
+  total: z.number(),
+  stuck: z.number(),
+  statuses: z.preprocess(lookup, z.record(z.string(), z.number())),
+});
+
 export const DigestSchema = z.object({
   tick: z.number(),
+  machines: z.object({
+    progress: z.object({ machines: z.number(), scanned: z.boolean(), refresh_ticks: z.number() }),
+    stuck: luaArray(z.object({ surface: z.string(), recipes: luaArray(StuckRecipeSchema) })),
+  }).optional(),
   player: z.object({
     name: z.string(),
     surface: z.string(),

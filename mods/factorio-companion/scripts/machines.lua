@@ -2,6 +2,7 @@
 -- events, status polled round-robin with a fixed per-tick budget, and running counts per
 -- surface, recipe and status. Cost stays flat as the base grows; only the refresh period grows.
 local util = require("scripts.util")
+local helmet = require("scripts.helmet")
 
 local TYPES = { "assembling-machine", "furnace", "rocket-silo", "lab", "mining-drill" }
 local TYPE_SET = {}
@@ -184,6 +185,33 @@ function M.register(handlers)
 
   handlers.machine_stats = function()
     return { progress = M.progress(), counts = M.counts() }
+  end
+
+  -- Look: registered machines for a recipe label that aren't working, where the player can see them.
+  handlers.find_machines = function(args)
+    local player = util.companion_player()
+    if not player then util.reject("no_player", "No player is connected.") end
+    local surface = args.surface or player.surface.name
+    local wanted = nil
+    if args.statuses and #args.statuses > 0 then
+      wanted = {}
+      for _, st in ipairs(args.statuses) do wanted[st] = true end
+    end
+    local refs, by_status, count, not_visible = {}, {}, 0, 0
+    for _, entity in ipairs(M.matching(surface, args.recipe, nil)) do
+      local status = STATUS_NAME[entity.status] or "unknown"
+      local stuck = status ~= "working" and status ~= "normal"
+      if (wanted and wanted[status]) or (not wanted and stuck) then
+        if entity.surface == player.surface and not helmet.visible(player.force, entity.surface, entity.position) then
+          not_visible = not_visible + 1
+        else
+          count = count + 1
+          by_status[status] = (by_status[status] or 0) + 1
+          if #refs < 200 then refs[#refs + 1] = { name = entity.name, x = entity.position.x, y = entity.position.y } end
+        end
+      end
+    end
+    return { surface = surface, recipe = args.recipe, count = count, by_status = by_status, not_visible = not_visible, entities = refs, same_surface = surface == player.surface.name }
   end
 
   -- Test tooling: runs one extra tick of scanning/polling so its cost can be profiled over RCON.

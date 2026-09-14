@@ -14,8 +14,9 @@
 - [x] FC-084 Round-robin status polling with a fixed per-tick budget
   - Acceptance: status counts per surface and recipe (working, no ingredients, full output, no power, …) refreshed in rotation; profiler cost within the S07 budget; refresh period reported
   - 20 machines per tick in rotation (refresh every 138 ticks on the dev save), incremental counts per surface/recipe/status; ~0.055 ms per tick by profiler. First real finding: 241 iron and 317 copper drills on Nauvis are waiting for space in destination
-- [ ] FC-085 Status in the digest and a `find_stuck` look tool
+- [x] FC-085 Status in the digest and a `find_stuck` look tool
   - Acceptance: the snapshot shows stuck counts for relevant recipes; the agent can list and highlight stuck machines for a recipe near the player or on a surface
+  - Digest carries each surface's worst stuck recipes (Lua digest now ~0.48 ms per 2 s poll); snapshot adds them for slowness/rate questions, filtered to named surfaces and items, plus computed diagnosis hints ("root cause: research has stopped …", output-blocked or starved surfaces). `find_stuck_machines` lists and highlights (visible chunks only). On the dev save: "Why is my Nauvis factory floor so slow?" leads with the research stall; "Show me the stuck yumako processing machines" highlights them on Gleba
 - [ ] FC-043 `recipe_graph` component
   - Acceptance: optional for this sprint. Recipe chain with stuck nodes highlighted, drawn from prototypes and status
 - [ ] FC-086 Diagnosis scenario eval

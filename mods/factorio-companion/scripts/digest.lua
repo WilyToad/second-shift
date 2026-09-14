@@ -1,5 +1,6 @@
 -- Small, frequently polled summary built from engine aggregates only: no entity scans.
 local util = require("scripts.util")
+local machines = require("scripts.machines")
 local companion_player = util.companion_player
 
 return function(handlers)
@@ -106,8 +107,27 @@ return function(handlers)
       end
     end
 
+    -- Worst stuck recipes per surface from the machine registry (FC-085).
+    local stuck = {}
+    for surface_name, by_recipe in pairs(machines.counts()) do
+      local rows = {}
+      for recipe, statuses in pairs(by_recipe) do
+        local total, bad, detail = 0, 0, {}
+        for status, n in pairs(statuses) do
+          total = total + n
+          if status ~= "working" and status ~= "normal" then bad = bad + n; detail[status] = n end
+        end
+        if bad > 0 then rows[#rows + 1] = { recipe = recipe, total = total, stuck = bad, statuses = detail } end
+      end
+      table.sort(rows, function(a, b) return a.stuck > b.stuck end)
+      local top = {}
+      for i = 1, math.min(8, #rows) do top[i] = rows[i] end
+      if #top > 0 then stuck[#stuck + 1] = { surface = surface_name, recipes = top } end
+    end
+
     return {
       tick = game.tick,
+      machines = { progress = machines.progress(), stuck = stuck },
       player = player and {
         name = player.name,
         surface = player.surface.name,

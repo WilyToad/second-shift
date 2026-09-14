@@ -85,6 +85,15 @@ export const actions = {
   cancel_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
   events: { args: z.object({ since: z.number().default(0) }), data: EventsSchema, kind: "look" },
   machine_stats: { args: z.object({}), data: MachineStatsSchema, kind: "look" },
+  find_machines: {
+    args: z.object({ recipe: z.string().optional(), surface: z.string().optional(), statuses: z.array(z.string()).optional() }),
+    data: z.object({
+      surface: z.string(), recipe: z.string().optional(), count: z.number(), not_visible: z.number(), same_surface: z.boolean(),
+      by_status: z.preprocess((v) => (Array.isArray(v) ? {} : v), z.record(z.string(), z.number())),
+      entities: luaArray(EntityRefSchema),
+    }),
+    kind: "look",
+  },
   debug_machine_tick: { args: z.object({}), data: MachineProgressSchema, kind: "look" },
 } as const;
 
