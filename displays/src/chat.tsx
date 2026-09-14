@@ -4,11 +4,19 @@ import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
 import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 
+/** Bold and inline code the model writes in Markdown (`**1,493/min**`, `` `iron-plate` ``) render as such, not as raw marks (FC-125). */
+export function Emphasis({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*\n]+\*\*|`[^`\n]+`)/);
+  return <>{parts.map((p, i) => p.startsWith("**") && p.endsWith("**") && p.length > 4 ? <strong key={i}>{p.slice(2, -2)}</strong>
+    : p.startsWith("`") && p.endsWith("`") && p.length > 2 ? <code key={i}>{p.slice(1, -1)}</code>
+    : p)}</>;
+}
+
 function AgentText({ text }: { text: string }) {
   return (
     <div class="msg agent">
       {segments(text).map((seg, i) =>
-        seg.kind === "text" ? <span key={i}>{seg.text}</span>
+        seg.kind === "text" ? <span key={i}><Emphasis text={seg.text} /></span>
         : seg.kind === "pending" ? <div key={i} class="vis-empty">Drawing chart…</div>
         : <RateChart key={i} spec={seg} />,
       )}

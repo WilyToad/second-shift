@@ -156,3 +156,13 @@ test("the thread follows new content only while scrolled to the bottom; a new qu
   expect(el.scrollTop).toBe(1400); // their own question jumps to the bottom
 });
 
+
+test("bold and inline code in answers render as markup, not raw marks", async () => {
+  const { render } = await import("preact");
+  const { Emphasis } = await import("./chat");
+  const root = document.createElement("div");
+  render(<Emphasis text="Gleba makes **1,493/min** of `jelly`, and a lone ** stays." />, root);
+  expect(root.querySelector("strong")?.textContent).toBe("1,493/min");
+  expect(root.querySelector("code")?.textContent).toBe("jelly");
+  expect(root.textContent).toBe("Gleba makes 1,493/min of jelly, and a lone ** stays.");
+});

@@ -17,6 +17,14 @@
 - [x] FC-120 App surfaces follow the brand
   - Acceptance: the web page uses the shared tokens, bundled fonts (works offline), the logo and a favicon; the mod has a portal thumbnail and matching title and description
   - `chat.css` imports `brand/tokens.css` (Bun bundles the fonts and favicon); top bar shows the mark and the name in Big Shoulders; checked in Chrome: all six font faces load from the server, favicon served. `mods/second-shift/thumbnail.png` 144 × 144
+- [x] FC-125 Answers show raw Markdown marks
+  - Acceptance: `**bold**` and `` `code` `` in answers render as bold and code, not raw marks
+  - Found while recording the first capture ("Gleba produces jelly at **1,493/min**"). `Emphasis` in `chat.tsx`; an unclosed `**` stays as typed; display test
+
+- [ ] FC-126 Blueprint requests sometimes come with an unasked-for paste card
+  - Notes: seen while recording: "Give me a blueprint for 300 electronic circuits a minute" answered with the card, "Say the word and I'll paste it", and a paste approval card in the same turn (S14 guidance says no tool call until asked). A 600/min request was refused correctly (1,800 cable/min is over one lane) but said "That approval card wasn't needed" when none was shown
+  - Acceptance: an eval over blueprint requests shows no paste card unless the player asked to paste
+
 - [ ] FC-121 Feature captures
   - Acceptance: screenshots of the console, answers with charts, the blueprint card, the approval flow, a screenshot card and a selection review, plus at least one animation, taken from the dev save and saved in the repo for the README and website
 - [ ] FC-122 README and license
