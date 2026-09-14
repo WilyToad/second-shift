@@ -4,7 +4,7 @@ A local AI companion that watches a Factorio game, advises the player in real ti
 on request the way the player's own character could. It runs entirely on this machine
 against oMLX.
 
-**Status:** planning. Nothing built yet. Stack: TypeScript on Bun (§4).
+**Status:** Phase 1 vertical slice working end to end (2026-09-13). Stack: TypeScript on Bun (§4).
 
 ---
 
@@ -265,6 +265,12 @@ stable-first so the cached prefix survives:
 
 Putting volatile state anywhere but last invalidates the whole prefix and costs ~40 s per turn.
 
+**Verified 2026-09-13 (`data/probe-cache.ts`):** oMLX caches in ~512-token blocks. A 15,214-token
+prompt: cold 11.5 s to first token; repeated, 14,336 tokens cached (28 × 512) and 1.24 s; same
+prefix with a new question or an appended turn, 0.93 s. Prompts under ~1k tokens get no cache
+hit, which doesn't matter at that size. The server stores each user turn *with* its snapshot in
+history, so the next turn's prefix is byte-identical to what was sent.
+
 **Also:** pass `chat_template_kwargs: {"enable_thinking": false}` for quick lookups; reserve
 thinking for planning questions. That alone is the difference between a 60 s and a 3 s answer.
 
@@ -360,6 +366,13 @@ server → web chat. oMLX model id: `Qwen3.8-Flash-Next-oQ4e-mtp`; API key read 
 - `server/` receives it, answers one typed question with state in context
 - Output to a minimal local web chat page (streaming text only, no visual components yet)
 - *Success:* one grounded answer, end to end, under 5 s warm
+
+**Phase 1 result (2026-09-13): done.** On the dev save, asked through the web chat:
+"What's my science output?" (751-token prompt) got a correct grounded answer with the first
+token in 2.1 s and the whole answer in 3.8 s. A follow-up about iron plates (1,487 tokens) took
+1.5 s and 2.4 s and quoted the live rate (798/min on nauvis-factory-floor). The mod's cost on the
+benchmark is within noise. Model load on a cold oMLX is ~22 s, absorbed by the warm-up at server
+start.
 
 **Phase 2 — make it useful, and let it act**
 - Prototype dump + grounding

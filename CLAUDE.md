@@ -6,7 +6,7 @@ local oMLX model. **`PLAN.md` is the source of truth**
 for goals, architecture, phases and measurements. Read it before starting non-trivial work, and
 update it when a decision changes.
 
-**Status:** planning / Phase 1. The directories exist but are empty. Stack: **TypeScript on Bun**
+**Status:** Phase 1 slice works end to end (mod → RCON → server → oMLX → web chat). Stack: **TypeScript on Bun**
 (runtime, package manager, test runner, bundler) for `interfaces/`, `server/` and `displays/`.
 No Vite. UI framework not chosen yet (PLAN §4).
 
@@ -115,6 +115,8 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
   autosaves, waits for RCON and checks the mod answers. The mod code reloads only on game restart.
 - `bun scripts/benchmark.ts [--ticks N --runs N]` (game closed) benchmarks the dev save with and
   without the mod using mirrored mod folders. Run it after every mod change.
+- `bun run start` runs the server (web chat on http://127.0.0.1:5170). It reconnects to the game
+  on its own and warms the model at startup.
 - `bun test`, `bun run typecheck`.
 - Captures for offline work go in `data/captures/` (gitignored).
 

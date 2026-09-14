@@ -1,2 +1,3 @@
-// The game↔agent contract: protocol envelope, digest schema, action and component specs.
-export {};
+export * from "./protocol";
+export * from "./digest";
+export * from "./actions";
