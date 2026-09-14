@@ -38,3 +38,4 @@ Times are commit times (local).
 - FC-031 done: blueprint checker (unknown entities, overlaps, uncraftable recipes); zero false positives on the real blueprint, all three issue kinds caught in tests.
 - FC-032 done, **S06 closed**: pasted blueprints become checked summaries (the raw string never reaches the model); e2e 8/8 twice. Fixed another brittle refusal regex in the rails e2e (the model's refusal was correct).
 - S07 "Bottleneck diagnosis" planned and activated (delegated): FC-083 registry, FC-084 status polling, FC-085 status in digest + find_stuck, FC-043 recipe graph (optional), FC-086 scenario eval. Reason: use case #1 had no machine-status data yet.
+- FC-083 + FC-084 done: machine registry (2,746 machines, matches a direct count) and round-robin status polling at ~0.055 ms/tick; the one-time scan peaks at 0.34 ms per tick. The dev save's Nauvis drills are mostly waiting for output space.

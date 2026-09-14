@@ -8,10 +8,12 @@
 
 ## Items
 
-- [ ] FC-083 Machine registry kept by build/remove events
+- [x] FC-083 Machine registry kept by build/remove events
   - Acceptance: crafting machines, furnaces, labs and drills tracked per surface via build/remove events and `register_on_object_destroyed`; initial registry built across ticks after load; counts match a one-off scan on the dev save
-- [ ] FC-084 Round-robin status polling with a fixed per-tick budget
+  - `scripts/machines.lua`: build events with type filters + `register_on_object_destroyed`; initial registry from a 16-chunks-per-tick scan (27 s on the dev save, tick cost median 0.10 ms / max 0.34 ms). 2,746 machines, matching a direct count; build/destroy tracked (`scripts/test-machines.ts` 5/5)
+- [x] FC-084 Round-robin status polling with a fixed per-tick budget
   - Acceptance: status counts per surface and recipe (working, no ingredients, full output, no power, …) refreshed in rotation; profiler cost within the S07 budget; refresh period reported
+  - 20 machines per tick in rotation (refresh every 138 ticks on the dev save), incremental counts per surface/recipe/status; ~0.055 ms per tick by profiler. First real finding: 241 iron and 317 copper drills on Nauvis are waiting for space in destination
 - [ ] FC-085 Status in the digest and a `find_stuck` look tool
   - Acceptance: the snapshot shows stuck counts for relevant recipes; the agent can list and highlight stuck machines for a recipe near the player or on a surface
 - [ ] FC-043 `recipe_graph` component

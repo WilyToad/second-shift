@@ -68,6 +68,11 @@ export type GameEvent = z.infer<typeof GameEventSchema>;
 
 export const EventsSchema = z.object({ seq: z.number(), oldest: z.number(), events: luaArray(GameEventSchema) });
 
+export const MachineProgressSchema = z.object({ machines: z.number(), scanned: z.boolean(), refresh_ticks: z.number() });
+/** surface -> recipe label -> status name -> count. */
+export const MachineCountsSchema = z.preprocess((v) => (Array.isArray(v) ? {} : v), z.record(z.string(), z.preprocess((v) => (Array.isArray(v) ? {} : v), z.record(z.string(), z.preprocess((v) => (Array.isArray(v) ? {} : v), z.record(z.string(), z.number()))))));
+export const MachineStatsSchema = z.object({ progress: MachineProgressSchema, counts: MachineCountsSchema });
+
 export const actions = {
   ping: { args: z.object({}), data: z.object({ tick: z.number() }) },
   info: { args: z.object({}), data: InfoSchema },
@@ -79,6 +84,8 @@ export const actions = {
   mark_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
   cancel_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
   events: { args: z.object({ since: z.number().default(0) }), data: EventsSchema, kind: "look" },
+  machine_stats: { args: z.object({}), data: MachineStatsSchema, kind: "look" },
+  debug_machine_tick: { args: z.object({}), data: MachineProgressSchema, kind: "look" },
 } as const;
 
 export type ActionName = keyof typeof actions;

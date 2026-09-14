@@ -566,6 +566,10 @@ judge by time to first token.
    - Resulting `digest` handler: ~0.19 ms per call (was ~1.6 ms), 4 KB JSON.
    - Benchmark with the refresher running: no measurable cost (−0.027 ms/tick, within run-to-run
      noise of about ±0.03 ms).
+   - **Machine status (S07, 2026-09-14):** event-kept registry of 2,746 machines on the dev save;
+     polling 20 per tick costs ~0.055 ms (full refresh every 138 ticks, 2.3 s). The one-time
+     registry scan (16 chunks per tick, ~27 s after load) costs median 0.10 ms, max 0.34 ms per
+     tick. On a megabase the refresh period grows, not the per-tick cost.
    - **The benchmark can't resolve costs this small.** Run-to-run noise is ~0.05 ms/tick, and
      `--benchmark` doesn't run RCON, so the digest path isn't in it. Derived cost from the
      profiler: refresh ~0.1 ms per 30 ticks + digest ~0.2 ms per 120 ticks (2 s poll) ≈
