@@ -132,6 +132,8 @@ return function(handlers)
           energy_usage = try(function() return e.energy_usage end),
           mining_speed = try(function() return e.mining_speed end),
           belt_speed = try(function() return e.belt_speed end),
+          -- Runs on fuel (biochamber, burner machines) rather than electricity. Explicit boolean.
+          burner = e.burner_prototype ~= nil,
           base_productivity = try(function()
             local p = e.effect_receiver and e.effect_receiver.base_effect and e.effect_receiver.base_effect.productivity
             return (p and p > 0) and p or nil

@@ -66,6 +66,7 @@ export const MachineSchema = z.strictObject({
   mining_speed: z.number().optional(),
   belt_speed: z.number().optional(),
   base_productivity: z.number().optional(), // e.g. foundry, electromagnetic plant, biochamber: 0.5
+  burner: z.boolean().optional(), // runs on fuel, not electricity (dump v7)
   // Inserters: revolutions per tick, bulk type, built-in hand size bonus, pickup/drop offsets when facing north.
   rotation_speed: z.number().optional(),
   bulk: z.boolean().optional(),

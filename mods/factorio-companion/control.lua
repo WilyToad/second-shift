@@ -4,7 +4,7 @@
 
 local PROTOCOL = 1
 -- Bump when dump_prototypes changes shape, so the server's prototype cache refreshes.
-local DUMP_VERSION = 6
+local DUMP_VERSION = 7
 
 local handlers = {}
 

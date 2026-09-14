@@ -9,7 +9,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 - [ ] FC-044 `layout_sketch` component with copyable blueprint string
 - [ ] FC-046 Blueprint selection tool in the mod
-- [ ] FC-048 Template-based blueprint creation
 - [ ] FC-049 Screenshots and their game cost (PLAN §8 Q7)
 
 ## Phase 3b — Character control
