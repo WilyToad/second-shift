@@ -1,0 +1,17 @@
+{
+  "name": "factorio-companion",
+  "private": true,
+  "type": "module",
+  "workspaces": ["interfaces", "server", "displays"],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "test": "bun test",
+    "setup-rcon": "bun scripts/setup-rcon.ts",
+    "link-mod": "bun scripts/link-mod.ts",
+    "launch": "bun scripts/launch.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2"
+  }
+}

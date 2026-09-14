@@ -1,22 +1,37 @@
 # Factorio Companion
 
-A local AI advisor for a live Factorio game: a read-only mod exports game state, and an agent
-loop answers questions about it using a local oMLX model. **`PLAN.md` is the source of truth**
+A local AI companion for a live Factorio game: a mod exports game state and performs
+player-equivalent actions, and an agent loop answers questions and acts on request, using a
+local oMLX model. **`PLAN.md` is the source of truth**
 for goals, architecture, phases and measurements. Read it before starting non-trivial work, and
 update it when a decision changes.
 
-**Status:** planning / Phase 1. The directories exist but are empty. No language, package manager
-or test runner has been picked for `interfaces/`, `server/` or `displays/` yet. Don't assume
-one; ask or propose it before scaffolding.
+**Status:** planning / Phase 1. The directories exist but are empty. Stack: **TypeScript on Bun**
+(runtime, package manager, test runner, bundler) for `interfaces/`, `server/` and `displays/`.
+No Vite. UI framework not chosen yet (PLAN §4).
 
 ## Hard rules
 
-- **The mod is read-only.** It never changes game state, never uses console commands (`/c`
-  permanently disables achievements on the save), and never automates play. The agent advises
-  and the player acts.
+- **Speed first.** When a choice trades effort for speed or less lag, pick the faster option.
+  Factories get huge, so game-side cost must grow with *changes*, never with factory size
+  (PLAN §5, "Speed is the top priority").
+- **The helmet rule: if the player can do it, the agent can; if not, it can't.** Same tools, same
+  reach or remote-view coverage, same time and item cost (PLAN §3 "Actions"). Nothing in the engine
+  enforces this, so the mod must. Never use `create_entity` for real entities, `destroy()`,
+  `teleport`, item insertion from nothing, tile changes, instant mining, instant research, cheat
+  mode or game speed in agent-facing code.
+- **Named actions only.** The agent never gets raw Lua or console commands. The server rejects
+  unknown action names; the mod re-checks the player's reach, items, research and coverage when
+  each action runs. Every action needs a test proving it fails when the player couldn't do it.
+- **Approval:** looking and small requests (queue research, map tag, a camera jump the player
+  asked for) run immediately. Map changes need a preview (in-world highlight + approval card) and a
+  confirm. Character control (walk, mine by hand, craft, move items) needs a confirm and a stop
+  hotkey. Anything the agent suggests on its own always needs a confirm. Pass `player` so map
+  changes go on the player's undo history.
+- Achievements don't matter, so console commands (`/c`, `/editor`) are fine for development.
 - **Two tiers, split by latency.** Anything time-critical (attacks, brownouts, low ammo, full
-  buffers) is plain Lua in the mod and never waits on the model. The model only handles
-  advisory questions (2–30 s).
+  buffers) is plain Lua in the mod and never waits on the model. The model handles questions
+  and requested actions (2–30 s).
 - **Prompt order is fixed: stable first, volatile last.** System rules → prototype digest →
   conversation history (append-only) → current `state.json` snapshot, always last. Anything
   volatile placed earlier breaks the prefix cache: ~2 s warm vs ~42 s cold (PLAN §5). Don't
@@ -24,6 +39,9 @@ one; ask or propose it before scaffolding.
 - **Ground recipes on `prototypes.json`, not on what the model remembers.** The save is heavily
   modded (Space Age, maraxsis, Cerys, factorissimo-2, PlanetsLib). Vanilla recipe knowledge is
   wrong here, so a recipe or tech claim that can't be cited from the dump is a bug.
+- **Visuals are rendered from data, not drawn by the model.** The agent emits compact component
+  specs (PLAN §3, visual component library); code renders them from `prototypes.json` and state.
+  Keep specs terse, because spec tokens are the latency cost.
 - Use `chat_template_kwargs: {"enable_thinking": false}` for quick lookups. Save thinking for
   planning questions.
 
@@ -34,7 +52,8 @@ one; ask or propose it before scaffolding.
 | Game | Factorio 2.0.76, Steam, mac-arm64, Space Age |
 | Factorio user dir | `~/Library/Application Support/factorio/` |
 | Mods dir | `…/factorio/mods/` (zips + `mod-list.json`) |
-| Mod output | `…/factorio/script-output/` (doesn't exist yet; created on first write) |
+| Mod output | `…/factorio/script-output/` (one-off dumps only; doesn't exist yet) |
+| Runtimes | Bun 1.3.14, Node 26.3.1 |
 | oMLX server | `http://127.0.0.1:8888`, config in `~/.omlx/settings.json`, logs in `~/.omlx/logs/server.log` |
 | Primary model | Qwen3.8 Flash-Next (`~/.omlx/models/Jundot/Qwen3.8-Flash-Next-oQ4e-mtp`) |
 | Memory ceiling | 118 GB oMLX guard; Flash-Next uses ~69.5 GB resident |
@@ -50,23 +69,60 @@ Most Factorio Lua online (and in model training data) targets 1.1. In 2.0:
 - `info.json` needs `"factorio_version": "2.0"`
 - Use `script.on_nth_tick` for periodic export. 60 ticks = 1 s.
 
-File writes run on the game's main thread. Measure for stutter before raising the export
-frequency or payload size (PLAN §8 Q5).
+## Mod performance rules (huge factories)
+
+- Never call `find_entities_filtered` (or any full sweep) on a timer. Keep an entity registry
+  updated from build/remove events, and build the initial one spread across ticks.
+- Prefer engine aggregates: `force.get_item_production_statistics(surface)`, research state,
+  `player.get_alerts()` (attacks, destroyed, turret out of ammo, train no path/no fuel, …).
+- No status-change event exists. Poll machine status round-robin with a fixed per-tick budget.
+- Push only a tiny digest. Compute detail only when a query asks for it, and cap its size.
+- No periodic file writes. Files are for one-off dumps and explicit captures only.
+- No unfiltered hot events (`on_entity_damaged`), no heavy `on_tick` work.
+- Benchmark every mod change: `factorio --benchmark <save copy> --benchmark-ticks N` with and
+  without the mod. Budget: under 0.1 ms/tick on average, no tick over 1 ms.
+
+## Factorio API reference
+
+The exact API for the installed version ships with the game:
+`…/factorio.app/Contents/doc-html/runtime-api.json` (and `prototype-api.json`). Check it before
+using an API from memory; online docs track the latest version, not necessarily 2.0.76.
+
+## Useful Factorio CLI flags
+
+Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.app/Contents/MacOS/factorio`
+
+- **Transport is RCON (decided, PLAN §8 Q5).** Measured facts:
+  - **RCON in the GUI client:** the `--rcon-*` flags are ignored. It works only with
+    `local-rcon-socket` + `local-rcon-password` in the loaded `config.ini` **and** the game hosted
+    as multiplayer (`--host <save>` or Host menu). Round trip ~17 ms; 5 MB replies fine. Use a
+    mod-registered command with request IDs, never `/c` or `/sc` (those trigger the achievement
+    prompt and give the agent raw Lua).
+  - **UDP** (`--enable-lua-udp <port>`) works in single-player. Datagrams over ~9.2 KB are
+    silently dropped; round trip ~45 ms; packets are lost while paused or saving. There's an
+    unverified report of a macOS `send_udp` crash.
+  - The game rewrites `config.ini` on exit. Edit it only with the game closed, or use `--config`.
+- Launching the binary directly makes Steam relaunch the game; arguments are kept.
+- `--dump-data` writes data.raw as JSON (including mods) to `script-output/` and exits.
+  Use it for offline prototype data.
+- `--dump-icon-sprites` writes every icon, modded ones included, as PNGs and exits.
+  Use it as the web app's icon source.
+- `--benchmark`, `--benchmark-ticks`, `--benchmark-runs` measure UPS cost on a save copy.
 
 ## Layout
 
 - `mods/factorio-companion/`: the Lua mod (`info.json`, `control.lua`). During development,
   link it into the Factorio mods dir as `factorio-companion` rather than copying it.
-- `interfaces/`: the game↔agent contract: state schema, file watcher, tool definitions.
+- `interfaces/`: the game↔agent contract: transport, state schema, query/tool definitions, component specs.
   A change to the state shape must update the schema and the mod together.
 - `server/`: agent loop, oMLX client, prompt assembly.
-- `displays/`: output surfaces (v1 = terminal).
+- `displays/`: output surfaces. The MVP is a local web app on the second monitor; in-game UI is a stretch goal (PLAN §3).
 - `data/`: captured `state.json` / `prototypes.json` samples for offline development. Gitignored.
   Prefer developing `server/` against these captures so the game doesn't need to be running.
 - `scripts/`: dev helpers (install mod, replay a capture).
 
 ## Working norms
 
-- Stay inside the current phase in PLAN §7. Scope creep toward "AI plays the game" is a named risk.
+- Stay inside the current phase in PLAN §7. The agent acts only on request; no autonomous play loops.
 - Performance claims need measurements (TTFT, cache hit rate from the oMLX logs), not estimates.
   Record new measurements in PLAN.md.

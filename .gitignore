@@ -1,0 +1,7 @@
+# Local captures, save copies, backups, generated server settings
+data/
+
+node_modules/
+*.log
+.env*
+.DS_Store

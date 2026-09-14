@@ -1,0 +1,6 @@
+{
+  "name": "@companion/server",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}

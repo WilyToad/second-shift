@@ -1,0 +1,6 @@
+{
+  "name": "@companion/displays",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}
