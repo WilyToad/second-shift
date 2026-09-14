@@ -1,15 +1,16 @@
 # S02 — Grounded on your modded recipes
 
-- **Status:** planned
+- **Status:** active
 - **Goal:** The companion answers recipe and ratio questions about this save's modded content from the save's own data, not vanilla memory.
 - **Acceptance:** A scripted set of 10 questions (including maraxsis, Cerys and Gleba items) is answered correctly with the recipe data cited, and first token stays under 3 s once warm at the full prompt size.
-- **Started:** —
+- **Started:** 2026-09-13
 - **Finished:** —
 
 ## Items
 
-- [ ] FC-010 Typed zod schema for `dump_prototypes`
+- [x] FC-010 Typed zod schema for `dump_prototypes`
   - Acceptance: the capture from the dev save validates; a renamed field fails the test
+  - Validated against `data/captures/prototypes.json`, captured live from the dev save with the current dump code
 - [ ] FC-011 Spike: recipe digest in the prompt vs lookup tools
   - Acceptance: measure the compact digest's token count; decide in PLAN whether recipes go in the cached prefix, behind tools, or both
 - [ ] FC-012 Recipe data in the prompt or tools per FC-011, refreshed when the mod list changes
@@ -26,6 +27,6 @@
 
 ## Notes
 
-Proposed 2026-09-13; waiting for the player to agree before it becomes active.
+Proposed and activated 2026-09-13.
 
 ## Review

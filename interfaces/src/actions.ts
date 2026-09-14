@@ -2,6 +2,7 @@
 // before anything reaches the game.
 import { z } from "zod";
 import { DigestSchema } from "./digest";
+import { PrototypesSchema } from "./prototypes";
 
 export const InfoSchema = z.object({
   protocol: z.number(),
@@ -16,7 +17,7 @@ export const actions = {
   ping: { args: z.object({}), data: z.object({ tick: z.number() }) },
   info: { args: z.object({}), data: InfoSchema },
   digest: { args: z.object({}), data: DigestSchema },
-  dump_prototypes: { args: z.object({}), data: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  dump_prototypes: { args: z.object({}), data: PrototypesSchema },
 } as const;
 
 export type ActionName = keyof typeof actions;
