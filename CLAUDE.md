@@ -117,7 +117,7 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
   without the mod using mirrored mod folders. Run it after every mod change.
 - `bun run start` runs the server (web chat on http://127.0.0.1:5170). It reconnects to the game
   on its own and warms the model at startup.
-- `bun test`, `bun run typecheck`.
+- `bun test`, `bun run typecheck`, `bun run check` (all of it), `bun run board` (sprint progress).
 - Captures for offline work go in `data/captures/` (gitignored).
 
 ## Layout
@@ -133,6 +133,12 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `scripts/`: dev helpers (install mod, replay a capture).
 
 ## Working norms
+
+- **Track work in `work/`** (see `work/README.md`). Check `bun run board` before starting; mark
+  the item `[~]` when you start and `[x]` in the commit that finishes it; put the item ID in the
+  commit message. New work gets a new `FC-###` item, not an untracked change. Only the player
+  moves a sprint from planned to active.
+- `bun run check` (tests + typecheck + work file validation) must pass before committing.
 
 - Stay inside the current phase in PLAN §7. The agent acts only on request; no autonomous play loops.
 - Performance claims need measurements (TTFT, cache hit rate from the oMLX logs), not estimates.

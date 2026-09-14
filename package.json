@@ -13,7 +13,9 @@
     "setup-rcon": "bun scripts/setup-rcon.ts",
     "link-mod": "bun scripts/link-mod.ts",
     "launch": "bun scripts/launch.ts",
-    "start": "bun server/src/main.ts"
+    "start": "bun server/src/main.ts",
+    "board": "bun scripts/board.ts",
+    "check": "bun test && tsc --noEmit -p . && bun scripts/board.ts --check"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",

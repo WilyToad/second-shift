@@ -344,6 +344,9 @@ dump as a hallucination.
 
 ## 7. Phases
 
+Phases are the roadmap. Day-to-day work is tracked as goal-based sprints in `work/`
+(`bun run board`); each sprint pulls items from `work/BACKLOG.md`, which is grouped by phase.
+
 **Phase 1 — vertical slice (target: one evening)**
 
 Setup decisions (2026-09-13): git with small commits; RCON keys in the real `config.ini`;
