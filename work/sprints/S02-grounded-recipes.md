@@ -54,5 +54,5 @@ across the last three runs. First token median ~1.6 s (max ≤ 2.2 s); warm foll
 - The mod now dumps the character prototype (exact hand-crafting categories). It hasn't been run
   in-game yet, because the game was closed during this sprint: FC-077.
 - Follow-up latency is close to the 3 s line as history grows: FC-076.
-- Commits: 75fbb73 (FC-010), 72a3c31 (FC-011), dadb01a (FC-012), plus this sprint's closing commit.
+- Commits: cac9e27 (FC-010), 72a3c31 (FC-011), dadb01a (FC-012), plus this sprint's closing commit.
 
