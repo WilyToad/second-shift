@@ -31,13 +31,16 @@ const stuck = Object.entries(stats.data.counts as Record<string, Record<string, 
 console.log("  sample non-working buckets:", JSON.stringify(stuck));
 
 // FC-102: the chunk index behind find_machines agrees with the status counts on every surface.
-const countsBySurface = stats.data.counts as Record<string, Record<string, Record<string, number>>>;
+// Paused (test tooling) so polling can't change a status between the two reads.
+await dev.sc(`game.tick_paused = true rcon.print("paused")`);
+const countsBySurface = (await call("machine_stats")).data.counts as Record<string, Record<string, Record<string, number>>>;
 const mismatches: string[] = [];
 for (const [surface, byRecipe] of Object.entries(countsBySurface)) {
   const expected = Object.values(byRecipe).flatMap((st) => Object.entries(st)).filter(([k]) => k !== "working" && k !== "normal").reduce((a, [, n]) => a + n, 0);
   const found = (await call("find_machines", false, { surface })).data;
   if (found.count + found.not_visible !== expected) mismatches.push(`${surface}: index ${found.count}+${found.not_visible}, counts ${expected}`);
 }
+await dev.sc(`game.tick_paused = false rcon.print("unpaused")`);
 check("find_machines index matches the status counts on every surface", mismatches.length === 0, mismatches.join("; ") || `${Object.keys(countsBySurface).length} surfaces`);
 
 // Build and destroy a machine through the game's own events.

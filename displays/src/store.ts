@@ -3,11 +3,12 @@ import { signal, type Signal } from "@preact/signals";
 import type { Digest, GameEvent } from "@companion/interfaces";
 import type { ClientMessage, ServerMessage } from "../../server/src/messages";
 import type { Plan } from "../../server/src/planner";
+import type { BlueprintCard } from "../../server/src/messages";
 import type { Point, SeriesMap } from "../../server/src/series";
 
 export type ThreadItem =
   | { kind: "user"; key: number; text: string }
-  | { kind: "agent"; key: number; text: Signal<string>; meta: Signal<string | null>; plan: Signal<Plan | null> }
+  | { kind: "agent"; key: number; text: Signal<string>; meta: Signal<string | null>; plan: Signal<Plan | null>; blueprint: Signal<BlueprintCard | null> }
   | { kind: "tool"; key: number; text: string }
   | { kind: "approval"; key: number; id: string; title: string; detail: string; status: Signal<string | null>; result: Signal<string | null> }
   | { kind: "error"; key: number; text: string };
@@ -39,7 +40,7 @@ export function onMessage(m: ServerMessage): void {
       break;
     case "user":
       append({ kind: "user", key: keys++, text: m.text });
-      streaming = { kind: "agent", key: keys++, text: signal(""), meta: signal(null), plan: signal(null) };
+      streaming = { kind: "agent", key: keys++, text: signal(""), meta: signal(null), plan: signal(null), blueprint: signal(null) };
       append(streaming);
       break;
     case "token":
@@ -57,7 +58,7 @@ export function onMessage(m: ServerMessage): void {
       if (streaming) {
         streaming.meta.value = `first token ${m.ttftMs ? (m.ttftMs / 1000).toFixed(1) : "?"} s · total ${(m.totalMs / 1000).toFixed(1)} s · prompt ${m.promptTokens ?? "?"} tok (${m.cachedTokens ?? 0} cached) · ${m.completionTokens ?? "?"} tok out`;
         // A turn that only produced tool calls and a card leaves an empty bubble; drop it.
-        if (!streaming.text.value.trim() && !streaming.plan.value) thread.value = thread.value.filter((i) => i !== streaming);
+        if (!streaming.text.value.trim() && !streaming.plan.value && !streaming.blueprint.value) thread.value = thread.value.filter((i) => i !== streaming);
       }
       streaming = null;
       break;
@@ -85,6 +86,9 @@ export function onMessage(m: ServerMessage): void {
     }
     case "plan":
       if (streaming) streaming.plan.value = m.plan;
+      break;
+    case "blueprint":
+      if (streaming) streaming.blueprint.value = m.blueprint;
       break;
     case "series":
       series.value = m.series;

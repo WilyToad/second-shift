@@ -1,5 +1,7 @@
 // Visual components the agent can put in an answer as terse fenced specs (PLAN §3 visual component
 // library). The model only names what to draw; the data comes from the page's recorded history.
+import { useSignal } from "@preact/signals";
+import type { BlueprintCard } from "../../server/src/messages";
 import type { Plan } from "../../server/src/planner";
 import type { Point } from "../../server/src/series";
 import { series } from "./store";
@@ -125,6 +127,46 @@ export function RecipeGraph({ plan }: { plan: Plan }) {
         </svg>
       </div>
       <div class="vis-note">{plan.notes.join(" · ")}</div>
+    </figure>
+  );
+}
+
+/** A blueprint built in code: a top-down tile sketch and a button that copies the string (S14). */
+export function BlueprintView({ card }: { card: BlueprintCard }) {
+  const copied = useSignal<"idle" | "copied" | "select">("idle");
+  const T = 14, PAD = 6;
+  const width = card.width * T + PAD * 2, height = card.height * T + PAD * 2;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(card.string);
+      copied.value = "copied";
+    } catch {
+      copied.value = "select"; // clipboard blocked: show the string to copy by hand
+    }
+  };
+  return (
+    <figure class="vis blueprint">
+      <figcaption class="vis-head">{pretty(card.label)}<span class="tag">layout_sketch · built in code</span></figcaption>
+      <div class="graph-scroll">
+        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Layout of ${card.label}: ${card.summary}`}>
+          {card.sketch.map((e, i) => {
+            const x = PAD + e.x * T, y = PAD + e.y * T, w = e.w * T, h = e.h * T;
+            // Belts and inserters get a direction tick: 0 north, 4 east, 8 south, 12 west.
+            const turn = e.direction === undefined ? null : (e.direction / 16) * 2 * Math.PI;
+            return (
+              <g key={i} class={`bp-${e.kind}`}>
+                <rect x={x + 0.5} y={y + 0.5} width={w - 1} height={h - 1} rx={e.w > 1 ? 2 : 1}><title>{pretty(e.name)}</title></rect>
+                {turn !== null && <line x1={x + w / 2} y1={y + h / 2} x2={x + w / 2 + Math.sin(turn) * w * 0.35} y2={y + h / 2 - Math.cos(turn) * h * 0.35} />}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div class="vis-note">{card.summary}</div>
+      <div class="bp-actions">
+        <button onClick={copy}>{copied.value === "copied" ? "Copied" : "Copy blueprint string"}</button>
+        {copied.value === "select" && <textarea class="bp-string" readOnly rows={3} value={card.string} onFocus={(e) => (e.target as HTMLTextAreaElement).select()} />}
+      </div>
     </figure>
   );
 }

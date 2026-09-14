@@ -210,7 +210,12 @@ Long actions (walking, mining a row by hand, placing many ghosts) are spread acr
 - **Throughput math in code:** machines × crafting speed × modules and beacons vs belt and
   inserter capacity, to find the real limit without the model guessing.
 - **Creating:** the model picks a template and parameters ("smelting column, 24 furnaces, turbo
-  belt, 8-beacon"); code builds the layout. Sources: the player's own blueprints and well-known
+  belt, 8-beacon"); code builds the layout. **Built (S14):** a production-row template
+  (`server/src/blueprint-template.ts`) for single recipes with at most 2 solid ingredients. A request
+  with a rate is built before the model runs; poles are placed by inserter reach and wired
+  explicitly, because pasted blueprints don't auto-connect. Measured in the dev game: gears 149.8/min
+  for 150 promised, circuits 299.6/300, automation science 30.0/30. Not yet: fluids, furnaces, fuel
+  machines, beacons, several rows. Sources: the player's own blueprints and well-known
   community designs. Freehand `layout_sketch` is for small ideas only and always goes through the
   checker.
 - **Output:** a before/after preview, a copyable string, and `place_blueprint` (a map change, so

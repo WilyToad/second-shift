@@ -36,3 +36,39 @@ test("thread renders streaming answers, tool lines and approval cards from serve
   expect(root.querySelectorAll(".approval button").length).toBe(0);
   expect(thread.value.length).toBe(4);
 });
+
+test("a built blueprint shows a layout sketch and copies its string", async () => {
+  const { render } = await import("preact");
+  const { Thread } = await import("./chat");
+  const { onMessage } = await import("./store");
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  render(<Thread />, root);
+  let clipboard = "";
+  Object.defineProperty(window.navigator, "clipboard", { value: { writeText: async (t: string) => { clipboard = t; } }, configurable: true });
+  Object.assign(globalThis, { navigator: window.navigator });
+
+  onMessage({ type: "user", text: "Make me a blueprint for 90 gears per minute" });
+  onMessage({ type: "blueprint", blueprint: {
+    label: "iron-gear-wheel 90/min (1 assembling-machine-2)", string: "0eNqrVkrKLCjJzM9TsqpWKs7PS8nMS1eyMjA0MDEyMzQwMzQyNjM2MzUyMDEwMzQ2NjAwMDKsBQCnvhFt",
+    summary: "1 assembling-machine-2 · 180/min iron-plate in", width: 3, height: 7,
+    sketch: [
+      { name: "transport-belt", kind: "transport-belt", x: 0, y: 0, w: 1, h: 1, direction: 4 },
+      { name: "inserter", kind: "inserter", x: 1, y: 1, w: 1, h: 1, direction: 0 },
+      { name: "assembling-machine-2", kind: "assembling-machine", x: 0, y: 2, w: 3, h: 3 },
+      { name: "medium-electric-pole", kind: "electric-pole", x: 0, y: 1, w: 1, h: 1 },
+    ],
+  } });
+  onMessage({ type: "token", text: "One assembler makes 90/min." });
+  onMessage({ type: "done", totalMs: 900, ttftMs: 400 });
+  await new Promise((r) => setTimeout(r, 10));
+
+  const card = root.querySelector(".blueprint")!;
+  expect(card.querySelectorAll("rect").length).toBe(4);
+  expect(card.querySelectorAll("line").length).toBe(2); // direction ticks on the belt and inserter
+  expect(card.textContent).toContain("1 assembling-machine-2 · 180/min iron-plate in");
+  (card.querySelector("button") as unknown as HTMLButtonElement).click();
+  await new Promise((r) => setTimeout(r, 10));
+  expect(clipboard).toStartWith("0eNq");
+  expect(card.querySelector("button")!.textContent).toBe("Copied");
+});

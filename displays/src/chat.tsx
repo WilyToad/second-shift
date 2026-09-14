@@ -1,6 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { RateChart, RecipeGraph, segments } from "./components";
+import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
 import { send, thread, type ThreadItem } from "./store";
 
 function AgentText({ text }: { text: string }) {
@@ -24,6 +24,7 @@ function Item({ item }: { item: ThreadItem }) {
         <>
           <AgentText text={item.text.value} />
           {item.plan.value && <div class="msg"><RecipeGraph plan={item.plan.value} /></div>}
+          {item.blueprint.value && <div class="msg"><BlueprintView card={item.blueprint.value} /></div>}
           {item.meta.value && <div class="meta">{item.meta}</div>}
         </>
       );

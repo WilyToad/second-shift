@@ -4,6 +4,9 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ActionArgs, ActionData, ActionName, Digest, EntityRef, FindEntitiesResult, Prototypes } from "@companion/interfaces";
 import { summarizePasted } from "./blueprint-review";
+import { encodeBlueprintString } from "./blueprint";
+import { describeRow, productionRow, type RowBuild } from "./blueprint-template";
+import type { BlueprintCard } from "./messages";
 import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
 import type { Snapshot } from "./game";
 import type { ServerMessage } from "./messages";
@@ -145,7 +148,7 @@ export const TOOLS: ToolSpec[] = [
     type: "function",
     function: {
       name: "place_blueprint",
-      description: "Ask the player to approve pasting the last blueprint they pasted into chat, as ghosts at their position.",
+      description: "Ask the player to approve pasting the last blueprint they pasted into chat or you built for them, as ghosts at their position.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -185,6 +188,29 @@ export function parseTarget(question: string): { perMinute: number; phrase: stri
 
 export function targetRate(question: string): number | null {
   return parseTarget(question)?.perMinute ?? null;
+}
+
+/** Is the player asking for a blueprint built to a rate ("a blueprint for 120 gears per minute")? */
+export function wantsBlueprint(question: string): boolean {
+  return /\b(blueprints?|layouts?|schematics?)\b/i.test(question) && parseTarget(question) !== null;
+}
+
+/** Top-down sketch of a generated build, in tiles from the blueprint's top-left corner. */
+export function blueprintCard(build: RowBuild, footprints: Record<string, { type: string; size: [number, number] }>): BlueprintCard {
+  const parts = build.blueprint.entities.map((e) => {
+    const [w, h] = footprints[e.name]?.size ?? [1, 1];
+    return { name: e.name, kind: footprints[e.name]?.type ?? "entity", x: e.position.x - w / 2, y: e.position.y - h / 2, w, h, ...(e.direction !== undefined ? { direction: e.direction } : {}) };
+  });
+  const minX = Math.min(...parts.map((p) => p.x)), minY = Math.min(...parts.map((p) => p.y));
+  const sketch = parts.map((p) => ({ ...p, x: p.x - minX, y: p.y - minY }));
+  return {
+    label: build.blueprint.label ?? build.item,
+    string: encodeBlueprintString({ blueprint: build.blueprint }),
+    summary: `${build.machines} ${build.machine} · ${build.inputs.map((i) => `${Math.round(i.perMinute)}/min ${i.name}`).join(" + ")} in · ${build.belt}, ${build.inserter}, ${build.pole}`,
+    width: Math.max(...sketch.map((p) => p.x + p.w)),
+    height: Math.max(...sketch.map((p) => p.y + p.h)),
+    sketch,
+  };
 }
 
 /** Is the player asking about a trend over time, where a rate_chart helps? */
@@ -269,14 +295,20 @@ export class Agent {
     // A pasted blueprint isn't running yet, so "is anything holding it back?" is about the design, not a trend.
     const chart = !pasted.summaries.length && wantsChart(question);
     const notes = [world ? "" : "no tool call is needed", chart ? "" : "no chart block"].filter(Boolean);
-    const guided = pasted.summaries.length
+    // Blueprint requests are built in code; the model only explains the result (S14).
+    const requested = !pasted.summaries.length && wantsBlueprint(question) ? this.blueprintFor(question, found?.items ?? []) : null;
+    const guided = requested
+      ? `${noted}\n\n(${requested.build
+        ? "A blueprint was built in code from the save's data and the player sees it with a copy button. In 60 words or fewer, using only the numbers in the generated blueprint line: what it makes, what to feed it on the input belt, that a pole must connect it to power, and that you can paste it as ghosts if they ask; no other calculations; no tool call (don't paste it until they ask); never write a blueprint string; no chart."
+        : "The blueprint couldn't be built; in 40 words or fewer give the reason from the data and what request would work; no chart."})`
+      : pasted.summaries.length
       ? `${noted}\n\n(Review from the checked summary in 90 words or fewer: lead with the total entity count and the main counts, then list every problem the checks found, or say they found none; for rates or bottlenecks use the throughput line's numbers; it isn't built, so offer no actions on its entities; no tool call or chart.)`
       : notes.length ? `${noted}\n\n(Answer from the data provided in 60 words or fewer; ${notes.join(", ")}.)` : noted;
     // Research questions get the live list of what can be queued right now (decided in code, not guessed).
     const researchLines = /\b(research\w*|tech\w*|unlock\w*|queue)\b/i.test(question) ? await this.researchOptions() : [];
     // Rate targets get an exact plan computed in code; the model narrates it (S09).
-    const plan = this.planFor(question, found?.items ?? []);
-    const planLines = plan ? [formatPlan(plan)] : [];
+    const plan = requested ? null : this.planFor(question, found?.items ?? []);
+    const planLines = plan ? [formatPlan(plan)] : requested ? [requested.line] : [];
     const working: ChatMessage[] = [userTurn(guided, { recipes: [...planLines, ...researchLines, ...(found?.lines ?? [])], snapshot })];
     const record: TurnRecord = {
       at: new Date(this.now()).toISOString(), question, world, chart, rounds: [], totalMs: 0,
@@ -290,6 +322,11 @@ export class Agent {
     };
     this.deps.emit({ type: "user", text: pasted.display });
     if (plan) this.deps.emit({ type: "plan", plan });
+    if (requested?.build) {
+      const card = blueprintCard(requested.build, this.deps.prototypes()!.entities);
+      this.lastBlueprint = { raw: card.string, at: this.now() };
+      this.deps.emit({ type: "blueprint", blueprint: card });
+    }
 
     let ttftMs: number | undefined;
     try {
@@ -348,6 +385,19 @@ export class Agent {
       // Warming is an optimization; the next question just pays the prefill instead.
     }
     this.logLine({ kind: "compaction", at: new Date(this.now()).toISOString(), beforeTokens: result.beforeTokens, afterTokens: result.afterTokens, warmMs: performance.now() - started });
+  }
+
+  /** The item next to the rate, built as a production row; the line tells the model what came out. */
+  private blueprintFor(question: string, items: string[]): { line: string; build?: RowBuild } | null {
+    const target = parseTarget(question);
+    const protos = this.deps.prototypes();
+    if (!target || !protos) return null;
+    const producible = (i: string) => Object.values(protos.recipes).some((r) => r.products.some((p) => p.name === i));
+    const named = target.phrase ? (this.deps.retriever()?.match(target.phrase) ?? []).map((e) => e.name) : [];
+    const item = named.find(producible) ?? items.find((i) => producible(i) && !protos.machines[i]);
+    if (!item) return { line: `[blueprint not built: couldn't tell which item "${target.phrase}" means]` };
+    const r = productionRow(protos, { item, perMinute: target.perMinute });
+    return r.ok ? { line: describeRow(r.build), build: r.build } : { line: `[blueprint not built for ${item} at ${target.perMinute}/min: ${r.reason}]` };
   }
 
   private planFor(question: string, items: string[]): Plan | null {
@@ -558,7 +608,7 @@ export class Agent {
 
   private proposeBlueprint(): string {
     const bp = this.lastBlueprint;
-    if (!bp || this.now() - bp.at > RESULT_TTL_MS) return "Error: no blueprint has been pasted recently. Ask the player to paste one first.";
+    if (!bp || this.now() - bp.at > RESULT_TTL_MS) return "Error: no blueprint has been pasted or built recently. Ask the player to paste one or request one first.";
     const position = this.deps.game.latest()?.digest.player?.position;
     if (!position) return "Error: the player's position isn't known yet.";
     return this.card(`Paste the blueprint at your position (${position.x}, ${position.y})?`, "Placed as ghosts, like pasting it yourself; construction robots build it and Ctrl+Z undoes it.", async () => {

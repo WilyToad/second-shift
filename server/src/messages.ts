@@ -3,6 +3,16 @@ import type { Digest, GameEvent } from "@companion/interfaces";
 import type { Plan } from "./planner";
 import type { SeriesMap } from "./series";
 
+/** A blueprint built in code, for the page: copyable string plus a top-down sketch in tiles. */
+export type BlueprintCard = {
+  label: string;
+  string: string;
+  summary: string;
+  width: number;
+  height: number;
+  sketch: { name: string; kind: string; x: number; y: number; w: number; h: number; direction?: number }[];
+};
+
 export type ServerMessage =
   | { type: "status"; game: { connected: boolean; tick?: number; ageMs?: number; paused?: boolean; error?: string }; model: { state: "loading" | "ready" | "error"; error?: string } }
   | { type: "user"; text: string }
@@ -16,6 +26,7 @@ export type ServerMessage =
   | { type: "digest"; digest: Digest; receivedAt: number }
   | { type: "series"; series: SeriesMap }
   | { type: "plan"; plan: Plan }
+  | { type: "blueprint"; blueprint: BlueprintCard }
   | { type: "reset" };
 
 export type ClientMessage =

@@ -3,7 +3,8 @@ import type { ActionName } from "@companion/interfaces";
 import { DigestSchema, PrototypesSchema } from "@companion/interfaces";
 import { encodeBlueprintString } from "./blueprint";
 import { RecipeRetriever } from "./retrieval";
-import { Agent, compactHistory, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsChart, type GameActions } from "./agent";
+import { Agent, compactHistory, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsBlueprint, wantsChart, type GameActions } from "./agent";
+import { rowPrototypes } from "./fixtures/row-prototypes";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
 
@@ -216,4 +217,34 @@ test("target rates are parsed per minute", () => {
 test("the planned item is the one next to the number, not the machine being counted", () => {
   expect(parseTarget("How many biochambers for 60 bioflux per minute?")).toEqual({ perMinute: 60, phrase: "bioflux" });
   expect(parseTarget("How many chemical plants for 120 plastic bars per minute?")).toEqual({ perMinute: 120, phrase: "plastic bars" });
+});
+
+test("a blueprint request is built in code: the page gets a card, the model gets a summary, and it can be pasted", async () => {
+  const prototypes = PrototypesSchema.parse(rowPrototypes);
+  const events: ServerMessage[] = [];
+  const model = fakeModel([{ text: "Here's a row of 3 assemblers." }, { tool: "place_blueprint" }, { text: "Confirm in the card." }]);
+  const game = fakeGame();
+  game.game.latest = () => ({ digest: DigestSchema.parse({ tick: 1, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {}, player: { name: "p", surface: "nauvis", position: { x: 10, y: 20 } } }), receivedAt: Date.now() });
+  const agent = new Agent({ model, game: game.game, system: () => "rules", retriever: () => new RecipeRetriever(prototypes), prototypes: () => prototypes, emit: (m) => events.push(m) });
+  await agent.ask("Make me a blueprint for 200 iron gear wheels per minute");
+  const card = events.find((e) => e.type === "blueprint");
+  if (card?.type !== "blueprint") throw new Error("no blueprint card");
+  expect(card.blueprint.summary).toContain("3 assembling-machine-2");
+  expect(card.blueprint.sketch.filter((e) => e.kind === "assembling-machine")).toHaveLength(3);
+  const prompt = model.seen[0]!.at(-1)!.content;
+  expect(prompt).toContain("[generated blueprint: 3 assembling-machine-2 making iron-gear-wheel at 270/min");
+  expect(prompt).not.toContain(card.blueprint.string);
+  expect(events.some((e) => e.type === "plan")).toBe(false);
+
+  await agent.ask("Paste it here please");
+  const approval = events.find((e) => e.type === "approval");
+  if (approval?.type !== "approval") throw new Error("no approval card");
+  expect(approval.title).toContain("Paste the blueprint at your position");
+});
+
+test("blueprint requests are told apart from plans", () => {
+  expect(wantsBlueprint("Make me a blueprint for 120 gears per minute")).toBe(true);
+  expect(wantsBlueprint("a layout for 2 circuits per second")).toBe(true);
+  expect(wantsBlueprint("How many assemblers for 120 gears per minute?")).toBe(false);
+  expect(wantsBlueprint("Review this blueprint")).toBe(false);
 });
