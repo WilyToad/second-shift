@@ -7,6 +7,7 @@ import { summarizePasted } from "./blueprint-review";
 import { blueprintsIn, decodeBlueprintString, encodeBlueprintString, type Blueprint } from "./blueprint";
 import { describeRow, productionRow, type RowBuild } from "./blueprint-template";
 import type { BlueprintCard } from "./messages";
+import { ChartBlockFilter, stripChartBlocks } from "./stream-filter";
 import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
 import type { Snapshot } from "./game";
 import type { ServerMessage } from "./messages";
@@ -360,21 +361,26 @@ export class Agent {
     try {
       for (let round = 0; ; round++) {
         const tools = round < MAX_TOOL_ROUNDS ? TOOLS : undefined;
+        // Turns without charts drop any chart block the model writes anyway (FC-111).
+        const filter = chart ? null : new ChartBlockFilter();
+        const show = (text: string) => {
+          if (!text) return;
+          ttftMs ??= performance.now() - started;
+          this.deps.emit({ type: "token", text });
+        };
         const result = await this.deps.model.stream(buildMessages(this.deps.system(), [...this.history, ...working.slice(0, -1)], working.at(-1)!), {
           thinking,
           tools,
-          onToken: (text) => {
-            ttftMs ??= performance.now() - started;
-            this.deps.emit({ type: "token", text });
-          },
+          onToken: (text) => show(filter ? filter.push(text) : text),
         });
+        if (filter) show(filter.end());
         record.rounds.push({
           promptTokens: result.usage?.prompt_tokens, cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens,
           serverTtftS: result.usage?.time_to_first_token, completionTokens: result.usage?.completion_tokens,
           ms: result.totalMs, toolCalls: result.toolCalls.length,
         });
         if (result.toolCalls.length === 0) {
-          let text = result.text;
+          let text = chart ? result.text : stripChartBlocks(result.text);
           if (chart && !text.includes("```rate_chart")) {
             const block = fallbackChart(question, found?.items ?? [], snap?.digest);
             if (block) { text += block; this.deps.emit({ type: "token", text: block }); }

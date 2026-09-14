@@ -281,3 +281,11 @@ test("changing a recipe goes through a card and names the recipe from the player
   expect(events.at(-1)).toMatchObject({ type: "approval_result", status: "done", message: "Set 2 machines to iron-gear-wheel; 20 items back to your inventory." });
 });
 
+
+test("a chart block on a turn without charts never reaches the page or the history", async () => {
+  const { agent, events } = setup([{ text: "Gears take 2 iron plates.\n\n```rate_chart\nitem=iron-gear-wheel surface=nauvis window=30m\n```" }]);
+  await agent.ask("What does an iron gear wheel need?");
+  const shown = events.filter((e) => e.type === "token").map((e: any) => e.text).join("");
+  expect(shown).toBe("Gears take 2 iron plates.\n\n");
+  expect(agent.history.at(-1)!.content).toBe("Gears take 2 iron plates.");
+});

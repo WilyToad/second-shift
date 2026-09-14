@@ -72,4 +72,4 @@ Times are commit times (local).
 - S15 "Machine settings" planned and activated (delegated): FC-093 set recipe on searched machines (helmet-checked, approval card), FC-044 layout sketch for pasted blueprints.
 - FC-093 done: "switch the assembling machines around me to copper cable" finds them, shows a card, and changes the recipe after approval. The helmet rule applies (not yours, not visible, locked/hidden recipe, wrong category, furnaces). Held ingredients go to your inventory. **For you to check:** whether changing a recipe by hand in remote view also returns ingredients to your inventory in the real game.
 - FC-044 done, **S15 closed**: pasted blueprints now show the layout sketch card too. All suites pass, but a full run now shows about one model miss somewhere (each passed on rerun); they're listed in FC-110.
-
+- S16 "Fewer model misses" planned and activated (delegated): FC-111 remove disallowed chart blocks in code, FC-112 say when a named thing doesn't exist, FC-113 keep failing answers from evals, FC-114 repeat runs.
