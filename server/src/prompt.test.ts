@@ -97,3 +97,13 @@ test("a question naming a surface only gets that surface's machine lines, plus r
   expect(text).toContain("root cause: research has stopped");
   expect(text).not.toContain("symptom on nauvis:");
 });
+
+test("alignment converges when reference lines tokenize differently from the system prompt", async () => {
+  // System text at 2 chars/token, reference lines at ~3.2 chars/token (like the real save).
+  const sys = "y".repeat(2 * 2367);
+  const measure = async (s: string) => 2367 + Math.ceil((s.length - sys.length) / 3.2);
+  const lines = Array.from({ length: 400 }, (_, i) => `technology t${i}: needs a, b | unlocks c, d`);
+  const aligned = await alignToCacheBlock(sys, lines, measure);
+  expect(aligned.tokens).toBeGreaterThanOrEqual(4096 + 24);
+  expect(aligned.tokens).toBeLessThan(4096 + 24 + 40);
+});

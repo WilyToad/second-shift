@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import type { ActionName } from "@companion/interfaces";
 import { DigestSchema, PrototypesSchema } from "@companion/interfaces";
 import { encodeBlueprintString } from "./blueprint";
+import { RecipeRetriever } from "./retrieval";
 import { Agent, compactHistory, fallbackChart, needsWorldTools, wantsChart, type GameActions } from "./agent";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
@@ -155,4 +156,52 @@ test("a pasted blueprint reaches the model only as a checked summary", async () 
   expect(prompt).toContain("assembling-machine-3 can't craft bioflux (category organic)");
   expect(events.find((e) => e.type === "user")).toEqual({ type: "user", text: "Review this blueprint: [blueprint 1]" });
   expect(agent.history.some((m) => m.content.includes(raw))).toBe(false);
+});
+
+test("planning tools: explicit research runs now, unprompted becomes a card, pastes and upgrades need approval", async () => {
+  const prototypes = PrototypesSchema.parse({
+    recipes: { "fast-transport-belt": { category: "crafting", energy: 0.5, enabled: false, maximum_productivity: 3, ingredients: [], products: [{ type: "item", name: "fast-transport-belt", amount: 1 }] } },
+    items: { "fast-transport-belt": { type: "item", stack_size: 100, place_result: "fast-transport-belt" } }, fluids: {},
+    technologies: { logistics: { prerequisites: [], unlocks: ["fast-transport-belt"], count: 10, ingredients: [], seconds_per_unit: 5, researched: false } },
+    machines: {}, entities: {},
+  });
+  const retriever = new RecipeRetriever(prototypes);
+  const calls: { action: string; args: any }[] = [];
+  const game: GameActions = {
+    latest: () => ({ receivedAt: 0, digest: DigestSchema.parse({ tick: 1, player: { name: "p", surface: "nauvis", position: { x: 5, y: 6 } }, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {} }) }),
+    async call(action: any, args?: any): Promise<any> {
+      calls.push({ action, args });
+      if (action === "queue_research") return { queued: args.technology, queue: [args.technology] };
+      if (action === "research_options") return { options: [{ name: "logistics", count: 10, packs: ["automation-science-pack"] }], available: 1, queue: [] };
+      if (action === "place_blueprint") return { placed: 3, expected: 3, x: args.x, y: args.y, undo_items: 1 };
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  const events: ServerMessage[] = [];
+  const model = fakeModel([
+    { tool: "queue_research", args: { technology: "fast belts" } }, { text: "Queued." },
+    { tool: "queue_research", args: { technology: "logistics" } }, { text: "Want me to queue it?" },
+    { text: "Looks fine." },
+    { tool: "place_blueprint" }, { text: "Confirm in the app." },
+  ]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => retriever, prototypes: () => prototypes, emit: (m) => events.push(m) });
+
+  await agent.ask("queue the research for fast belts");
+  const acts = () => calls.filter((c) => c.action !== "research_options"); // research turns also fetch the options list
+  expect(acts()).toEqual([{ action: "queue_research", args: { technology: "logistics" } }]);
+  expect(model.seen[0]!.at(-1)!.content).toContain("researchable now (1, cheapest first): logistics 10×automation");
+
+  await agent.ask("what should I work on next?"); // model suggests research unprompted
+  expect(acts().length).toBe(1);
+  expect((events.filter((e) => e.type === "approval").at(-1) as any).title).toBe("Queue research: logistics?");
+
+  const raw = encodeBlueprintString({ blueprint: { item: "blueprint", entities: [{ entity_number: 1, name: "fast-transport-belt", position: { x: 0.5, y: 0.5 } }] } });
+  await agent.ask(`review this ${raw}`);
+  await agent.ask("paste it here");
+  const card = events.filter((e) => e.type === "approval").at(-1) as any;
+  expect(card.title).toBe("Paste the blueprint at your position (5, 6)?");
+  expect(calls.some((c) => c.action === "place_blueprint")).toBe(false);
+  await agent.approve(card.id);
+  expect(calls.at(-1)).toEqual({ action: "place_blueprint", args: { blueprint: raw, x: 5, y: 6 } });
+  expect(events.at(-1)).toMatchObject({ type: "approval_result", status: "done", message: "Placed 3 of 3 ghosts at (5, 6)." });
 });

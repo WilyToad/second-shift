@@ -5,7 +5,7 @@ const since = args.includes("--since") ? args[args.indexOf("--since") + 1]! : ""
 const last = args.includes("--last") ? Number(args[args.indexOf("--last") + 1]) : Infinity;
 const lines = (await Bun.file(new URL("../data/eval/turns.jsonl", import.meta.url)).text()).trim().split("\n").filter(Boolean);
 type Turn = import("../server/src/agent").TurnRecord;
-const turns: Turn[] = lines.map((l) => JSON.parse(l)).filter((t: Turn) => t.at >= since).slice(-last);
+const turns: Turn[] = lines.map((l) => JSON.parse(l)).filter((t: Turn & { kind?: string }) => !t.kind && Array.isArray(t.rounds) && t.rounds.length > 0 && t.at >= since).slice(-last);
 if (!turns.length) { console.log("No turns recorded."); process.exit(0); }
 
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)] ?? NaN; };

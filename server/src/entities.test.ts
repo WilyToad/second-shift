@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PrototypesSchema } from "@companion/interfaces";
-import { resolveEntityFilter } from "./entities";
+import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
 
 const p = PrototypesSchema.parse({
   recipes: {}, fluids: {}, technologies: {},
@@ -17,4 +17,14 @@ test("groups: rails, tracks and belts resolve to entity types", () => {
 test("specific things resolve through prototypes to entity names", () => {
   expect(resolveEntityFilter("biochambers", p)?.names).toEqual(["biochamber"]);
   expect(resolveEntityFilter("quantum widgets", p)).toBeNull();
+});
+
+test("the player's own words pick the entity: nicknames first, then groups", () => {
+  const withBelts = PrototypesSchema.parse({
+    recipes: {}, fluids: {}, technologies: {}, machines: {},
+    items: { "transport-belt": { type: "item", stack_size: 100, place_result: "transport-belt" }, "fast-transport-belt": { type: "item", stack_size: 100, place_result: "fast-transport-belt" } },
+    entities: { "transport-belt": { type: "transport-belt", size: [1, 1], collision: [-0.4, -0.4, 0.4, 0.4] }, "fast-transport-belt": { type: "transport-belt", size: [1, 1], collision: [-0.4, -0.4, 0.4, 0.4] } },
+  });
+  expect(resolveEntityFilterInText("How many yellow belts are near me on the right?", withBelts)?.names).toEqual(["transport-belt"]);
+  expect(resolveEntityFilterInText("how many rails are near me", null)?.types).toContain("straight-rail");
 });

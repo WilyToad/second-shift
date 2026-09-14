@@ -90,7 +90,7 @@ try {
     for _, r in pairs(helpers.json_to_table([=[${JSON.stringify(placed.belts)}]=])) do local e = s.find_entity(r.name, r) if e then e.destroy() end end
     for _, g in pairs(s.find_entities_filtered({ area = { { p.position.x - 50, p.position.y - 50 }, { p.position.x + 50, p.position.y + 50 } }, name = "entity-ghost", force = f })) do if g.ghost_name == "transport-belt" then g.destroy() end end
     for _, t in pairs(f.find_chart_tags(s, { { p.position.x - 10, p.position.y - 10 }, { p.position.x + 10, p.position.y + 10 } })) do if t.text == "companion test tag" then t.destroy() end end
-    local q = {} for _, name in pairs(helpers.json_to_table([=[${originalQueue}]=]) or {}) do q[#q+1] = name end f.research_queue = q
+    f.cancel_current_research() local q = {} for _, name in pairs(helpers.json_to_table([=[${originalQueue}]=]) or {}) do q[#q+1] = name end f.research_queue = q
     if p.controller_type == defines.controllers.remote then p.exit_remote_view() end
     rcon.print("cleaned")`);
   dev.rcon.close();

@@ -1,6 +1,6 @@
 // Compact text forms of the save's prototype data for the model. Every token here is prefill
 // cost, so formats are terse and consistent: one line per recipe, technology or machine.
-import type { Prototypes, Recipe, Technology } from "@companion/interfaces";
+import type { Machine, Prototypes, Recipe, Technology } from "@companion/interfaces";
 
 const num = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100));
 
@@ -63,8 +63,8 @@ export function formatTechnologies(p: Prototypes): string {
   return Object.entries(p.technologies).sort(([a], [b]) => a.localeCompare(b)).map(([name, t]) => techLine(name, t)).join("\n");
 }
 
-export function formatMachines(p: Prototypes): string {
-  return Object.entries(p.machines).sort(([a], [b]) => a.localeCompare(b)).map(([name, m]) => {
+export function machineLine(name: string, m: Machine): string | null {
+  {
     const parts = [`${m.type} ${m.size[0]}x${m.size[1]}`];
     if (m.crafting_speed !== undefined) parts.push(`speed ${num(m.crafting_speed)}`);
     if (m.mining_speed !== undefined) parts.push(`mining ${num(m.mining_speed)}`);
@@ -72,8 +72,12 @@ export function formatMachines(p: Prototypes): string {
     if (m.module_slots) parts.push(`modules ${m.module_slots}`);
     if (m.type === "character") return null;
     if (m.crafting_categories?.length) parts.push(`categories ${m.crafting_categories.join(", ")}`);
-    return `${name}: ${parts.join(", ")}`;
-  }).filter((line) => line !== null).join("\n");
+    return `machine ${name}: ${parts.join(", ")}`;
+  }
+}
+
+export function formatMachines(p: Prototypes): string {
+  return Object.entries(p.machines).sort(([a], [b]) => a.localeCompare(b)).map(([name, m]) => machineLine(name, m)).filter((line) => line !== null).join("\n");
 }
 
 export function formatItemTraits(p: Prototypes): string {

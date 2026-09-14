@@ -1,7 +1,7 @@
 // Picks the recipe and technology lines relevant to a question, in code, so the model gets the
 // save's real data without the whole 59k-token dump in the prompt (PLAN §6, FC-011).
 import type { Prototypes } from "@companion/interfaces";
-import { craftersByCategory, recipeLine, techLine } from "./grounding";
+import { craftersByCategory, machineLine, recipeLine, techLine } from "./grounding";
 
 type Kind = "item" | "fluid" | "recipe" | "technology";
 type Entry = { kind: Kind; name: string };
@@ -15,6 +15,9 @@ const ALIASES: Record<string, string> = {
   lds: "low-density-structure", "low density structure": "low-density-structure",
   "agri science": "agricultural-science-pack", "ag science": "agricultural-science-pack",
   "em science": "electromagnetic-science-pack", "metallurgic science": "metallurgic-science-pack",
+  "yellow belt": "transport-belt", belt: "transport-belt", "red belt": "fast-transport-belt", "fast belt": "fast-transport-belt",
+  "blue belt": "express-transport-belt", "express belt": "express-transport-belt", "green belt": "turbo-transport-belt", "turbo belt": "turbo-transport-belt",
+  "yellow inserter": "inserter", "red inserter": "long-handed-inserter", "blue inserter": "fast-inserter", "green inserter": "bulk-inserter",
 };
 
 const MOD_PREFIXES = ["maraxsis-", "cerys-"];
@@ -84,6 +87,19 @@ export class RecipeRetriever {
     return found;
   }
 
+  /** Technologies the player might mean: named ones, then those unlocking a named item's recipe. */
+  technologiesFor(text: string): string[] {
+    const out: string[] = [];
+    for (const e of this.match(text)) {
+      if (e.kind === "technology" && !out.includes(e.name)) out.push(e.name);
+    }
+    for (const e of this.match(text)) {
+      if (e.kind !== "item" && e.kind !== "fluid") continue;
+      for (const recipe of this.producers.get(e.name) ?? []) for (const t of this.unlockedBy.get(recipe) ?? []) if (!out.includes(t)) out.push(t);
+    }
+    return out;
+  }
+
   /** Relevant lines for a question, capped. Returns the names it matched for transparency. */
   retrieve(question: string, maxLines = 24): { matched: string[]; items: string[]; lines: string[] } {
     const entries = this.match(question);
@@ -119,9 +135,20 @@ export class RecipeRetriever {
     }
     for (const t of techs) this.p.technologies[t]!.unlocks.slice(0, 5).forEach((n) => addRecipe(n));
 
+    // Machines named in the question (speed, modules, categories), and the crafters of the main recipe.
+    const machines: string[] = [];
+    const addMachine = (name: string) => { if (this.p.machines[name] && this.p.machines[name]!.type !== "character" && !machines.includes(name)) machines.push(name); };
+    for (const e of entries) { addMachine(e.name); const placed = this.p.items[e.name]?.place_result; if (placed) addMachine(placed); }
+    const mainRecipe = recipes[0] ? this.p.recipes[recipes[0]] : undefined;
+    // Crafter details only when the question is about machines or rates; otherwise "made in" is enough.
+    if (/\b(speed|machines?|how many|ratio|per (minute|second)|modules?|need)\b/i.test(question)) {
+      for (const crafter of (mainRecipe ? this.crafters.get(mainRecipe.category) ?? [] : []).slice(0, 2)) addMachine(crafter);
+    }
+
     const lines = [
       ...techs.map((t) => techLine(t, this.p.technologies[t]!)),
       ...recipes.map((r) => recipeLine(r, this.p.recipes[r]!, this.crafters)),
+      ...machines.map((m) => machineLine(m, this.p.machines[m]!)).filter((l): l is string => l !== null),
     ].slice(0, maxLines);
     const items = entries.filter((e) => e.kind === "item" || e.kind === "fluid").map((e) => e.name);
     return { matched: entries.map((e) => `${e.kind}:${e.name}`), items, lines };

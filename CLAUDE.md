@@ -32,8 +32,10 @@ No Vite. UI: Preact + signals in `displays/src` (PLAN §4).
 - **Two tiers, split by latency.** Anything time-critical (attacks, brownouts, low ammo, full
   buffers) is plain Lua in the mod and never waits on the model. The model handles questions
   and requested actions (2–30 s).
-- **Prompt order is fixed: stable first, volatile last.** System rules → prototype digest →
-  conversation history (append-only) → current `state.json` snapshot, always last. Anything
+- **Prompt order is fixed: stable first, volatile last.** System rules (+ traits, block-aligned) →
+  conversation history (append-only; past questions stored compacted) → new question with retrieved
+  lines → live snapshot, always last. Every new tool or rule grows the stable prefix: re-run the latency
+  report (PLAN §6). Anything
   volatile placed earlier breaks the prefix cache: ~2 s warm vs ~42 s cold (PLAN §5). Don't
   put timestamps, tick counts or other changing values in the system prompt.
 - **Ground recipes on `prototypes.json`, not on what the model remembers.** The save is heavily

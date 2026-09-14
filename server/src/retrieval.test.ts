@@ -33,6 +33,7 @@ test.if(real !== null)("real save: Gleba and modded names resolve", () => {
   const line = bioflux.lines.find((l) => l.startsWith("bioflux: 15 yumako-mash, 12 jelly -> 4 bioflux"));
   expect(line).toBeDefined();
   expect(line).toEndWith("made in: biochamber"); // category "organic" only, not "organic-or-assembling" machines
+  expect(retriever.retrieve("What's the crafting speed of a biochamber?").lines.some((l) => l.startsWith("machine biochamber: assembling-machine 3x3, speed 2"))).toBe(true);
   expect(retriever.retrieve("how do I build a hydro plant").matched).toContain("item:maraxsis-hydro-plant");
   expect(retriever.retrieve("carbon fiber recipe").matched).toContain("item:carbon-fiber");
   const agri = retriever.retrieve("What do I need before I can research agricultural science?");

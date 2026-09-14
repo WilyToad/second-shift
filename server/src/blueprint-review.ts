@@ -9,12 +9,12 @@ const MAX_BLUEPRINTS = 5;
 const top = (counts: Record<string, number>, n: number) =>
   Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${k} ${v}`).join(", ");
 
-export function summarizePasted(question: string, prototypes: Prototypes | null): { question: string; display: string; summaries: string[] } {
+export function summarizePasted(question: string, prototypes: Prototypes | null): { question: string; display: string; summaries: string[]; raws: string[] } {
   const summaries: string[] = [];
   let index = 0;
   const replace = (label: string) => (text: string) => text.replace(PASTED, () => `[${label} ${++index}]`);
   const matches = question.match(PASTED) ?? [];
-  if (matches.length === 0) return { question, display: question, summaries };
+  if (matches.length === 0) return { question, display: question, summaries, raws: [] };
 
   matches.forEach((raw, i) => {
     const n = i + 1;
@@ -39,5 +39,5 @@ export function summarizePasted(question: string, prototypes: Prototypes | null)
   index = 0;
   const cleaned = replace("pasted blueprint")(question);
   index = 0;
-  return { question: cleaned, display: replace("blueprint")(question), summaries };
+  return { question: cleaned, display: replace("blueprint")(question), summaries, raws: matches };
 }

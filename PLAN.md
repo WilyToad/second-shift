@@ -401,7 +401,20 @@ tokens) and conversation compaction (history over ~8k estimated tokens loses old
 snapshots, then the cache is re-warmed), first token median 1.11 s and max 1.80 s; follow-ups in a
 16-question conversation median 1.59 s, p90 2.23 s, max 2.51 s. When aligning, the measured prefix
 includes the probe's placeholder user turn (~10 tokens), so alignment keeps a 24-token margin.
-Aligning exactly to 4,096 cost a whole block (first token 2.48 s). Conversation trimming (FC-076) and block-aware prompt layout are the next levers.
+Aligning exactly to 4,096 cost a whole block (first token 2.48 s).
+
+**S08 prompt changes (2026-09-14):** planning tools pushed the system prompt to 6,169 tokens, and
+follow-ups rose to 2.75–2.85 s. Three fixes restored the targets:
+1. The machine list moved out of the system prompt into retrieval (machines named in the question,
+   and crafters for rate/machine questions).
+2. Each past question is stored in history compacted (no recipe lines or snapshot). The previous turn
+   sits past the last cache block and is re-read either way, so a short version is cheaper than a
+   byte-identical one.
+3. Alignment re-estimates chars/token from the reference lines it adds (a fixed estimate stopped at
+   4,082 < 4,096).
+
+Result over 3 runs: first token median 1.16–1.43 s, follow-ups 1.90–2.04 s, 16-question conversation
+median 1.72 s / p90 2.30 s. The system prompt is now 4,121 tokens. Conversation trimming (FC-076) and block-aware prompt layout are the next levers.
 ---
 
 ## 7. Phases

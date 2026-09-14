@@ -4,7 +4,7 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ActionArgs, ActionData, ActionName, Digest, EntityRef, FindEntitiesResult, Prototypes } from "@companion/interfaces";
 import { summarizePasted } from "./blueprint-review";
-import { resolveEntityFilter } from "./entities";
+import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
 import type { Snapshot } from "./game";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, ToolCall, ToolSpec } from "./model";
@@ -16,8 +16,8 @@ export interface GameActions {
   latest(): Snapshot | undefined;
 }
 
-type MapAction = "mark_deconstruction" | "cancel_deconstruction";
-type Pending = { id: string; action: MapAction; entities: EntityRef[]; title: string };
+/** A card waiting for the player: `run` does the work and returns the outcome message. */
+type Pending = { id: string; title: string; run: () => Promise<string> };
 type LastResult = { refs: EntityRef[]; label: string; count: number; at: number; where: string };
 
 /** One answered question, for latency analysis (FC-080). Section sizes are characters. */
@@ -115,6 +115,42 @@ export const TOOLS: ToolSpec[] = [
   {
     type: "function",
     function: {
+      name: "mark_upgrade",
+      description: "Ask the player to approve marking the last result for upgrade (like an upgrade planner). Nothing happens until they confirm.",
+      parameters: { type: "object", properties: { to: { type: "string", description: "Target entity, e.g. fast belts. Default: next tier." } } },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "queue_research",
+      description: "Add a technology to the research queue.",
+      parameters: { type: "object", properties: { technology: { type: "string", description: "Technology or the item it unlocks, as the player said it." } }, required: ["technology"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "map_action",
+      description: "Put a map tag, or move the camera (remote view), at the player's position or the last result.",
+      parameters: {
+        type: "object",
+        properties: { kind: { type: "string", enum: ["tag", "camera"] }, at: { type: "string", enum: ["here", "last_result"] }, text: { type: "string", description: "Tag text." } },
+        required: ["kind"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "place_blueprint",
+      description: "Ask the player to approve pasting the last blueprint they pasted into chat, as ghosts at their position.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "cancel_deconstruction",
       description: "Ask the player to approve cancelling deconstruction marks on the last result. Nothing happens until they confirm.",
       parameters: { type: "object", properties: {} },
@@ -131,7 +167,7 @@ export function needsWorldTools(question: string, hasLastResult: boolean): boole
   const q = question.toLowerCase();
   if (/\b(near|nearby|around me|next to me|close to me|here|to my|on my|of me|in view|on screen|visible)\b/.test(q)) return true;
   if (/\b(find|search|look for|highlight|show me|where are|count|which)\b/.test(q)) return true;
-  if (/\b(mark|unmark|deconstruct\w*|remove|delete|clear|cancel)\b/.test(q)) return true;
+  if (/\b(mark|unmark|deconstruct\w*|remove|delete|clear|cancel|upgrade\w*|queue|start research\w*|research it|tag|pin|camera|jump|take me|paste|place|build it)\b/.test(q)) return true;
   if (/\bhow many\b/.test(q) && !/\b(need|needs|take|takes|require|requires|make|makes|per)\b/.test(q)) return true;
   if (hasLastResult && /\b(them|those|these|it|that)\b/.test(q)) return true;
   return false;
@@ -166,6 +202,8 @@ const plural = (n: number, word: string) => `${n} ${n === 1 ? word : word.endsWi
 export class Agent {
   readonly history: ChatMessage[] = [];
   private lastResult: LastResult | null = null;
+  private lastBlueprint: { raw: string; at: number } | null = null;
+  private currentQuestion = "";
   private pending = new Map<string, Pending>();
   private notes: string[] = [];
 
@@ -201,6 +239,8 @@ export class Agent {
     // Pasted blueprint strings never reach the model: they become checked summaries.
     const pasted = summarizePasted(rawQuestion, this.deps.prototypes());
     const question = pasted.question;
+    this.currentQuestion = question;
+    if (pasted.raws.length) this.lastBlueprint = { raw: pasted.raws.at(-1)!, at: this.now() };
     const snap = this.deps.game.latest() ?? this.deps.fallbackSnapshot?.();
     const found = this.deps.retriever()?.retrieve(question);
     const snapshot = snap ? formatSnapshot(snap.digest, this.now() - snap.receivedAt, { question, items: found?.items ?? [] }) : null;
@@ -215,7 +255,9 @@ export class Agent {
     const guided = pasted.summaries.length
       ? `${noted}\n\n(Review from the checked summary in 90 words or fewer: lead with the total entity count and the main counts, then list every problem the checks found, or say they found none; no tool call or chart.)`
       : notes.length ? `${noted}\n\n(Answer from the data provided in 60 words or fewer; ${notes.join(", ")}.)` : noted;
-    const working: ChatMessage[] = [userTurn(guided, { recipes: found?.lines ?? [], snapshot })];
+    // Research questions get the live list of what can be queued right now (decided in code, not guessed).
+    const researchLines = /\b(research\w*|tech\w*|unlock\w*|queue)\b/i.test(question) ? await this.researchOptions() : [];
+    const working: ChatMessage[] = [userTurn(guided, { recipes: [...researchLines, ...(found?.lines ?? [])], snapshot })];
     const record: TurnRecord = {
       at: new Date(this.now()).toISOString(), question, world, chart, rounds: [], totalMs: 0,
       chars: {
@@ -252,7 +294,9 @@ export class Agent {
             if (block) { text += block; this.deps.emit({ type: "token", text: block }); }
           }
           working.push({ role: "assistant", content: text });
-          this.history.push(...working);
+          // Store the question without its bulky retrieved lines and snapshot: the next turn re-reads the
+          // previous turn anyway (it sits past the last cache block), so a short version is much cheaper (S08).
+          this.history.push(...working.map((m, i) => (i === 0 && m.role === "user" ? { ...m, content: compactUserContent(m.content) } : m)));
           record.visibleTtftMs = ttftMs;
           record.totalMs = performance.now() - started;
           this.logTurn(record);
@@ -285,6 +329,17 @@ export class Agent {
     this.logLine({ kind: "compaction", at: new Date(this.now()).toISOString(), beforeTokens: result.beforeTokens, afterTokens: result.afterTokens, warmMs: performance.now() - started });
   }
 
+  private async researchOptions(): Promise<string[]> {
+    try {
+      const r = await this.deps.game.call("research_options");
+      if (!r.options.length) return [`researchable now: nothing (${r.available} available)`];
+      const packs = (p: string[]) => p.map((n) => n.replace(/-science-pack$/, "")).join("+");
+      return [`researchable now (${r.available}, cheapest first): ${r.options.map((o) => `${o.name} ${o.count}×${packs(o.packs)}`).join(", ")}${r.queue.length ? ` | queue: ${r.queue.join(", ")}` : " | queue: empty"}`];
+    } catch {
+      return [];
+    }
+  }
+
   private logTurn(record: TurnRecord): void {
     this.logLine(record);
   }
@@ -314,7 +369,15 @@ export class Agent {
           return await this.findStuck(args);
         case "mark_deconstruction":
         case "cancel_deconstruction":
-          return this.propose(call.function.name);
+          return this.proposeOnLastResult(call.function.name);
+        case "mark_upgrade":
+          return this.proposeOnLastResult("mark_upgrade", args.to ? String(args.to) : undefined);
+        case "queue_research":
+          return await this.queueResearch(String(args.technology ?? ""));
+        case "map_action":
+          return await this.mapAction(args);
+        case "place_blueprint":
+          return this.proposeBlueprint();
         default:
           return `Error: there is no tool named ${call.function.name}. You can only use: ${TOOLS.map((t) => t.function.name).join(", ")}.`;
       }
@@ -324,8 +387,11 @@ export class Agent {
   }
 
   private async find(args: Record<string, unknown>): Promise<string> {
-    const what = String(args.what ?? "");
-    const filter = resolveEntityFilter(what, this.deps.prototypes());
+    // The player's own words win over the model's paraphrase (it once turned "yellow belts" into "fast transport belts").
+    const fromQuestion = resolveEntityFilterInText(this.currentQuestion, this.deps.prototypes());
+    const filter = fromQuestion ?? resolveEntityFilter(String(args.what ?? ""), this.deps.prototypes());
+    const said = String(args.what ?? "");
+    const what = fromQuestion?.names ? fromQuestion.names.join(", ") : said || fromQuestion?.label || "";
     if (!filter) return `I don't know what "${what}" refers to in this save. Nothing was searched.`;
     const direction = (["right", "left", "up", "down", "around"] as const).find((d) => d === args.direction) ?? "around";
     const radius = Math.min(Math.max(Number(args.radius) || 32, 1), 128);
@@ -376,19 +442,92 @@ export class Agent {
     return summary;
   }
 
-  private propose(action: MapAction): string {
+  private card(title: string, detail: string, run: () => Promise<string>): string {
+    const id = crypto.randomUUID();
+    this.pending.set(id, { id, title, run });
+    this.deps.emit({ type: "approval", id, title, detail });
+    return "An approval card is now shown to the player. Nothing has been done yet: tell them to confirm or cancel in the app. The outcome will arrive with their next message.";
+  }
+
+  private proposeOnLastResult(action: "mark_deconstruction" | "cancel_deconstruction" | "mark_upgrade", to?: string): string {
     const last = this.lastResult;
     if (!last || this.now() - last.at > RESULT_TTL_MS) return "Error: there is no recent search result to act on. Use find_entities first.";
     if (last.refs.length === 0) return `Error: the last search found no ${last.label}, so there's nothing to act on.`;
-    const id = crypto.randomUUID();
     const n = last.refs.length;
-    const title = action === "mark_deconstruction" ? `Mark ${n} ${last.label} for deconstruction?` : `Cancel deconstruction marks on ${n} ${last.label}?`;
-    const detail = action === "mark_deconstruction"
-      ? `The ${last.label} found ${last.where}, highlighted in-game. Construction robots remove them; Ctrl+Z in-game undoes the marks.`
-      : `Removes deconstruction marks from the ${last.label} found ${last.where}.`;
-    this.pending.set(id, { id, action, entities: last.refs, title });
-    this.deps.emit({ type: "approval", id, title, detail });
-    return "An approval card is now shown to the player. Nothing has been done yet: tell them to confirm or cancel in the app. The outcome will arrive with their next message.";
+    const entities = last.refs;
+    const applied = (verb: string) => async () => {
+      const target = action === "mark_upgrade" && to ? resolveEntityFilter(to, this.deps.prototypes())?.names?.[0] : undefined;
+      const r = action === "mark_upgrade"
+        ? await this.deps.game.call("mark_upgrade", { entities, ...(target ? { target } : {}) })
+        : await this.deps.game.call(action, { entities });
+      const refused = Object.entries(r.rejected).map(([reason, count]) => `${count} ${reason.replace(/_/g, " ")}`).join(", ");
+      return `${verb} ${plural(r.done, "entity")}${refused ? `; refused: ${refused}` : ""}.`;
+    };
+    if (action === "mark_deconstruction") return this.card(`Mark ${n} ${last.label} for deconstruction?`, `The ${last.label} found ${last.where}, highlighted in-game. Construction robots remove them; Ctrl+Z in-game undoes the marks.`, applied("Marked"));
+    if (action === "cancel_deconstruction") return this.card(`Cancel deconstruction marks on ${n} ${last.label}?`, `Removes deconstruction marks from the ${last.label} found ${last.where}.`, applied("Unmarked"));
+    return this.card(`Mark ${n} ${last.label} for upgrade${to ? ` to ${to}` : ""}?`, `The ${last.label} found ${last.where}, like an upgrade planner. Robots swap them when the items are available; Ctrl+Z undoes the marks.`, applied("Marked for upgrade"));
+  }
+
+  /** Small requests run right away only when the player's own words asked for them; otherwise they need a card. */
+  private asked(pattern: RegExp): boolean {
+    return pattern.test(this.currentQuestion);
+  }
+
+  private async queueResearch(what: string): Promise<string> {
+    const candidates = this.deps.retriever()?.technologiesFor(what) ?? [];
+    if (!candidates.length) return `I couldn't find a technology matching "${what}" in this save.`;
+    const run = async (): Promise<string> => {
+      const failures: string[] = [];
+      for (const technology of candidates.slice(0, 3)) {
+        try {
+          const r = await this.deps.game.call("queue_research", { technology });
+          return `Queued ${r.queued}. Queue: ${r.queue.join(", ")}.`;
+        } catch (e) {
+          failures.push((e as Error).message);
+        }
+      }
+      return `Not queued: ${failures.join(" ")}`;
+    };
+    if (!this.asked(/\b(queue|research|start)\b/i)) return this.card(`Queue research: ${candidates[0]}?`, "Adds it to the research queue.", run);
+    const message = await run();
+    this.deps.emit({ type: "tool", summary: message });
+    return message;
+  }
+
+  private async mapAction(args: Record<string, unknown>): Promise<string> {
+    const kind = args.kind === "camera" ? "camera" : "tag";
+    const digest = this.deps.game.latest()?.digest;
+    const atLast = args.at === "last_result" && this.lastResult?.refs[0];
+    const spot = atLast ? { x: this.lastResult!.refs[0]!.x, y: this.lastResult!.refs[0]!.y } : digest?.player ? { x: digest.player.position.x, y: digest.player.position.y } : null;
+    if (!spot) return "Error: the player's position isn't known yet.";
+    const run = async (): Promise<string> => {
+      if (kind === "camera") {
+        const r = await this.deps.game.call("camera_to", spot);
+        return `Camera moved to (${r.x}, ${r.y}) on ${r.surface}. Press Esc in-game to return.`;
+      }
+      const r = await this.deps.game.call("add_map_tag", { ...spot, text: String(args.text ?? "companion") });
+      return `Map tag "${r.text}" added at (${r.x}, ${r.y}).`;
+    };
+    const wanted = kind === "camera" ? /\b(camera|jump|show me|take me|go to|look at)\b/i : /\b(tag|pin|label|mark (it )?on (the )?map)\b/i;
+    if (!this.asked(wanted)) return this.card(kind === "camera" ? `Move your camera to (${Math.floor(spot.x)}, ${Math.floor(spot.y)})?` : `Add a map tag at (${Math.floor(spot.x)}, ${Math.floor(spot.y)})?`, kind === "camera" ? "Opens remote view there; nothing in the factory changes." : `Tag text: ${String(args.text ?? "companion")}`, run);
+    try {
+      const message = await run();
+      this.deps.emit({ type: "tool", summary: message });
+      return message;
+    } catch (e) {
+      return `Error: ${(e as Error).message}`;
+    }
+  }
+
+  private proposeBlueprint(): string {
+    const bp = this.lastBlueprint;
+    if (!bp || this.now() - bp.at > RESULT_TTL_MS) return "Error: no blueprint has been pasted recently. Ask the player to paste one first.";
+    const position = this.deps.game.latest()?.digest.player?.position;
+    if (!position) return "Error: the player's position isn't known yet.";
+    return this.card(`Paste the blueprint at your position (${position.x}, ${position.y})?`, "Placed as ghosts, like pasting it yourself; construction robots build it and Ctrl+Z undoes it.", async () => {
+      const r = await this.deps.game.call("place_blueprint", { blueprint: bp.raw, x: position.x, y: position.y });
+      return `Placed ${r.placed} of ${r.expected} ghosts at (${r.x}, ${r.y})${r.placed < r.expected ? " (some spots were blocked)" : ""}.`;
+    });
   }
 
   async approve(id: string): Promise<void> {
@@ -396,10 +535,7 @@ export class Agent {
     if (!p) return this.deps.emit({ type: "approval_result", id, status: "expired", message: "This request is no longer pending." });
     this.pending.delete(id);
     try {
-      const r = await this.deps.game.call(p.action, { entities: p.entities });
-      const refused = Object.entries(r.rejected).map(([reason, n]) => `${n} ${reason.replace(/_/g, " ")}`).join(", ");
-      const verb = p.action === "mark_deconstruction" ? "Marked" : "Unmarked";
-      const message = `${verb} ${plural(r.done, "entity")}${refused ? `; refused: ${refused}` : ""}.`;
+      const message = await p.run();
       this.notes.push(`player approved "${p.title}" → ${message}`);
       this.deps.emit({ type: "approval_result", id, status: "done", message });
     } catch (e) {

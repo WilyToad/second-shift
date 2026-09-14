@@ -1,9 +1,10 @@
 // Prompt assembly. Order is fixed so the model's prefix cache survives between turns:
-//   1. system rules (never changes)
-//   2. conversation history, stored exactly as sent (append-only)
-//   3. the new question with the latest game snapshot, always last
+//   1. system rules (never changes; padded to a cache block boundary)
+//   2. conversation history (append-only; each past question stored compacted, without its recipe
+//      lines and snapshot, so follow-ups re-read little)
+//   3. the new question with its retrieved lines and the latest game snapshot, always last
 import type { Digest, Prototypes } from "@companion/interfaces";
-import { formatItemTraits, formatMachines } from "./grounding";
+import { formatItemTraits } from "./grounding";
 import type { ChatMessage } from "./model";
 
 export const SYSTEM_RULES = `You are Factorio Companion, an assistant riding along in the player's helmet in a live, heavily modded Factorio 2.0 game (Space Age plus mods such as maraxsis, Cerys, factorissimo-2).
@@ -110,7 +111,8 @@ export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { ques
 /** Stable system prompt: rules plus the small, rarely changing slice of save data (PLAN §6). */
 export function systemPrompt(prototypes: Prototypes | null): string {
   if (!prototypes) return `${SYSTEM_RULES}\n\n[save data not loaded yet: recipes and machines are unknown]`;
-  return `${SYSTEM_RULES}\n\n[save data: machines]\n${formatMachines(prototypes)}\n\n[save data: items that spoil or burn]\n${formatItemTraits(prototypes)}`;
+  // Machine details come with each question via retrieval (S08): the full list cost ~2k stable tokens.
+  return `${SYSTEM_RULES}\n\n[save data: items that spoil or burn]\n${formatItemTraits(prototypes)}`;
 }
 
 export const CACHE_BLOCK_TOKENS = 2048;
@@ -126,7 +128,9 @@ export async function alignToCacheBlock(system: string, referenceLines: string[]
   const base = await measure(system);
   const target = Math.ceil(base / CACHE_BLOCK_TOKENS) * CACHE_BLOCK_TOKENS;
   if (base >= target - CACHE_BLOCK_TOKENS + ALIGN_MARGIN_TOKENS && base <= target - CACHE_BLOCK_TOKENS + ALIGN_MARGIN_TOKENS * 3) return { system, tokens: base, target: target - CACHE_BLOCK_TOKENS }; // already just past a boundary
-  const charsPerToken = system.length / base;
+  // Start from the system prompt's ratio, then learn the reference lines' own ratio from each measured
+  // round: they tokenize differently (S08: ~3.2 vs ~2.0 chars/token), and a fixed ratio left the loop short.
+  let charsPerToken = system.length / base;
   let candidate = system;
   let tokens = base;
   let used = 0;
@@ -135,15 +139,17 @@ export async function alignToCacheBlock(system: string, referenceLines: string[]
   // boundary by a small margin; stopping right at 4,096 measured left block 2 uncached (S05). Tokens past
   // the margin are re-read on every turn, so stop at the first line that crosses it.
   const goal = target + ALIGN_MARGIN_TOKENS;
-  for (let round = 0; round < 6 && tokens < goal && used < referenceLines.length; round++) {
-    const missingChars = Math.max(goal - tokens, 1) * charsPerToken * 0.9;
+  for (let round = 0; round < 10 && tokens < goal && used < referenceLines.length; round++) {
+    const missingChars = Math.max(goal - tokens, 1) * charsPerToken;
     let added = 0;
     while (used < referenceLines.length && added < missingChars) {
       const line = referenceLines[used++]!;
       candidate += (used === 1 ? `\n\n${heading}\n` : "\n") + line;
       added += line.length + 1;
     }
+    const before = tokens;
     tokens = await measure(candidate);
+    if (tokens > before) charsPerToken = added / (tokens - before);
   }
   return { system: candidate, tokens, target };
 }

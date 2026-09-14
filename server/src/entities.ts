@@ -24,6 +24,25 @@ const GROUPS: Record<string, string[]> = {
 
 const singular = (w: string) => (w.endsWith("ies") ? w.slice(0, -3) + "y" : w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
 
+/**
+ * The thing a whole question refers to ("how many yellow belts are near me?"), using the player's own
+ * words. Specific items (via names and nicknames) win over broad groups.
+ */
+export function resolveEntityFilterInText(text: string, prototypes: Prototypes | null): EntityFilter | null {
+  if (prototypes) {
+    const names = new Set<string>();
+    for (const e of new RecipeRetriever(prototypes).match(text)) {
+      if (prototypes.entities[e.name] || prototypes.machines[e.name]) names.add(e.name);
+      const placed = prototypes.items[e.name]?.place_result;
+      if (placed) names.add(placed);
+    }
+    if (names.size) return { label: text, names: [...names] };
+  }
+  const words = normalize(text).split(" ").map(singular).join(" ");
+  const group = Object.keys(GROUPS).sort((a, b) => b.length - a.length).find((key) => new RegExp(`\\b${key}\\b`).test(words));
+  return group ? { label: group, types: GROUPS[group] } : null;
+}
+
 export function resolveEntityFilter(what: string, prototypes: Prototypes | null): EntityFilter | null {
   const words = normalize(what).split(" ").filter(Boolean);
   if (words.length === 0) return null;
