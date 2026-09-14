@@ -69,7 +69,7 @@ test("poles reach every inserter and are wired together", () => {
   if (!r.ok) throw new Error(r.reason);
   const poles = r.build.blueprint.entities.filter((e) => e.name === "medium-electric-pole");
   expect(poles.map((e) => [e.position.x, e.position.y])).toEqual([[0.5, 1.5], [0.5, 5.5], [6.5, 1.5], [6.5, 5.5]]);
-  const numbers = poles.map((e) => e.entity_number);
+  const numbers = poles.map((e) => e.entity_number) as [number, number, number, number];
   expect((r.build.blueprint as { wires?: number[][] }).wires).toEqual([
     [numbers[0], 5, numbers[1], 5],
     [numbers[2], 5, numbers[3], 5], [numbers[0], 5, numbers[2], 5], [numbers[1], 5, numbers[3], 5],
