@@ -363,6 +363,11 @@ of 1,800 ticks over 1 ms, all from the one-time registry scan starting on a save
 benchmark's 1,800 ticks don't reach the end of that scan, so the steady-state cost is lower than the
 average (polling alone profiles at 0.055 ms/tick). FC-104 tracks the listing ticks.
 
+**Re-run after S15–S20 (2026-09-14, renamed mod `second-shift`, same command):** without 0.635 ms/tick, with
+0.678 ms/tick, so **0.043 ms/tick**; worst tick 10.8 ms without and 11.0 ms with (the base game's own spikes). Within
+the benchmark's ~0.05 ms run-to-run noise of the earlier result, so public copy says "under 0.1 ms per tick" and
+names the one-time registry scan rather than quoting either number as exact.
+
 **Measure every mod change** with `factorio --benchmark <save copy> --benchmark-ticks N`,
 with and without the companion mod, and watch the in-game time-usage debug view (F4 →
 show-time-usage). Proposed budget: under 0.1 ms per tick on average, no single tick over 1 ms.

@@ -16,7 +16,7 @@
     "start": "bun server/src/main.ts",
     "board": "bun scripts/board.ts",
     "check": "bun test && tsc --noEmit -p . && bun scripts/board.ts --check",
-    "site:dev": "bun website/src/index.html --port 5181",
+    "site:dev": "bun --port=5181 website/src/index.html",
     "site:build": "bun website/build.ts",
     "site:serve": "bun website/serve.ts"
   },

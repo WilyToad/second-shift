@@ -149,7 +149,9 @@ flowchart LR
 ```
 
 - **The mod** keeps a registry of machines from build events, polls a small slice each tick and sends a compact
-  digest. Measured cost on a large Space Age base: **0.082 ms per tick**. It never scans the whole map on a timer.
+  digest. On a large Space Age base it adds **under 0.1 ms per tick** (0.043 ms in the latest benchmark). It never
+  scans the whole map on a timer; the only heavy moment is a one-time scan when a save first loads with the mod, with a
+  few ticks of about 7 ms.
 - **The server** asks for only what a question needs: an area search, the recipe lines that matter, the latest
   digest. It keeps the model's prompt cache warm, so follow-up answers start in about two seconds.
 - **Numbers are computed in code:** production plans, blueprint throughput, charts. The model explains them; it

@@ -3,7 +3,7 @@
 A single static page, built with Bun from `src/` and following the [brand guide](../brand/BRAND.md).
 
 ```sh
-bun run site:dev      # dev server with reload on http://127.0.0.1:5181
+bun run site:dev      # dev server with reload on http://localhost:5181
 bun run site:build    # static build into website/dist (hashed assets, ~7 MB, mostly video)
 bun run site:serve    # serve the build as a static host would, on http://127.0.0.1:5180
 ```
