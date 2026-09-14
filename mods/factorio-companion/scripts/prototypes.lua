@@ -87,6 +87,19 @@ return function(handlers)
       end
     end
 
-    return { recipes = recipes, items = items, fluids = fluids, technologies = technologies, machines = machines }
+    -- Footprints of everything a player can build, for blueprint checks: tile size and collision box.
+    local entities = {}
+    for name, e in pairs(prototypes.entity) do
+      if not e.hidden and e.items_to_place_this and #e.items_to_place_this > 0 then
+        local box = e.collision_box
+        entities[name] = {
+          type = e.type,
+          size = { e.tile_width, e.tile_height },
+          collision = { box.left_top.x, box.left_top.y, box.right_bottom.x, box.right_bottom.y },
+        }
+      end
+    end
+
+    return { recipes = recipes, items = items, fluids = fluids, technologies = technologies, machines = machines, entities = entities }
   end
 end

@@ -22,7 +22,7 @@ function fakeGame() {
           if (p.type === 3) { sock.write(encodePacket(p.id, 2, "")); continue; }
           const req = JSON.parse(p.body.replace(/^\/companion /, ""));
           let data: unknown = { tick: 1 };
-          if (req.action === "info") data = { protocol: 1, mod_version: "0.1.0", game_version: "2.0.77", tick: 1, mods: state.mods, players: 1 };
+          if (req.action === "info") data = { protocol: 1, dump_version: 2, mod_version: "0.1.0", game_version: "2.0.77", tick: 1, mods: state.mods, players: 1 };
           if (req.action === "dump_prototypes") { state.dumps++; data = prototypes; }
           if (req.action === "digest") data = digest;
           if (req.action === "events") data = { seq: 0, oldest: 1, events: {} };

@@ -74,7 +74,8 @@ export class GameLink {
   /** Refetches prototype data only when the game's mod list differs from what's loaded. */
   private async syncPrototypes(): Promise<void> {
     const info = await this.call("info");
-    const modsKey = String(Bun.hash(JSON.stringify(Object.entries(info.mods).sort())));
+    // The mod list plus the dump format: either changing means the cached prototypes are stale.
+    const modsKey = String(Bun.hash(JSON.stringify([info.dump_version, ...Object.entries(info.mods).sort()])));
     if (this.loaded?.modsKey === modsKey) return;
     const started = performance.now();
     const data = await this.call("dump_prototypes");

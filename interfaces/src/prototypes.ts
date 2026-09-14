@@ -65,12 +65,21 @@ export const MachineSchema = z.strictObject({
   belt_speed: z.number().optional(),
 });
 
+/** A buildable entity's footprint: tile size and collision box [left, top, right, bottom] around its position. */
+export const EntityFootprintSchema = z.strictObject({
+  type: z.string(),
+  size: z.tuple([z.number(), z.number()]),
+  collision: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+});
+
 export const PrototypesSchema = z.strictObject({
   recipes: z.record(z.string(), RecipeSchema),
   items: z.record(z.string(), ItemSchema),
   fluids: z.record(z.string(), FluidSchema),
   technologies: z.record(z.string(), TechnologySchema),
   machines: z.record(z.string(), MachineSchema),
+  // Older captures predate this section.
+  entities: z.record(z.string(), EntityFootprintSchema).default({}),
 });
 export type Prototypes = z.infer<typeof PrototypesSchema>;
 export type Recipe = z.infer<typeof RecipeSchema>;

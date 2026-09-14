@@ -589,6 +589,9 @@ judge by time to first token.
     402 items, 43 fluids, 342 technologies and 69 machines (incl. 115 maraxsis and 27 Cerys
     recipes) as 0.44 MB in ~30 ms. It includes per-force state (recipe enabled, tech researched).
     `--dump-data` isn't needed. Note: `helpers.table_to_json` writes empty arrays as `{}`.
+    **2026-09-14 (FC-082):** the dump also carries footprints for the 167 buildable entities (type, tile
+    size, collision box): 0.46 MB, Lua time ~23 ms. That's a one-off hitch on connect or when mods change,
+    an accepted exception to the per-tick budget (split it across ticks if it's ever noticeable).
 
 ---
 

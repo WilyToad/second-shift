@@ -3,6 +3,8 @@
 -- The reply is one JSON line via rcon.print: {"id":..,"ok":true,"data":..} or {"id":..,"ok":false,"error":{..}}.
 
 local PROTOCOL = 1
+-- Bump when dump_prototypes changes shape, so the server's prototype cache refreshes.
+local DUMP_VERSION = 2
 
 local handlers = {}
 
@@ -13,6 +15,7 @@ end
 handlers.info = function()
   return {
     protocol = PROTOCOL,
+    dump_version = DUMP_VERSION,
     mod_version = script.active_mods["factorio-companion"],
     game_version = script.active_mods["base"],
     tick = game.tick,

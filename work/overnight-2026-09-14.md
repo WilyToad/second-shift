@@ -34,3 +34,4 @@ Times are commit times (local).
 - FC-076 done: conversation compaction + cache re-warm; 16-question conversation follow-ups median 1.59 s, p90 2.23 s, max 2.51 s. **S05 closed**: all latency targets met with the game running.
 - S06 "Blueprint review" planned and activated (delegated): FC-030 codec, FC-082 entity sizes, FC-031 checker, FC-032 review in chat.
 - FC-030 done: blueprint string codec; a real 49-entity blueprint from the dev save round-trips and re-imports in-game with 49 entities.
+- FC-082 done: entity footprints in the prototype dump (167 entities). Fixed a stale-cache gap: the server now refetches when the mod's dump format version changes, not only when the mod list does.

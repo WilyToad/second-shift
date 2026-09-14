@@ -7,6 +7,7 @@ import { PrototypesSchema } from "./prototypes";
 
 export const InfoSchema = z.object({
   protocol: z.number(),
+  dump_version: z.number().default(1),
   mod_version: z.string(),
   game_version: z.string(),
   tick: z.number(),
