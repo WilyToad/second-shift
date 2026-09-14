@@ -265,7 +265,7 @@ stable-first so the cached prefix survives:
 
 Putting volatile state anywhere but last invalidates the whole prefix and costs ~40 s per turn.
 
-**Verified 2026-09-13 (`data/probe-cache.ts`):** oMLX caches in ~512-token blocks. A 15,214-token
+**Verified 2026-09-13 (`scripts/probes/cache.ts`):** oMLX caches in ~512-token blocks. A 15,214-token
 prompt: cold 11.5 s to first token; repeated, 14,336 tokens cached (28 × 512) and 1.24 s; same
 prefix with a new question or an appended turn, 0.93 s. Prompts under ~1k tokens get no cache
 hit, which doesn't matter at that size. The server stores each user turn *with* its snapshot in
