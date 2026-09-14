@@ -14,6 +14,8 @@ const call = async (action: string, args: Record<string, unknown> = {}) => {
 };
 // First /sc on a save only answers the achievement prompt and returns nothing.
 const sc = async (lua: string) => { const a = (await rcon.exec(`/sc ${lua}`)).trim(); return a || (await rcon.exec(`/sc ${lua}`)).trim(); };
+// Placement below is "near the player": leave map view so that means the character (FC-092).
+await sc(`local p = game.connected_players[1] if p.controller_type == defines.controllers.remote then p.exit_remote_view() end rcon.print("ok")`);
 
 const RAILS = ["straight-rail", "curved-rail-a", "curved-rail-b", "half-diagonal-rail", "legacy-straight-rail", "legacy-curved-rail", "elevated-straight-rail", "elevated-curved-rail-a", "elevated-curved-rail-b", "elevated-half-diagonal-rail", "rail-ramp"];
 const results: [string, boolean, string][] = [];

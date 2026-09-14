@@ -4,6 +4,7 @@ import { encodeBlueprintString } from "../server/src/blueprint";
 import { connectDevGame } from "./lib/devgame";
 
 const dev = await connectDevGame();
+await dev.leaveRemoteView();
 let id = 1;
 const call = async (action: ActionName, args: Record<string, unknown> = {}) => {
   const { reply, profile } = parseReply(await dev.rcon.exec(encodeCommand({ id: id++, action, args, profile: true })));

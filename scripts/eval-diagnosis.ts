@@ -5,6 +5,7 @@ import { asChecks, saveEvalRun } from "./lib/eval-log";
 import { connectDevGame } from "./lib/devgame";
 
 const dev = await connectDevGame();
+await dev.leaveRemoteView();
 const results: [string, boolean, string][] = [];
 const answers: Record<string, string> = {};
 const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };

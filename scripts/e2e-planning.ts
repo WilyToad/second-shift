@@ -4,6 +4,7 @@ import type { ServerMessage } from "../server/src/messages";
 import { connectDevGame } from "./lib/devgame";
 
 const dev = await connectDevGame();
+await dev.leaveRemoteView();
 const sc = dev.sc;
 const originalQueue = await sc(`local q = {} for _, t in pairs(game.forces.player.research_queue or {}) do q[#q+1] = t.name end rcon.print(helpers.table_to_json(q))`);
 const { placed: rails } = await dev.placeRailsEast(6);

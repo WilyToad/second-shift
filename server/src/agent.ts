@@ -400,7 +400,10 @@ export class Agent {
     const world = needsWorldTools(question, this.lastResult !== null);
     // A pasted blueprint isn't running yet, so "is anything holding it back?" is about the design, not a trend.
     const chart = !pasted.summaries.length && wantsChart(question);
-    const notes = [world ? "" : "no tool call is needed", chart ? "" : "no chart block"].filter(Boolean);
+    // A new "how many / where" question is a new search: earlier results may be for another spot (FC-092 follow-up:
+    // "how many belts are here?" after "…near me?" reused the character's result instead of searching the view).
+    const searchAgain = world && /\b(how many|find|where (are|is)|count|search|look for|any \w+ (here|near))\b/i.test(question);
+    const notes = [world ? "" : "no tool call is needed", chart ? "" : "no chart block", searchAgain ? "call find_entities again for this question, even if an earlier result looks similar" : ""].filter(Boolean);
     // Blueprint requests are built in code; the model only explains the result (S14).
     const requested = !pasted.summaries.length && wantsBlueprint(question) ? this.blueprintFor(question, found?.items ?? []) : null;
     // Rate targets get an exact plan computed in code; the model narrates it (S09).

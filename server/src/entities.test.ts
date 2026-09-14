@@ -26,5 +26,8 @@ test("the player's own words pick the entity: nicknames first, then groups", () 
     entities: { "transport-belt": { type: "transport-belt", size: [1, 1], collision: [-0.4, -0.4, 0.4, 0.4] }, "fast-transport-belt": { type: "transport-belt", size: [1, 1], collision: [-0.4, -0.4, 0.4, 0.4] } },
   });
   expect(resolveEntityFilterInText("How many yellow belts are near me on the right?", withBelts)?.names).toEqual(["transport-belt"]);
+  // Plain "belts" means every belt type (it used to mean yellow belts only, and missed the player's express belts).
+  expect(resolveEntityFilterInText("How many belts are near me?", withBelts)).toMatchObject({ types: expect.arrayContaining(["transport-belt", "underground-belt", "splitter"]) });
+  expect(resolveEntityFilterInText("How many belts are near me?", withBelts)?.names).toBeUndefined();
   expect(resolveEntityFilterInText("how many rails are near me", null)?.types).toContain("straight-rail");
 });

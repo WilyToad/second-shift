@@ -16,7 +16,7 @@ const ALIASES: Record<string, string> = {
   lds: "low-density-structure", "low density structure": "low-density-structure",
   "agri science": "agricultural-science-pack", "ag science": "agricultural-science-pack",
   "em science": "electromagnetic-science-pack", "metallurgic science": "metallurgic-science-pack",
-  "yellow belt": "transport-belt", belt: "transport-belt", "red belt": "fast-transport-belt", "fast belt": "fast-transport-belt",
+  "yellow belt": "transport-belt", "red belt": "fast-transport-belt", "fast belt": "fast-transport-belt",
   "blue belt": "express-transport-belt", "express belt": "express-transport-belt", "green belt": "turbo-transport-belt", "turbo belt": "turbo-transport-belt",
   "yellow inserter": "inserter", "red inserter": "long-handed-inserter", "blue inserter": "fast-inserter", "green inserter": "bulk-inserter",
 };

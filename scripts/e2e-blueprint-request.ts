@@ -48,6 +48,7 @@ for (const [n, req] of REQUESTS.entries()) {
   if (n === 0) {
     // Test tooling: stand the player on open ground (the dev save's spot is built up), restored afterwards.
     const dev = await connectDevGame();
+await dev.leaveRemoteView();
     const moved = JSON.parse(await dev.sc(`local p = game.connected_players[1] local from = p.position
       local spot = p.surface.find_non_colliding_position("rocket-silo", { from.x + 40, from.y }, 200, 2, true)
       if spot and p.character then p.teleport(spot) end

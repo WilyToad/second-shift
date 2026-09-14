@@ -4,6 +4,7 @@ import type { ServerMessage } from "../server/src/messages";
 import { connectDevGame } from "./lib/devgame";
 
 const dev = await connectDevGame();
+await dev.leaveRemoteView();
 const { placed } = await dev.placeRailsEast(8);
 console.log(`setup: placed ${placed.length} test rails east of the player`);
 

@@ -5,6 +5,7 @@ import type { ServerMessage } from "../server/src/messages";
 import { connectDevGame } from "./lib/devgame";
 
 const dev = await connectDevGame();
+await dev.leaveRemoteView();
 const setup = JSON.parse(await dev.sc(`local p = game.connected_players[1] local s = p.surface local from = p.position
   local spot = s.find_non_colliding_position("rocket-silo", { from.x - 60, from.y }, 300, 2, true)
   p.teleport(spot)

@@ -12,6 +12,10 @@ export async function connectDevGame() {
   return {
     rcon,
     sc,
+    /** Tests that place things "near the player" expect them at the character, not a map view (FC-092). */
+    async leaveRemoteView(): Promise<void> {
+      await sc(`local p = game.connected_players[1] if p.controller_type == defines.controllers.remote then p.exit_remote_view() end rcon.print("ok")`);
+    },
     /** Places up to `max` straight rails east of the player where they fit. */
     async placeRailsEast(max = 8): Promise<{ placed: Ref[]; player: { x: number; y: number } }> {
       const r = JSON.parse(await sc(`

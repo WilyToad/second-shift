@@ -69,7 +69,13 @@ export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { ques
   const wantsRates = !relevance || (!relevance.planned && RATE_QUESTION.test(relevance.question));
   const mentioned = new Set(relevance?.items ?? []);
   const lines = [`[game state at tick ${digest.tick}, ${Math.round(ageMs / 1000)} s old${digest.paused ? ", game is PAUSED: rates and machine status are frozen" : ""}]`];
-  if (digest.player) lines.push(`player: ${digest.player.name} on ${digest.player.surface} at (${digest.player.position.x}, ${digest.player.position.y})`);
+  if (digest.player) {
+    const p = digest.player;
+    // In remote view the position is the map view; say so, and where the character is (FC-092).
+    lines.push(p.remote_view && p.character_position
+      ? `player: ${p.name} in map view looking at (${p.position.x}, ${p.position.y}) on ${p.surface}; character at (${p.character_position.x}, ${p.character_position.y}) on ${p.character_surface ?? p.surface}`
+      : `player: ${p.name} on ${p.surface} at (${p.position.x}, ${p.position.y})`);
+  }
   const r = digest.research;
   lines.push(`research: ${r.current ? `${r.current} ${Math.round(r.progress * 100)}%` : "nothing researching"}${r.queue.length > 1 ? `; queued: ${r.queue.slice(1).join(", ")}` : ""}`);
   let omitted = false;

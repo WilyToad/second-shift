@@ -6,6 +6,7 @@ import { connectDevGame } from "./lib/devgame";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
 
 const dev = await connectDevGame();
+await dev.leaveRemoteView();
 const ws = new WebSocket("ws://127.0.0.1:5170/ws");
 const got: ServerMessage[] = [];
 ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
