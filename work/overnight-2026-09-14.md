@@ -29,3 +29,4 @@ Times are commit times (local).
 - S04 closed (visual layout check pending). New backlog item FC-079: first-token latency with the game running has crept to median ~2.9 s, max ~4.1 s.
 - S05 "Fast in real play" planned and activated (delegated): FC-080 latency breakdown, FC-079 latency target, FC-081 smaller tail, FC-076 conversation trimming.
 - FC-080 done: per-turn latency log + report. Key finding: the stable prefix is ~3.7k tokens and oMLX caches 2,048-token blocks, so every new question re-reads ~1.7k stable tokens. Fixing next by padding the prefix with useful reference lines to cross 4,096.
+- FC-079 done: S05 latency targets met with the game running (first token median 1.23 s, max 1.92 s; follow-up 2.39 s; answers median 90 tokens). Biggest win: padding the system prompt past the 4,096-token cache block (new questions 2.03 s → 0.80 s server first token).

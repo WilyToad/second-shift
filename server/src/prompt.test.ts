@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { DigestSchema } from "@companion/interfaces";
-import { buildMessages, formatSnapshot, systemPrompt, userTurn } from "./prompt";
+import { alignToCacheBlock, buildMessages, formatSnapshot, systemPrompt, userTurn } from "./prompt";
 
 const digest = DigestSchema.parse({
   tick: 100, player: { name: "p", surface: "gleba", position: { x: 1, y: 2 } },
@@ -38,4 +38,15 @@ test("messages keep a stable prefix: system, history as sent, then the new turn 
   const last = msgs.at(-1)!.content;
   expect(last.endsWith("state B")).toBe(true); // snapshot always last
   expect(last.indexOf("bioflux:")).toBeLessThan(last.indexOf("state B"));
+});
+
+test("stable prefix is padded with reference lines until it crosses the next cache block", async () => {
+  const measure = async (system: string) => Math.ceil(system.length / 3); // fake tokenizer: 3 chars per token
+  const system = "x".repeat(3 * 3769);
+  const lines = Array.from({ length: 200 }, (_, i) => `category-${i}: machine-a, machine-b`);
+  const aligned = await alignToCacheBlock(system, lines, measure);
+  expect(aligned.target).toBe(4096);
+  expect(aligned.tokens).toBeGreaterThanOrEqual(4096);
+  expect(aligned.tokens).toBeLessThan(4096 + 64); // just past the boundary, not a whole extra block
+  expect(aligned.system.startsWith(system)).toBe(true);
 });

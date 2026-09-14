@@ -17,7 +17,7 @@ Rules:
 - Use tools only for things placed in the world near the player ("how many rails to my right?"). Recipe, item, machine and research questions are answered from the data you're given, with no tool call.
 - find_entities searches near the player where they can currently see; right = east, up = north. Say what you searched (what, direction, radius) and the count. Its results are highlighted in-game and remembered, so "them" means the last result.
 - mark_deconstruction and cancel_deconstruction only ask for approval: after calling one, tell the player to confirm the card in the app. Never say it's done until a message reports the outcome.
-- Answer in 80 words or fewer unless the player asks for detail. Lead with the direct answer and include every requirement the data gives for it (amounts, machines, prerequisites, research triggers); skip background the player didn't ask for. Give the answer, not your reasoning; never show self-corrections.
+- Answer in 60 words or fewer unless the player asks for detail. Lead with the direct answer and include every requirement the data gives for it (amounts, machines, prerequisites, research triggers); skip background the player didn't ask for. Give the answer, not your reasoning; never show self-corrections.
 - Be concrete: numbers with units (per minute), surface names, item names.
 - When the player asks how a rate is trending, or asks for a chart, add a chart block after your answer, using exact item and surface names from the game state:
 \`\`\`rate_chart
@@ -65,6 +65,36 @@ export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { ques
 export function systemPrompt(prototypes: Prototypes | null): string {
   if (!prototypes) return `${SYSTEM_RULES}\n\n[save data not loaded yet: recipes and machines are unknown]`;
   return `${SYSTEM_RULES}\n\n[save data: machines]\n${formatMachines(prototypes)}\n\n[save data: items that spoil or burn]\n${formatItemTraits(prototypes)}`;
+}
+
+export const CACHE_BLOCK_TOKENS = 2048;
+
+/**
+ * oMLX caches whole 2,048-token blocks, so a stable prefix that ends mid-block gets that block
+ * re-read on every new question (measured 2.03 s vs 0.80 s first token, S05). Appends reference
+ * lines until the measured prefix just crosses the next block boundary. `measure` returns the prompt
+ * token count for a system prompt (with tools), so the template's own tokens are included.
+ */
+export async function alignToCacheBlock(system: string, referenceLines: string[], measure: (system: string) => Promise<number>, heading = "[save data: recipe categories and what crafts them]"): Promise<{ system: string; tokens: number; target: number }> {
+  const base = await measure(system);
+  const target = Math.ceil(base / CACHE_BLOCK_TOKENS) * CACHE_BLOCK_TOKENS;
+  if (base >= target - 16) return { system, tokens: base, target }; // already at a boundary
+  const charsPerToken = system.length / base;
+  let candidate = system;
+  let tokens = base;
+  let used = 0;
+  // A few measured rounds: estimate how many lines are needed, then top up if still short.
+  for (let round = 0; round < 4 && tokens < target + 8 && used < referenceLines.length; round++) {
+    const missingChars = (target + 16 - tokens) * charsPerToken;
+    let added = 0;
+    while (used < referenceLines.length && added < missingChars) {
+      const line = referenceLines[used++]!;
+      candidate += (used === 1 ? `\n\n${heading}\n` : "\n") + line;
+      added += line.length + 1;
+    }
+    tokens = await measure(candidate);
+  }
+  return { system: candidate, tokens, target };
 }
 
 /** The volatile tail, in order: question, retrieved recipe lines, game state last. */

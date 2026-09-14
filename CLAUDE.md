@@ -39,6 +39,9 @@ No Vite. UI: Preact + signals in `displays/src` (PLAN §4).
 - **Ground recipes on `prototypes.json`, not on what the model remembers.** The save is heavily
   modded (Space Age, maraxsis, Cerys, factorissimo-2, PlanetsLib). Vanilla recipe knowledge is
   wrong here, so a recipe or tech claim that can't be cited from the dump is a bug.
+- **Keep the stable prompt prefix block-aligned.** oMLX caches whole 2,048-token blocks; the server pads the system
+  prompt past the next boundary at startup (`alignToCacheBlock`). Changing rules or tools re-aligns automatically,
+  but check `scripts/latency-report.ts` after prompt changes.
 - **Visuals are rendered from data, not drawn by the model.** The agent emits compact component
   specs (PLAN §3, visual component library); code renders them from `prototypes.json` and state.
   Keep specs terse, because spec tokens are the latency cost.

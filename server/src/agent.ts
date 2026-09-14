@@ -137,7 +137,7 @@ export class Agent {
     const world = needsWorldTools(question, this.lastResult !== null);
     const chart = wantsChart(question);
     const notes = [world ? "" : "no tool call is needed", chart ? "" : "no chart block"].filter(Boolean);
-    const guided = notes.length ? `${noted}\n\n(Answer from the data provided in 80 words or fewer; ${notes.join(", ")}.)` : noted;
+    const guided = notes.length ? `${noted}\n\n(Answer from the data provided in 60 words or fewer; ${notes.join(", ")}.)` : noted;
     const working: ChatMessage[] = [userTurn(guided, { recipes: found?.lines ?? [], snapshot })];
     const record: TurnRecord = {
       at: new Date(this.now()).toISOString(), question, world, chart, rounds: [], totalMs: 0,

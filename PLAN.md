@@ -384,7 +384,17 @@ question is ~0.75 s warm with the game closed. Measured costs on top of that:
   turns. `tool_choice: "none"` isn't usable: oMLX drops the tools from the prompt, which breaks
   the cached prefix.
 - Grounding eval with the game running and live snapshots: 10/10, first token median 2.56 s, max
-  3.61 s. Rails flow: first answer in 3.5–4.7 s total, including the find round trip. Conversation trimming (FC-076) and block-aware prompt layout are the next levers.
+  3.61 s. Rails flow: first answer in 3.5–4.7 s total, including the find round trip.
+
+**Cache block alignment (S05, 2026-09-14, `scripts/probes/block-alignment.ts`):** the stable
+prefix (rules, machines, traits, tool definitions) was ~3,770 tokens. oMLX caches whole 2,048-token
+blocks, so every *new* question re-read ~1,700 stable tokens: server first token median 2.03 s.
+Padding the prefix with useful reference lines (recipe category → crafters) until it crosses 4,096
+brought the same novel questions to **0.80 s**. The server now does this automatically at startup
+and whenever prototypes change (`alignToCacheBlock`, measured through oMLX, so the template's own
+tokens count). With a 60-word answer limit, the S05 suite with the game running: first token median
+1.23 s, max 1.92 s; follow-up 2.39 s; answers median 90 tokens; tool turns ~3.3 s (two model calls).
+Per-turn breakdowns: `data/eval/turns.jsonl` → `scripts/latency-report.ts`. Conversation trimming (FC-076) and block-aware prompt layout are the next levers.
 ---
 
 ## 7. Phases

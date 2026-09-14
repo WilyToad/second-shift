@@ -5,7 +5,8 @@ import { Agent, TOOLS } from "./agent";
 import { GameLink, type Snapshot } from "./game";
 import type { ClientMessage, ServerMessage } from "./messages";
 import { OmlxClient, readOmlxApiKey } from "./model";
-import { buildMessages, systemPrompt, userTurn } from "./prompt";
+import { craftersByCategory } from "./grounding";
+import { alignToCacheBlock, buildMessages, systemPrompt, userTurn } from "./prompt";
 import { RecipeRetriever } from "./retrieval";
 import { buildSeries } from "./series";
 
@@ -107,10 +108,22 @@ game.onStatus((s) => {
 game.onEvents((events, dropped) => broadcast({ type: "events", events, ...(dropped ? { dropped } : {}) }));
 // New prototype data changes the system prompt, so rebuild retrieval and re-warm the cache.
 game.onPrototypes((p) => {
-  system = systemPrompt(p.data);
   retriever = new RecipeRetriever(p.data);
   console.log(`Grounding on ${Object.keys(p.data.recipes).length} recipes (${p.source}).`);
-  busy = busy.then(warmUp);
+  busy = busy.then(async () => {
+    const base = systemPrompt(p.data);
+    system = base;
+    try {
+      const categories = [...craftersByCategory(p.data)].sort(([a], [b]) => a.localeCompare(b)).map(([c, crafters]) => `${c}: ${crafters.join(", ")}`);
+      const measure = async (s: string) => (await model.stream(buildMessages(s, [], { role: "user", content: "." }), { tools: TOOLS, maxTokens: 1 })).usage?.prompt_tokens ?? 0;
+      const aligned = await alignToCacheBlock(base, categories, measure);
+      system = aligned.system;
+      console.log(`System prompt aligned to the cache: ${aligned.tokens} tokens (block boundary ${aligned.target}).`);
+    } catch (e) {
+      console.warn("Couldn't align the system prompt to the cache:", (e as Error).message);
+    }
+    await warmUp();
+  });
 });
 await game.loadCachedPrototypes();
 game.start();
