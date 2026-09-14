@@ -266,10 +266,11 @@ export class Agent {
     this.notes = [];
     // Turn guidance decided in code, kept in the uncached tail so the system prompt stays stable.
     const world = needsWorldTools(question, this.lastResult !== null);
-    const chart = wantsChart(question);
+    // A pasted blueprint isn't running yet, so "is anything holding it back?" is about the design, not a trend.
+    const chart = !pasted.summaries.length && wantsChart(question);
     const notes = [world ? "" : "no tool call is needed", chart ? "" : "no chart block"].filter(Boolean);
     const guided = pasted.summaries.length
-      ? `${noted}\n\n(Review from the checked summary in 90 words or fewer: lead with the total entity count and the main counts, then list every problem the checks found, or say they found none; no tool call or chart.)`
+      ? `${noted}\n\n(Review from the checked summary in 90 words or fewer: lead with the total entity count and the main counts, then list every problem the checks found, or say they found none; for rates or bottlenecks use the throughput line's numbers; it isn't built, so offer no actions on its entities; no tool call or chart.)`
       : notes.length ? `${noted}\n\n(Answer from the data provided in 60 words or fewer; ${notes.join(", ")}.)` : noted;
     // Research questions get the live list of what can be queued right now (decided in code, not guessed).
     const researchLines = /\b(research\w*|tech\w*|unlock\w*|queue)\b/i.test(question) ? await this.researchOptions() : [];

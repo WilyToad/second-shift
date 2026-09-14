@@ -8,7 +8,7 @@ import { outputPerCraft, productivityFor } from "./planner";
 
 export type RecipeGroup = { recipe: string; machine: string; count: number; craftsPerMinute: number; productivity: number };
 export type Flow = { name: string; perMinute: number; fluid: boolean; belts?: number };
-export type InserterLimit = { machine: string; recipe: string; side: "input" | "output"; machines: number; needPerSecond: number; capacityPerSecond: number };
+export type InserterLimit = { machine: string; recipe: string; side: "input" | "output"; machines: number; inserters: number; needPerSecond: number; capacityPerSecond: number };
 export type Throughput = {
   groups: RecipeGroup[];
   inputs: Flow[]; // needed from outside, net of what the blueprint makes itself
@@ -19,6 +19,7 @@ export type Throughput = {
 };
 
 const EPSILON = 1e-6;
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** Pickup and drop offsets of an inserter facing `direction` (2.0 blueprint directions: 0 north, 4 east).
  * The prototype gives them facing north; each quarter turn maps (x, y) to (-y, x). Checked in the dev
@@ -106,15 +107,18 @@ export function blueprintThroughput(bp: Blueprint, p: Prototypes): Throughput {
     if (to && from !== to) { to.capIn += capacity; to.inserters.in++; }
   }
   const limitGroups = new Map<string, InserterLimit>();
-  const addLimit = (m: Placed, side: "input" | "output", need: number, capacity: number) => {
+  const addLimit = (m: Placed, side: "input" | "output", need: number, capacity: number, count: number) => {
     const key = `${m.name} ${m.recipe} ${side}`;
     const limit = limitGroups.get(key);
-    if (limit) { limit.machines++; limit.capacityPerSecond = Math.min(limit.capacityPerSecond, capacity); limit.needPerSecond = Math.max(limit.needPerSecond, need); }
-    else limitGroups.set(key, { machine: m.name, recipe: m.recipe, side, machines: 1, needPerSecond: need, capacityPerSecond: capacity });
+    if (limit) {
+      limit.machines++;
+      if (capacity < limit.capacityPerSecond) Object.assign(limit, { capacityPerSecond: capacity, inserters: count });
+      limit.needPerSecond = Math.max(limit.needPerSecond, need);
+    } else limitGroups.set(key, { machine: m.name, recipe: m.recipe, side, machines: 1, inserters: count, needPerSecond: need, capacityPerSecond: capacity });
   };
   for (const m of placed) {
-    if (m.inserters.out && m.needOut > m.capOut + EPSILON) addLimit(m, "output", m.needOut, m.capOut);
-    if (m.inserters.in && m.needIn > m.capIn + EPSILON) addLimit(m, "input", m.needIn, m.capIn);
+    if (m.inserters.out && m.needOut > m.capOut + EPSILON) addLimit(m, "output", m.needOut, m.capOut, m.inserters.out);
+    if (m.inserters.in && m.needIn > m.capIn + EPSILON) addLimit(m, "input", m.needIn, m.capIn, m.inserters.in);
   }
 
   const flow = (name: string, perMinute: number): Flow => {
@@ -150,7 +154,10 @@ export function describeThroughput(t: Throughput, maxFlows = 8): string {
     parts.push(overloaded.length ? `more than one full ${t.belt.name}: ${overloaded.map((f) => f.name).join(", ")}` : `every item fits on one ${t.belt.name} (${round(t.belt.perMinute)}/min)`);
   }
   if (t.limits.length) {
-    const lines = t.limits.map((l) => `${l.machines}× ${l.machine} (${l.recipe}) ${l.side} needs ${round(l.needPerSecond)}/s but its inserters move about ${round(l.capacityPerSecond)}/s`);
+    const lines = t.limits.map((l) => {
+      const needed = Math.ceil(l.needPerSecond / (l.capacityPerSecond / l.inserters));
+      return `${l.machines}× ${l.machine} (${l.recipe}) ${l.side} needs ${round(l.needPerSecond)}/s but its ${plural(l.inserters, "inserter")} ${l.inserters === 1 ? "moves" : "move"} about ${round(l.capacityPerSecond)}/s (${needed} like ${l.inserters === 1 ? "it" : "them"} would keep up)`;
+    });
     parts.push(`inserters too slow (estimated from swing time): ${lines.join("; ")}`);
   }
   if (t.notes.length) parts.push(`not counted: ${t.notes.join("; ")}`);

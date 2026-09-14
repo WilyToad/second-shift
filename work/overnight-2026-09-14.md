@@ -62,4 +62,6 @@ Times are commit times (local).
 - S13 "Blueprint throughput" planned and activated (delegated): FC-097 per-minute flows and belt load for pasted blueprints, FC-105 inserter limits, FC-106 e2e question.
 - FC-097 done: pasted blueprints now get per-minute inputs/outputs and belt load. On the real Gleba blueprint: 4 magazine assemblers need 1,200 iron plate/min (44% of one express belt).
 - FC-105 done: inserter limits (dump v6). Pickup/drop geometry checked against inserters built from a real blueprint item in the dev game (on a temporary surface, deleted after).
+- **Correction:** the companion server had been running since 01:50, and the e2e/eval scripts use the running server. So the server-backed results I logged for S12 and the first FC-097 blueprint run tested older server code. After restarting the server I re-ran everything, and it all passes. CLAUDE.md now says to restart the server after server changes.
+- FC-106 done, **S13 closed**: a pasted circuit build got the right numbers in both runs (300 circuits/min from 450 copper + 300 iron, slow inserter named). Fixed two things the e2e found: an unwanted trend chart on "holding it back", and the model guessing inserter counts (the summary now gives them).
 

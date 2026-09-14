@@ -134,10 +134,13 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun scripts/benchmark.ts [--ticks N --runs N]` (game closed) benchmarks the dev save with and
   without the mod using mirrored mod folders. Run it after every mod change.
 - `bun run start` runs the server (web chat on http://127.0.0.1:5170). It reconnects to the game
-  on its own and warms the model at startup.
+  on its own and warms the model at startup. The e2e and eval scripts talk to this running server, so
+  **restart it after any server change** before trusting their results (it doesn't reload code).
 - `bun test`, `bun run typecheck`, `bun run check` (all of it), `bun run board` (sprint progress).
 - `bun scripts/test-planning.ts` (dev save hosted) runs the helmet tests for planning actions (research, tags, camera, upgrade, blueprint paste).
 - `bun scripts/test-machines.ts` (dev save hosted) checks the machine registry and polling cost.
+- `bun scripts/megabase.ts` (dev save hosted) scales the running game to 25,000 machines on a temporary surface and profiles every mod path (PLAN §5).
+- `bun scripts/test-research.ts` and `bun scripts/test-inserters.ts` (dev save hosted) check the research patch and inserter geometry.
 - `bun scripts/test-helmet.ts` (dev save hosted) runs the in-game helmet-rule tests. Run it after any change
   to mod actions or `scripts/helmet.lua`.
 - Captures for offline work go in `data/captures/` (gitignored).

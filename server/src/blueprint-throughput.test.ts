@@ -77,7 +77,7 @@ test("inserters that can't keep up with their machine, from pickup and drop geom
   ].map((e, i) => ({ entity_number: i + 1, ...e }));
   const t = blueprintThroughput(BlueprintSchema.parse({ item: "blueprint", entities: layout }), p);
   expect(t.limits.map((l) => [l.side, l.machines, l.needPerSecond, Math.round(l.capacityPerSecond * 100) / 100])).toEqual([["output", 1, 1.5, 0.84], ["input", 1, 3, 1.68]]);
-  expect(describeThroughput(t)).toContain("inserters too slow (estimated from swing time): 1× assembling-machine-2 (iron-gear-wheel) output needs 1.5/s but its inserters move about 0.8/s");
+  expect(describeThroughput(t)).toContain("inserters too slow (estimated from swing time): 1× assembling-machine-2 (iron-gear-wheel) output needs 1.5/s but its 1 inserter moves about 0.8/s (2 like it would keep up); 1× assembling-machine-2 (iron-gear-wheel) input needs 3/s but its 2 inserters move about 1.7/s (4 like them would keep up)");
 
   // Researched bonuses and a bulk inserter on the output: 12 × 0.04 × 60 = 28.8/s, no limit there.
   const researched = { ...p, inserter_bonuses: { stack: 2, bulk: 11 } };

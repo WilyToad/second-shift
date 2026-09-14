@@ -25,7 +25,7 @@ Research completion no longer causes a dropped frame. Closing the LAN port was b
 **Acceptance:**
 - ✓ Research completion patches recipe data without a full dump: 0.06 ms in the game (was 26 ms). The data matched a fresh full dump in-game (`test-research` 4/4).
 - ✗ Not met: the hosted game still listens on 0.0.0.0:34197. The GUI client ignores `--bind`; FC-072 went back to the backlog for the player.
-- ✓ All suites pass: research 4/4, grounding 10/10 (first token median 1.23 s, max 1.91 s), ratios 8/8, rails 6/6, charts 2/2, blueprints 8/8, console 4/4, planning 7/7, diagnosis 4/4, helmet 13/13, machines 7/7, planning helmet 13/13.
+- ✓ All suites pass (the server-backed ones re-run after restarting the server, which had been running older code; see S13): research 4/4, grounding 10/10 (first token median 1.23 s, max 1.91 s), ratios 8/8, rails 6/6, charts 2/2, blueprints 8/8, console 4/4, planning 7/7, diagnosis 4/4, helmet 13/13, machines 7/7, planning helmet 13/13.
 
 **What we learned:**
 - Building a table per entry inside a mod reply is expensive: the same whole-force data cost 5.4 ms as tables and 1.3 ms as flat lists.
