@@ -84,6 +84,15 @@ export const actions = {
   mark_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
   cancel_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
   events: { args: z.object({ since: z.number().default(0) }), data: EventsSchema, kind: "look" },
+  queue_research: { args: z.object({ technology: z.string() }), data: z.object({ queued: z.string(), queue: luaArray(z.string()) }), kind: "small_request" },
+  add_map_tag: { args: z.object({ x: z.number().optional(), y: z.number().optional(), text: z.string().max(200) }), data: z.object({ x: z.number(), y: z.number(), text: z.string() }), kind: "small_request" },
+  camera_to: { args: z.object({ x: z.number(), y: z.number(), surface: z.string().optional() }), data: z.object({ surface: z.string(), x: z.number(), y: z.number() }), kind: "small_request" },
+  mark_upgrade: { args: TargetsSchema.extend({ target: z.string().optional() }), data: ApplyResultSchema, kind: "map_change" },
+  place_blueprint: {
+    args: z.object({ blueprint: z.string(), x: z.number().optional(), y: z.number().optional(), direction: z.number().optional() }),
+    data: z.object({ placed: z.number(), expected: z.number(), x: z.number(), y: z.number(), undo_items: z.number() }),
+    kind: "map_change",
+  },
   machine_stats: { args: z.object({}), data: MachineStatsSchema, kind: "look" },
   find_machines: {
     args: z.object({ recipe: z.string().optional(), surface: z.string().optional(), statuses: z.array(z.string()).optional() }),

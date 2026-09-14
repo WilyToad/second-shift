@@ -129,6 +129,7 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun run start` runs the server (web chat on http://127.0.0.1:5170). It reconnects to the game
   on its own and warms the model at startup.
 - `bun test`, `bun run typecheck`, `bun run check` (all of it), `bun run board` (sprint progress).
+- `bun scripts/test-planning.ts` (dev save hosted) runs the helmet tests for planning actions (research, tags, camera, upgrade, blueprint paste).
 - `bun scripts/test-machines.ts` (dev save hosted) checks the machine registry and polling cost.
 - `bun scripts/test-helmet.ts` (dev save hosted) runs the in-game helmet-rule tests. Run it after any change
   to mod actions or `scripts/helmet.lua`.

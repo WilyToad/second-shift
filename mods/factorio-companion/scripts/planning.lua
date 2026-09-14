@@ -1,0 +1,126 @@
+-- Planning actions (S08): research queue, map tags, camera, upgrade marks and blueprint placement.
+-- Each re-checks what the player could do right now (helmet rule) when it runs.
+local util = require("scripts.util")
+local helmet = require("scripts.helmet")
+local reject = util.reject
+
+local MAX_TARGETS = 1000
+
+local function require_player()
+  local player = util.companion_player()
+  if not player then reject("no_player", "No player is connected.") end
+  return player
+end
+
+local function chunk_of(position)
+  return { x = math.floor(position.x / 32), y = math.floor(position.y / 32) }
+end
+
+local function resolve(player, ref)
+  if type(ref) ~= "table" or type(ref.name) ~= "string" or type(ref.x) ~= "number" or type(ref.y) ~= "number" then return nil end
+  return player.surface.find_entity(ref.name, { x = ref.x, y = ref.y })
+end
+
+return function(handlers)
+  -- Small request: add a technology to the research queue, as the research screen would allow.
+  handlers.queue_research = function(args)
+    local player = require_player()
+    local force = player.force
+    local tech = force.technologies[args.technology or ""]
+    if not tech then reject("unknown_technology", "No technology named " .. tostring(args.technology) .. ".") end
+    if tech.researched then reject("already_researched", tech.name .. " is already researched.") end
+    if not tech.enabled then reject("not_available", tech.name .. " can't be researched in this save.") end
+    if tech.prototype.research_trigger then
+      reject("trigger_technology", tech.name .. " unlocks by doing something in the game (" .. tech.prototype.research_trigger.type .. "), not by labs.")
+    end
+    local missing = {}
+    for name, pre in pairs(tech.prerequisites) do
+      if not pre.researched then missing[#missing + 1] = name end
+    end
+    if #missing > 0 then
+      table.sort(missing)
+      error({ code = "missing_prerequisites", message = tech.name .. " needs " .. table.concat(missing, ", ") .. " first.", missing = missing }, 0)
+    end
+    for _, queued in pairs(force.research_queue or {}) do
+      if queued.name == tech.name then reject("already_queued", tech.name .. " is already in the research queue.") end
+    end
+    local ok = force.add_research(tech)
+    if not ok then reject("queue_refused", "The game didn't accept " .. tech.name .. " into the queue.") end
+    local queue = {}
+    for _, t in pairs(force.research_queue or {}) do queue[#queue + 1] = t.name end
+    return { queued = tech.name, queue = queue }
+  end
+
+  -- Small request: a map tag where the player could place one (charted map on their surface).
+  handlers.add_map_tag = function(args)
+    local player = require_player()
+    local position = { x = tonumber(args.x) or player.position.x, y = tonumber(args.y) or player.position.y }
+    if not player.force.is_chunk_charted(player.surface, chunk_of(position)) then reject("not_charted", "That spot isn't on the player's map yet.") end
+    local tag = player.force.add_chart_tag(player.surface, { position = position, text = tostring(args.text or ""), last_user = player })
+    if not tag then reject("tag_refused", "The game didn't accept a tag there.") end
+    return { x = math.floor(position.x), y = math.floor(position.y), text = tag.text }
+  end
+
+  -- Small request: open remote view at a charted position, as the map would.
+  handlers.camera_to = function(args)
+    local player = require_player()
+    local surface = args.surface and game.get_surface(args.surface) or player.surface
+    if not surface then reject("unknown_surface", "No surface named " .. tostring(args.surface) .. ".") end
+    local position = { x = tonumber(args.x) or 0, y = tonumber(args.y) or 0 }
+    if not player.force.is_chunk_charted(surface, chunk_of(position)) then reject("not_charted", "That spot isn't on the player's map.") end
+    player.set_controller({ type = defines.controllers.remote, position = position, surface = surface })
+    return { surface = surface.name, x = math.floor(position.x), y = math.floor(position.y) }
+  end
+
+  -- Map change (approval in the app): same rules as an upgrade planner.
+  handlers.mark_upgrade = function(args)
+    local player = require_player()
+    local targets = args.entities or {}
+    if #targets > MAX_TARGETS then reject("too_many", "At most " .. MAX_TARGETS .. " entities per action.") end
+    local wanted = args.target and prototypes.entity[args.target] or nil
+    if args.target and not wanted then reject("unknown_target", "No entity named " .. tostring(args.target) .. ".") end
+    local done, rejected, first = 0, {}, true
+    for _, ref in ipairs(targets) do
+      local e = resolve(player, ref)
+      local reason = "gone"
+      if e then reason = helmet.why_not_deconstruct(player, e) end
+      local target = wanted or (e and e.valid and e.prototype.next_upgrade) or nil
+      if not reason then
+        if not target then reason = "no_upgrade"
+        elseif target.name == e.name then reason = "same_entity"
+        elseif target.fast_replaceable_group ~= e.prototype.fast_replaceable_group or target.tile_width ~= e.prototype.tile_width or target.tile_height ~= e.prototype.tile_height then reason = "not_compatible"
+        elseif e.to_be_upgraded() then reason = "already_marked" end
+      end
+      if reason then
+        rejected[reason] = (rejected[reason] or 0) + 1
+      else
+        e.order_upgrade({ force = player.force, target = target, player = player, undo_index = first and 0 or 1 })
+        first = false
+        done = done + 1
+      end
+    end
+    return { done = done, rejected = rejected, undo_items = player.undo_redo_stack.get_undo_item_count() }
+  end
+
+  -- Map change (approval in the app): paste a blueprint as ghosts, like the player would.
+  handlers.place_blueprint = function(args)
+    local player = require_player()
+    local position = { x = tonumber(args.x) or player.position.x, y = tonumber(args.y) or player.position.y }
+    if not helmet.visible(player.force, player.surface, position) then reject("not_visible", "The player can't see that spot right now.") end
+    local inventory = game.create_inventory(1)
+    local stack = inventory[1]
+    local result = stack.import_stack(tostring(args.blueprint or ""))
+    if result == -1 or not (stack.valid_for_read and stack.is_blueprint and stack.is_blueprint_setup()) then
+      inventory.destroy()
+      reject("bad_blueprint", "That isn't a single blueprint the game can import.")
+    end
+    local expected = stack.get_blueprint_entity_count()
+    local ghosts = stack.build_blueprint({
+      surface = player.surface, force = player.force, position = position,
+      direction = tonumber(args.direction) or defines.direction.north,
+      build_mode = defines.build_mode.normal, by_player = player, skip_fog_of_war = true,
+    })
+    inventory.destroy()
+    return { placed = #ghosts, expected = expected, x = math.floor(position.x), y = math.floor(position.y), undo_items = player.undo_redo_stack.get_undo_item_count() }
+  end
+end
