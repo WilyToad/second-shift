@@ -466,6 +466,14 @@ server → web chat. oMLX model id: `Qwen3.8-Flash-Next-oQ4e-mtp`; API key read 
 8. **Engine aggregates vs polling.** Which digest fields can come from engine aggregates
    (production stats, alerts, research) and which need amortized status polling? This decides
    how well the mod holds up on a huge base.
+   **Measured 2026-09-13 on the dev save** (Lua time via `helpers.create_profiler`):
+   - `get_flow_count` for all 412 item series across 4 surfaces: ~0.5 ms. One surface/category:
+     ~0.1 ms. So rates are refreshed one (surface, category) every 30 ticks into a cache.
+   - Unfiltered `player.get_alerts({})` with 1,149 alerts: 0.55–0.7 ms. Filtered by one type:
+     ~0.01 ms. So only urgent types are fetched, each filtered.
+   - Resulting `digest` handler: ~0.19 ms per call (was ~1.6 ms), 4 KB JSON.
+   - Benchmark with the refresher running: no measurable cost (−0.027 ms/tick, within run-to-run
+     noise of about ±0.03 ms).
 9. **Undo.** Do actions passed `player` / `undo_index` really land on the player's Ctrl+Z history,
    and does Ctrl+Z reverse them? Verify with deconstruction marks first.
 10. **Exact remote-view rules.** What does 2.0 let a player do remotely (radar coverage vs merely
