@@ -1,4 +1,4 @@
-import type { ClientMessage, ServerMessage } from "../../server/src/main";
+import type { ClientMessage, ServerMessage } from "../../server/src/messages";
 
 const thread = document.getElementById("thread")!;
 const ask = document.getElementById("ask") as HTMLTextAreaElement;
@@ -6,6 +6,7 @@ const thinking = document.getElementById("thinking") as HTMLInputElement;
 const gameStatus = document.getElementById("game-status")!;
 const modelStatus = document.getElementById("model-status")!;
 let current: HTMLElement | null = null;
+const cards = new Map<string, HTMLElement>();
 let socket: WebSocket;
 
 function add(cls: string, text: string): HTMLElement {
@@ -42,8 +43,40 @@ function onMessage(m: ServerMessage): void {
       current = null;
       break;
     }
+    case "tool": {
+      const line = document.createElement("div");
+      line.className = "tool";
+      line.textContent = m.summary;
+      (current ?? thread.lastElementChild)?.before(line);
+      break;
+    }
+    case "approval": {
+      const card = document.createElement("div");
+      card.className = "approval";
+      card.innerHTML = `<div class="approval-title"></div><div class="approval-detail"></div><div class="row"><button class="confirm">Confirm</button><button class="cancel">Cancel</button></div>`;
+      card.querySelector(".approval-title")!.textContent = m.title;
+      card.querySelector(".approval-detail")!.textContent = m.detail;
+      card.querySelector(".confirm")!.addEventListener("click", () => send({ type: "approve", id: m.id }));
+      card.querySelector(".cancel")!.addEventListener("click", () => send({ type: "decline", id: m.id }));
+      thread.appendChild(card);
+      cards.set(m.id, card);
+      thread.scrollTop = thread.scrollHeight;
+      break;
+    }
+    case "approval_result": {
+      const card = cards.get(m.id);
+      if (!card) break;
+      card.querySelector(".row")?.remove();
+      card.classList.add(m.status);
+      const result = document.createElement("div");
+      result.className = "approval-result";
+      result.textContent = m.message;
+      card.appendChild(result);
+      break;
+    }
     case "reset":
       thread.replaceChildren();
+      cards.clear();
       current = null;
       break;
     case "error":
@@ -57,6 +90,10 @@ function connect(): void {
   socket = new WebSocket(`ws://${location.host}/ws`);
   socket.onmessage = (e) => onMessage(JSON.parse(e.data));
   socket.onclose = () => { gameStatus.textContent = "server: reconnecting…"; gameStatus.className = "pill crit"; setTimeout(connect, 1000); };
+}
+
+function send(msg: ClientMessage): void {
+  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg));
 }
 
 document.getElementById("composer")!.addEventListener("submit", (e) => {

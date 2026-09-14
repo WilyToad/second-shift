@@ -2,7 +2,12 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+export type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
+export type ChatMessage =
+  | { role: "system" | "user"; content: string }
+  | { role: "assistant"; content: string; tool_calls?: ToolCall[] }
+  | { role: "tool"; content: string; tool_call_id: string };
+export type ToolSpec = { type: "function"; function: { name: string; description: string; parameters: object } };
 export type Usage = {
   prompt_tokens: number;
   completion_tokens: number;
@@ -11,7 +16,13 @@ export type Usage = {
   model_load_duration?: number;
   generation_tokens_per_second?: number;
 };
-export type StreamResult = { text: string; usage?: Usage; ttftMs?: number; totalMs: number };
+export type StreamResult = { text: string; toolCalls: ToolCall[]; usage?: Usage; ttftMs?: number; totalMs: number };
+export type StreamOptions = { thinking?: boolean; maxTokens?: number; signal?: AbortSignal; onToken?: (t: string) => void; tools?: ToolSpec[] };
+
+/** What the agent needs from a model; lets tests use a fake. */
+export interface ChatModel {
+  stream(messages: ChatMessage[], opts?: StreamOptions): Promise<StreamResult>;
+}
 
 export async function readOmlxApiKey(): Promise<string> {
   const settings = await Bun.file(join(homedir(), ".omlx/settings.json")).json();
@@ -35,12 +46,12 @@ export async function* sseData(body: ReadableStream<Uint8Array>): AsyncGenerator
   }
 }
 
-export class OmlxClient {
+export class OmlxClient implements ChatModel {
   constructor(private readonly opts: { baseUrl: string; apiKey: string; model: string }) {}
 
   async stream(
     messages: ChatMessage[],
-    { thinking = false, maxTokens = 1024, signal, onToken }: { thinking?: boolean; maxTokens?: number; signal?: AbortSignal; onToken?: (t: string) => void } = {},
+    { thinking = false, maxTokens = 1024, signal, onToken, tools }: StreamOptions = {},
   ): Promise<StreamResult> {
     const started = performance.now();
     const res = await fetch(`${this.opts.baseUrl}/v1/chat/completions`, {
@@ -53,6 +64,7 @@ export class OmlxClient {
         stream: true,
         stream_options: { include_usage: true },
         max_tokens: maxTokens,
+        ...(tools?.length ? { tools } : {}),
         chat_template_kwargs: { enable_thinking: thinking },
         // Qwen's recommended sampling; oMLX's default temperature (1.0) is too loose for factual answers.
         ...(thinking ? { temperature: 0.6, top_p: 0.95, top_k: 20 } : { temperature: 0.7, top_p: 0.8, top_k: 20 }),
@@ -63,11 +75,20 @@ export class OmlxClient {
     let text = "";
     let usage: Usage | undefined;
     let ttftMs: number | undefined;
+    const calls: ToolCall[] = [];
     for await (const data of sseData(res.body)) {
       if (data === "[DONE]") break;
       const chunk = JSON.parse(data);
       if (chunk.usage) usage = chunk.usage;
       if (chunk.model === "keepalive") continue;
+      // Tool calls may arrive whole or in pieces; accumulate by index.
+      for (const part of chunk.choices?.[0]?.delta?.tool_calls ?? []) {
+        const call = (calls[part.index ?? 0] ??= { id: "", type: "function", function: { name: "", arguments: "" } });
+        if (part.id) call.id = part.id;
+        if (part.function?.name) call.function.name += part.function.name;
+        if (part.function?.arguments) call.function.arguments += part.function.arguments;
+        ttftMs ??= performance.now() - started;
+      }
       const token: string | undefined = chunk.choices?.[0]?.delta?.content;
       if (token) {
         ttftMs ??= performance.now() - started;
@@ -75,6 +96,6 @@ export class OmlxClient {
         onToken?.(token);
       }
     }
-    return { text, usage, ttftMs, totalMs: performance.now() - started };
+    return { text, toolCalls: calls.filter(Boolean), usage, ttftMs, totalMs: performance.now() - started };
   }
 }

@@ -15,3 +15,13 @@ header { display: flex; gap: 12px; align-items: center; padding: 10px 16px; bord
 .bar { max-width: 820px; margin: 8px auto 0; display: flex; justify-content: space-between; align-items: center; color: var(--muted); }
 button { background: var(--agent); color: #10232a; border: 0; border-radius: 3px; padding: 4px 14px; font-weight: 700; cursor: pointer; }
 .visually-hidden { position: absolute; left: -9999px; }
+.tool { max-width: 820px; width: 100%; margin: 0 auto; font: 13px ui-monospace, Menlo, monospace; color: var(--muted); border-left: 2px solid var(--seam); padding-left: 8px; }
+.approval { max-width: 820px; width: 100%; margin: 0 auto; border: 1px dashed var(--agent); background: rgba(124, 196, 216, 0.1); border-radius: 4px; padding: 10px 14px; }
+.approval-title { font-weight: 700; }
+.approval-detail { color: var(--muted); font-size: 14px; margin-top: 2px; }
+.approval .row { display: flex; gap: 8px; margin-top: 8px; }
+.approval .cancel { background: transparent; color: var(--muted); border: 1px solid var(--seam); }
+.approval-result { margin-top: 6px; font-size: 14px; }
+.approval.done { border-style: solid; border-color: var(--ok); } .approval.done .approval-result { color: var(--ok); }
+.approval.declined, .approval.expired { border-color: var(--seam); opacity: 0.8; }
+.approval.failed { border-color: var(--crit); } .approval.failed .approval-result { color: var(--crit); }

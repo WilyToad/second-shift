@@ -41,16 +41,18 @@ const ws = new WebSocket(url);
 let answer = "";
 let onDone: (m: any) => void = () => {};
 let ready = false;
+let tools = 0;
 ws.onmessage = (e) => {
   const m = JSON.parse(String(e.data));
   if (m.type === "status") ready = m.model.state === "ready";
   if (m.type === "token") answer += m.text;
+  if (m.type === "tool") tools++;
   if (m.type === "done" || m.type === "error" || m.type === "reset") onDone(m);
 };
 await new Promise((r) => (ws.onopen = r));
 for (let i = 0; i < 600 && !ready; i++) await Bun.sleep(250);
 
-const send = (msg: object) => new Promise<any>((resolve) => { answer = ""; onDone = resolve; ws.send(JSON.stringify(msg)); });
+const send = (msg: object) => new Promise<any>((resolve) => { answer = ""; tools = 0; onDone = resolve; ws.send(JSON.stringify(msg)); });
 const results = [];
 for (const c of cases) {
   await send({ type: "reset" });
@@ -58,8 +60,8 @@ for (const c of cases) {
   const missing = c.mustInclude.filter((t) => !includes(answer, t));
   const refused = /\b(no|not|cannot|can't|isn't|doesn't|don't|couldn't|unknown|unable)\b/i.test(answer) && !/->|→/.test(answer);
   const pass = done.type === "done" && (c.negative ? refused : missing.length === 0);
-  results.push({ ...c, pass, missing, answer, ttftMs: done.ttftMs, totalMs: done.totalMs, completionTokens: done.completionTokens, promptTokens: done.promptTokens, cachedTokens: done.cachedTokens });
-  console.log(`${pass ? "PASS" : "FAIL"}  ${(done.ttftMs / 1000).toFixed(1)}s first / ${(done.totalMs / 1000).toFixed(1)}s total / ${done.completionTokens} tok  ${c.question}${missing.length ? `\n      missing: ${missing.join(", ")}` : ""}`);
+  results.push({ ...c, pass, missing, answer, toolCalls: tools, ttftMs: done.ttftMs, totalMs: done.totalMs, completionTokens: done.completionTokens, promptTokens: done.promptTokens, cachedTokens: done.cachedTokens });
+  console.log(`${pass ? "PASS" : "FAIL"}  ${(done.ttftMs / 1000).toFixed(1)}s first / ${(done.totalMs / 1000).toFixed(1)}s total / ${done.completionTokens} tok / prompt ${done.promptTokens} (${done.cachedTokens} cached)${tools ? ` / ${tools} tool` : ""}  ${c.question}${missing.length ? `\n      missing: ${missing.join(", ")}` : ""}`);
 }
 
 // Warm follow-up in the same conversation (FC-013): prefix cache should cover system + previous turn.

@@ -370,7 +370,19 @@ follow-up 2.5–2.8 s, answers median ~70 tokens. What made the difference:
 - Qwen's recommended sampling (temperature 0.7, top-p 0.8, top-k 20); oMLX defaults to 1.0.
 
 Follow-ups sit at 2.5–2.8 s because history past the last 2,048-token block is re-prefilled on
-every turn. Conversation trimming (FC-076) and block-aware prompt layout are the next levers.
+every turn.
+
+**With tools (S03, 2026-09-14, `scripts/probes/tools-latency.ts`):** the tool definitions grow the
+system prompt past 4,096 tokens, so warm prompts cache 4,096. First visible token for a recipe
+question is ~0.75 s warm with the game closed. Measured costs on top of that:
+- A running game costs ~12% on cached prefill (0.92 s vs 0.82 s on a 15k prompt).
+- There's a constant ~0.33 s between oMLX's reported first token and the first visible text.
+- An unnecessary tool round trip adds 3–5 s. The model made one on 4 of 10 recipe questions until
+  the server started classifying world questions in code and adding a no-tools note to the other
+  turns. `tool_choice: "none"` isn't usable: oMLX drops the tools from the prompt, which breaks
+  the cached prefix.
+- Grounding eval with the game running and live snapshots: 10/10, first token median 2.56 s, max
+  3.61 s. Rails flow: first answer in 3.5–4.7 s total, including the find round trip. Conversation trimming (FC-076) and block-aware prompt layout are the next levers.
 ---
 
 ## 7. Phases

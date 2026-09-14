@@ -27,10 +27,12 @@
 - [!] FC-027 Verify undo for agent actions (PLAN §8 Q9)
   - Acceptance: the action appears on `player.undo_redo_stack`; the player confirms Ctrl+Z restores the marks
   - Automated part verified: marking 8 rails adds one undo item with 8 `removed-entity` actions (same as one planner drag). Waiting for the player to press Ctrl+Z in-game
-- [ ] FC-078 Model proposes actions through tool calls; "them" resolves to the last query result
+- [x] FC-078 Model proposes actions through tool calls; "them" resolves to the last query result
   - Acceptance: the model calls a named action with arguments; the server validates it against the action list and the remembered query result before anything reaches the game
-- [ ] FC-023 Action plumbing: named actions validated on the server, approval card in the web page
+  - `server/src/agent.ts` (unit-tested with a fake model and game) and `scripts/e2e-rails.ts`: 6/6 with the real model and game. World questions are classified in code (`needsWorldTools`); the model otherwise called find_entities on 4/10 recipe questions
+- [x] FC-023 Action plumbing: named actions validated on the server, approval card in the web page
   - Acceptance: map-changing actions wait for Confirm/Cancel in the web page; nothing is sent to the game on Cancel
+  - Approval card in the chat page; outcomes reach the model at the start of the next turn; stale cards expire
 - [x] FC-029 Helmet-rule test harness: every action fails when the player couldn't do it
   - Acceptance: scripted in-game checks on the dev save show `mark_deconstruction` refuses out-of-coverage targets and non-deconstructible entities
   - `bun scripts/test-helmet.ts`: 13/13 (find right/left, highlight, mark, undo item, already marked, cancel, character refused, unseen chunk refused, no destroy action)
