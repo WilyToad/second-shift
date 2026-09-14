@@ -1,10 +1,10 @@
 # S20 — Morning checks with the player
 
-- **Status:** active
+- **Status:** done
 - **Goal:** Everything the overnight run left for the player is checked or decided with them, and any change that comes out of it is made.
 - **Acceptance:** Each item below is verified in-game with the player or decided by them, recorded here and in PLAN where it answers an open question.
 - **Started:** 2026-09-14
-- **Finished:** —
+- **Finished:** 2026-09-14
 
 ## Items
 
@@ -31,3 +31,15 @@
 Started 2026-09-14 morning with the player. FC-027 (Ctrl+Z) and FC-028 (fog of war) were verified first and recorded in S03. FC-115 (the selection shortcut) was verified next and recorded in S17.
 
 ## Review
+
+Every overnight item that needed the player is checked or decided, and each change that came out of it is made and tested.
+
+**Acceptance:**
+- ✓ FC-027 Ctrl+Z removes the companion's marks (S03). ✓ FC-028 the game blocks marking in fog of war and uncharted map, matching the rule (S03). ✓ FC-115 the selection shortcut works by hand (S17).
+- ✓ Decided and built: FC-092 "here" vs "near me" in map view, including three bugs the player's live test exposed. FC-116 recipe-change leftovers (inventory in reach, else spilled for robots). FC-072 leave the port.
+- ✓ FC-117 visual review; the one problem (rich text in a platform name) fixed.
+
+**What we learned:**
+- The player trying it live found in minutes what the tests missed: "belts" meaning only yellow belts, a reused search result, and coordinates taken from the wrong spot. Tests had quietly assumed the player was never in map view.
+- The game and the mod API don't always allow the same things (a script can't fill a machine's trash slots). Checking what the game does by hand first made that visible before it caused a surprise.
+
