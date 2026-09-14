@@ -42,3 +42,4 @@ Times are commit times (local).
 - FC-085 done: machine status in the digest + `find_stuck_machines` tool + computed diagnosis hints. Real finding on the dev save: the Nauvis base is backed up because research stopped (47 idle labs), which the companion now says first. Fixed a runtime `require` in a mod handler (Factorio only allows require at load).
 - **Review:** your dev save's real state: research has stopped, so science and everything upstream on Nauvis is output-blocked; on Gleba some yumako processors and iron furnaces are starved. Worth checking in your real save.
 - FC-086 done, **S07 closed**: diagnosis scenario eval 4/4 (names every real status, highlights all stuck machines); all 7 regression suites pass. Follow-up latency 2.72 s in one run: tracked as FC-087.
+- S08 "Planning actions" planned and activated (delegated): FC-088 queue_research, FC-089 map tags + camera, FC-090 mark_upgrade, FC-091 place_blueprint (small), FC-087 latency watch.

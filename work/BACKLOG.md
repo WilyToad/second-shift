@@ -10,7 +10,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 - [ ] FC-043 `recipe_graph` component
   - Acceptance: optional for this sprint. Recipe chain with stuck nodes highlighted, drawn from prototypes and status
 - [ ] FC-044 `layout_sketch` component with copyable blueprint string
-- [ ] FC-045 Planning actions: `place_blueprint`, `mark_upgrade`, entity settings, `queue_research`, map tags, `camera_to`
 - [ ] FC-046 Blueprint selection tool in the mod
 - [ ] FC-047 Throughput analysis for builds and blueprints
 - [ ] FC-048 Template-based blueprint creation
@@ -30,8 +29,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Tech debt and risks
 
-- [ ] FC-087 Follow-up latency watch after S07's prompt growth
-  - Notes: grounding eval follow-up took 2.72 s after the find_stuck_machines tool and diagnosis rules were added (S05 target 2.5 s). Check with the latency report over several runs; trim rules or re-align if it holds
 
 - [ ] FC-070 Find or build a heavier benchmark save (megabase scale)
 - [ ] FC-071 Resolve the "Factorio Companion" name clash with ob1-s/factorio-AI-coop
