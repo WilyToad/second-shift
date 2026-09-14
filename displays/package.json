@@ -2,5 +2,13 @@
   "name": "@companion/displays",
   "private": true,
   "type": "module",
-  "main": "src/chat.ts"
+  "main": "src/main.tsx",
+  "dependencies": {
+    "@preact/signals": "^2.11.2",
+    "preact": "^10.29.8",
+    "@companion/interfaces": "workspace:*"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.14.5"
+  }
 }

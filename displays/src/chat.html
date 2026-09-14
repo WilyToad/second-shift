@@ -7,20 +7,7 @@
   <link rel="stylesheet" href="./chat.css">
 </head>
 <body>
-  <header>
-    <strong>Factorio Companion</strong>
-    <span id="game-status" class="pill">game: connecting…</span>
-    <span id="model-status" class="pill">model: loading…</span>
-  </header>
-  <main id="thread" aria-live="polite"></main>
-  <form id="composer">
-    <label for="ask" class="visually-hidden">Ask the companion</label>
-    <textarea id="ask" rows="2" placeholder="Ask about your factory, e.g. “what's my science output?”"></textarea>
-    <div class="bar">
-      <label><input type="checkbox" id="thinking"> Think it through</label>
-      <button type="submit">Send</button>
-    </div>
-  </form>
-  <script type="module" src="./chat.ts"></script>
+  <div id="app"></div>
+  <script type="module" src="./main.tsx"></script>
 </body>
 </html>

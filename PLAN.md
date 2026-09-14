@@ -237,7 +237,9 @@ Long actions (walking, mining a row by hand, placing many ghosts) are spread acr
   so there are no extra dependencies for the hot path.
 - No Vite for now. Vite is a frontend dev server, not an alternative to Bun. Add it only if we
   pick a UI framework that needs a Vite plugin (e.g. Svelte).
-- UI framework: undecided. The mockup is plain DOM + SVG. React/Preact JSX works in Bun natively.
+- UI framework (decided 2026-09-14, FC-041): **Preact + `@preact/signals`**. It's ~4 KB, JSX builds in Bun natively (no
+  Vite), and signals update streamed tokens and live panels without re-rendering. Plain DOM wouldn't scale to three
+  panels, cards and charts. Components get DOM tests with happy-dom (no browser needed).
 - `Bun.udpSocket` is Bun-only; accepted, since this is a local tool.
 
 ---

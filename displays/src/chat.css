@@ -1,6 +1,7 @@
 :root { color-scheme: dark; --ground: #1c1a18; --panel: #25221f; --seam: #3a352f; --text: #ebe5d9; --muted: #a39b8e; --agent: #7cc4d8; --warn: #eaa13c; --crit: #e0584b; --ok: #86bf5b; }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--ground); color: var(--text); font: 15px/1.5 "Titillium Web", system-ui, sans-serif; display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
+body { margin: 0; background: var(--ground); color: var(--text); font: 15px/1.5 "Titillium Web", system-ui, sans-serif; }
+#app { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
 header { display: flex; gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--seam); flex-wrap: wrap; }
 .pill { font: 13px ui-monospace, Menlo, monospace; color: var(--muted); border: 1px solid var(--seam); border-radius: 3px; padding: 1px 8px; }
 .pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.crit { color: var(--crit); }
@@ -13,6 +14,7 @@ header { display: flex; gap: 12px; align-items: center; padding: 10px 16px; bord
 #composer { border-top: 1px solid var(--seam); padding: 12px 16px; }
 #composer textarea { width: 100%; max-width: 820px; display: block; margin: 0 auto; background: var(--panel); color: var(--text); border: 1px solid var(--seam); border-radius: 4px; padding: 8px 12px; font: inherit; resize: vertical; }
 .bar { max-width: 820px; margin: 8px auto 0; display: flex; justify-content: space-between; align-items: center; color: var(--muted); }
+.cancel { background: transparent; color: var(--muted); border: 1px solid var(--seam); }
 button { background: var(--agent); color: #10232a; border: 0; border-radius: 3px; padding: 4px 14px; font-weight: 700; cursor: pointer; }
 .visually-hidden { position: absolute; left: -9999px; }
 .tool { max-width: 820px; width: 100%; margin: 0 auto; font: 13px ui-monospace, Menlo, monospace; color: var(--muted); border-left: 2px solid var(--seam); padding-left: 8px; }

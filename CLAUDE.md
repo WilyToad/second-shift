@@ -8,7 +8,7 @@ update it when a decision changes.
 
 **Status:** Phase 1 slice works end to end (mod → RCON → server → oMLX → web chat). Stack: **TypeScript on Bun**
 (runtime, package manager, test runner, bundler) for `interfaces/`, `server/` and `displays/`.
-No Vite. UI framework not chosen yet (PLAN §4).
+No Vite. UI: Preact + signals in `displays/src` (PLAN §4).
 
 ## Hard rules
 
