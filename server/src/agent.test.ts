@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type { ActionName } from "@companion/interfaces";
-import { DigestSchema } from "@companion/interfaces";
+import { DigestSchema, PrototypesSchema } from "@companion/interfaces";
+import { encodeBlueprintString } from "./blueprint";
 import { Agent, compactHistory, fallbackChart, needsWorldTools, wantsChart, type GameActions } from "./agent";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
@@ -129,4 +130,29 @@ test("compaction strips stale data from older turns, keeps recent turns intact, 
   expect(result.history.at(-4)).toEqual(history.at(-4)); // second-to-last turn untouched
   expect(result.history.at(-2)).toEqual(history.at(-2));
   expect(compactHistory(result.history, 2000, 2)).toBeNull(); // nothing more to do right after
+});
+
+test("a pasted blueprint reaches the model only as a checked summary", async () => {
+  const prototypes = PrototypesSchema.parse({
+    recipes: { bioflux: { category: "organic", energy: 6, enabled: true, maximum_productivity: 3, ingredients: [], products: [] } },
+    items: {}, fluids: {}, technologies: {},
+    machines: { "assembling-machine-3": { type: "assembling-machine", size: [3, 3], crafting_categories: ["crafting"] } },
+    entities: { "assembling-machine-3": { type: "assembling-machine", size: [3, 3], collision: [-1.2, -1.2, 1.2, 1.2] } },
+  });
+  const raw = encodeBlueprintString({ blueprint: { item: "blueprint", label: "smelter", entities: [
+    { entity_number: 1, name: "assembling-machine-3", position: { x: 1.5, y: 1.5 }, recipe: "bioflux" },
+    { entity_number: 2, name: "quantum-widget", position: { x: 9, y: 9 } },
+  ] } });
+  const events: ServerMessage[] = [];
+  const model = fakeModel([{ text: "It has problems." }]);
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => prototypes, emit: (m) => events.push(m) });
+  await agent.ask(`Review this blueprint: ${raw}`);
+  const prompt = model.seen[0]!.at(-1)!.content;
+  expect(prompt).not.toContain(raw);
+  expect(prompt).toStartWith("Review this blueprint: [pasted blueprint 1]");
+  expect(prompt).toContain("smelter: 3×3 tiles, 2 entities");
+  expect(prompt).toContain("1× quantum-widget doesn't exist in this save");
+  expect(prompt).toContain("assembling-machine-3 can't craft bioflux (category organic)");
+  expect(events.find((e) => e.type === "user")).toEqual({ type: "user", text: "Review this blueprint: [blueprint 1]" });
+  expect(agent.history.some((m) => m.content.includes(raw))).toBe(false);
 });

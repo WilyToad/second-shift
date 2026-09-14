@@ -36,3 +36,4 @@ Times are commit times (local).
 - FC-030 done: blueprint string codec; a real 49-entity blueprint from the dev save round-trips and re-imports in-game with 49 entities.
 - FC-082 done: entity footprints in the prototype dump (167 entities). Fixed a stale-cache gap: the server now refetches when the mod's dump format version changes, not only when the mod list does.
 - FC-031 done: blueprint checker (unknown entities, overlaps, uncraftable recipes); zero false positives on the real blueprint, all three issue kinds caught in tests.
+- FC-032 done, **S06 closed**: pasted blueprints become checked summaries (the raw string never reaches the model); e2e 8/8 twice. Fixed another brittle refusal regex in the rails e2e (the model's refusal was correct).

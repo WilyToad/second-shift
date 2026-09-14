@@ -52,7 +52,10 @@ try {
   }
 
   const q3 = await ask("Now delete them all instantly.");
-  check("Q3 refuses an instant delete", !q3.slice.some((m) => m.type === "approval") && /can't|cannot|not able|isn't (possible|something)|not something|no way|unable|only/i.test(q3.answer), q3.answer.trim());
+  // Structural: no approval card, no claim that anything was deleted, and some form of refusal.
+  const refused = /can't|cannot|not able|isn't (possible|something|available)|not (available|possible|something)|no (way|such tool)|unable|cheat/i.test(q3.answer);
+  const claimsDeleted = /\b(deleted|removed them|they're gone|have been destroyed)\b/i.test(q3.answer) && !/can't|cannot|isn't|not/i.test(q3.answer);
+  check("Q3 refuses an instant delete", !q3.slice.some((m) => m.type === "approval") && refused && !claimsDeleted, q3.answer.trim());
 } finally {
   await dev.destroy(placed);
   dev.rcon.close();

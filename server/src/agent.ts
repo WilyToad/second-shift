@@ -3,6 +3,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ActionArgs, ActionData, ActionName, Digest, EntityRef, FindEntitiesResult, Prototypes } from "@companion/interfaces";
+import { summarizePasted } from "./blueprint-review";
 import { resolveEntityFilter } from "./entities";
 import type { Snapshot } from "./game";
 import type { ServerMessage } from "./messages";
@@ -36,7 +37,7 @@ const MAX_TOOL_ROUNDS = 3;
 const HISTORY_BUDGET_TOKENS = 8000;
 const KEEP_RECENT_TURNS = 2;
 const CHARS_PER_TOKEN = 2.8;
-const TAIL_MARKERS = ["\n\n[recipes and technologies from this save]", "\n\n[game state", "\n\n(Answer from the data provided"];
+const TAIL_MARKERS = ["\n\n[recipes and technologies from this save]", "\n\n[game state", "\n\n(Answer from the data provided", "\n\n(Review from the checked summary"];
 
 /** A user turn without its bulky, now-stale data: retrieved lines, snapshot and guidance notes. */
 export function compactUserContent(content: string): string {
@@ -180,19 +181,25 @@ export class Agent {
     this.deps.emit({ type: "reset" });
   }
 
-  async ask(question: string, thinking = false): Promise<void> {
+  async ask(rawQuestion: string, thinking = false): Promise<void> {
     const started = performance.now();
+    // Pasted blueprint strings never reach the model: they become checked summaries.
+    const pasted = summarizePasted(rawQuestion, this.deps.prototypes());
+    const question = pasted.question;
     const snap = this.deps.game.latest() ?? this.deps.fallbackSnapshot?.();
     const found = this.deps.retriever()?.retrieve(question);
     const snapshot = snap ? formatSnapshot(snap.digest, this.now() - snap.receivedAt, { question, items: found?.items ?? [] }) : null;
     // Outcomes of approvals since the last turn go in front of the question, keeping history append-only.
-    const noted = this.notes.length ? `[since your last reply: ${this.notes.join("; ")}]\n\n${question}` : question;
+    const withBlueprints = pasted.summaries.length ? `${question}\n\n${pasted.summaries.join("\n\n")}` : question;
+    const noted = this.notes.length ? `[since your last reply: ${this.notes.join("; ")}]\n\n${withBlueprints}` : withBlueprints;
     this.notes = [];
     // Turn guidance decided in code, kept in the uncached tail so the system prompt stays stable.
     const world = needsWorldTools(question, this.lastResult !== null);
     const chart = wantsChart(question);
     const notes = [world ? "" : "no tool call is needed", chart ? "" : "no chart block"].filter(Boolean);
-    const guided = notes.length ? `${noted}\n\n(Answer from the data provided in 60 words or fewer; ${notes.join(", ")}.)` : noted;
+    const guided = pasted.summaries.length
+      ? `${noted}\n\n(Review from the checked summary in 90 words or fewer: lead with the total entity count and the main counts, then list every problem the checks found, or say they found none; no tool call or chart.)`
+      : notes.length ? `${noted}\n\n(Answer from the data provided in 60 words or fewer; ${notes.join(", ")}.)` : noted;
     const working: ChatMessage[] = [userTurn(guided, { recipes: found?.lines ?? [], snapshot })];
     const record: TurnRecord = {
       at: new Date(this.now()).toISOString(), question, world, chart, rounds: [], totalMs: 0,
@@ -204,7 +211,7 @@ export class Agent {
         snapshot: snapshot?.length ?? 0,
       },
     };
-    this.deps.emit({ type: "user", text: question });
+    this.deps.emit({ type: "user", text: pasted.display });
 
     let ttftMs: number | undefined;
     try {
