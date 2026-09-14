@@ -11,9 +11,9 @@
 - [x] FC-046 Blueprint selection tool in the mod
   - Acceptance: shortcut + selection tool prototypes; on selection the mod makes a blueprint of the area, announces it in the event feed, and the app fetches it and reviews it like a pasted blueprint; e2e through the server
   - `data.lua` adds `companion-selection-tool` (spawned by the `companion-select-build` shortcut, blueprint icon, copy-style box). `scripts/selection.lua` copies the dragged area with `create_blueprint` like the player's blueprint tool, pushes a `selection` event (entity count, surface, centre) and keeps the string in a module local for `get_selection` (capped at 4 MB). The event feed moved to `scripts/feed.lua` so modules can share it. The server fetches the string when the event arrives and asks the review for the player ("Review the build I just selected: [blueprint 1]"); the guidance says the build already exists, so the answer doesn't offer to paste it. `scripts/e2e-selection.ts` 7/7 twice via the `debug_select_area` test handler (same capture code): 49 entities around the player, feed event, automatic review with sketch and entity count in 3.8 s, stale selections refused. Prototypes verified loaded (`scripts/probes/selection-prototypes.ts`). Blueprint e2e still 9/9
-- [ ] FC-115 Player check: use the shortcut in-game
+- [x] FC-115 Player check: use the shortcut in-game
   - Acceptance: the player clicks "Show the companion a build" on the shortcut bar, drags over a build, and the review shows up in the companion page
-  - Pending player verification
+  - Player-verified 2026-09-14: found the shortcut, dragged over the rocket silo area; the page showed the blueprint card and the review (7 entities: 2 laser turrets, rocket silo, bulk inserter, requester chest, big pole, substation; no problems; silo throughput). Wording slip in that answer: "the silo needs 20 rocket parts per minute" where it builds them
 
 ## Notes
 
@@ -25,7 +25,7 @@ The whole path from selection to review works, tested through the same capture c
 
 **Acceptance:**
 - ✓ Prototypes load; capture, feed event, fetch, automatic review with sketch (`e2e-selection` 7/7 twice).
-- ⏳ Pending player: clicking the shortcut and dragging by hand (FC-115).
+- ✓ Player-verified 2026-09-14: the shortcut and a hand drag produce the review in the page (FC-115).
 - ✓ Blueprint review unchanged (9/9).
 
 **What we learned:**

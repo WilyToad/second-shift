@@ -16,6 +16,6 @@
 
 ## Notes
 
-Started 2026-09-14 morning with the player. FC-027 (Ctrl+Z) and FC-028 (fog of war) were verified first and recorded in S03.
+Started 2026-09-14 morning with the player. FC-027 (Ctrl+Z) and FC-028 (fog of war) were verified first and recorded in S03. FC-115 (the selection shortcut) was verified next and recorded in S17.
 
 ## Review
