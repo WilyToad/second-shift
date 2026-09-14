@@ -7,7 +7,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 3 — Pleasant console and more actions
 
-- [ ] FC-043 `recipe_graph` component
 - [ ] FC-044 `layout_sketch` component with copyable blueprint string
 - [ ] FC-045 Planning actions: `place_blueprint`, `mark_upgrade`, entity settings, `queue_research`, map tags, `camera_to`
 - [ ] FC-046 Blueprint selection tool in the mod

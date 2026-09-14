@@ -37,3 +37,4 @@ Times are commit times (local).
 - FC-082 done: entity footprints in the prototype dump (167 entities). Fixed a stale-cache gap: the server now refetches when the mod's dump format version changes, not only when the mod list does.
 - FC-031 done: blueprint checker (unknown entities, overlaps, uncraftable recipes); zero false positives on the real blueprint, all three issue kinds caught in tests.
 - FC-032 done, **S06 closed**: pasted blueprints become checked summaries (the raw string never reaches the model); e2e 8/8 twice. Fixed another brittle refusal regex in the rails e2e (the model's refusal was correct).
+- S07 "Bottleneck diagnosis" planned and activated (delegated): FC-083 registry, FC-084 status polling, FC-085 status in digest + find_stuck, FC-043 recipe graph (optional), FC-086 scenario eval. Reason: use case #1 had no machine-status data yet.
