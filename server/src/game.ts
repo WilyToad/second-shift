@@ -1,9 +1,12 @@
 // Link to the running game: RCON connection with reconnect, typed mod actions, and a digest poller.
-import { actions, encodeCommand, parseReply, type ActionArgs, type ActionData, type ActionName, type Digest } from "@companion/interfaces";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { actions, encodeCommand, parseReply, PrototypesSchema, type ActionArgs, type ActionData, type ActionName, type Digest, type Prototypes } from "@companion/interfaces";
 import { RconClient } from "./rcon";
-import { readRconSettings } from "./factorio";
+import { readRconSettings, type RconSettings } from "./factorio";
 
 export type Snapshot = { digest: Digest; receivedAt: number };
+export type LoadedPrototypes = { modsKey: string; data: Prototypes; source: "game" | "cache" };
 export type GameStatus = { connected: boolean; lastError?: string; latest?: Snapshot };
 
 export class ModError extends Error {
@@ -17,8 +20,56 @@ export class GameLink {
   private lastError: string | undefined;
   private stopped = false;
   private listeners = new Set<(s: GameStatus) => void>();
+  private prototypeListeners = new Set<(p: LoadedPrototypes) => void>();
+  private loaded: LoadedPrototypes | null = null;
 
-  constructor(private readonly opts: { pollMs: number; historySize: number }) {}
+  constructor(private readonly opts: { pollMs: number; historySize: number; cacheDir: string; settings?: () => Promise<RconSettings | null> }) {}
+
+  /** Recipe data from the last game session, so the server can ground answers before the game connects. */
+  async loadCachedPrototypes(): Promise<LoadedPrototypes | null> {
+    const file = Bun.file(join(this.opts.cacheDir, "prototypes.json"));
+    if (!(await file.exists())) return null;
+    try {
+      const cached = (await file.json()) as { modsKey: string; data: unknown };
+      this.setPrototypes({ modsKey: cached.modsKey, data: PrototypesSchema.parse(cached.data), source: "cache" });
+    } catch (e) {
+      console.warn("Ignoring unreadable prototype cache:", (e as Error).message);
+    }
+    return this.loaded;
+  }
+
+  prototypes(): LoadedPrototypes | null {
+    return this.loaded;
+  }
+
+  onPrototypes(fn: (p: LoadedPrototypes) => void): () => void {
+    this.prototypeListeners.add(fn);
+    return () => this.prototypeListeners.delete(fn);
+  }
+
+  private setPrototypes(p: LoadedPrototypes): void {
+    this.loaded = p;
+    for (const fn of this.prototypeListeners) fn(p);
+  }
+
+  /** Refetches prototype data only when the game's mod list differs from what's loaded. */
+  private async syncPrototypes(): Promise<void> {
+    const info = await this.call("info");
+    const modsKey = String(Bun.hash(JSON.stringify(Object.entries(info.mods).sort())));
+    if (this.loaded?.modsKey === modsKey) return;
+    const started = performance.now();
+    const data = await this.call("dump_prototypes");
+    mkdirSync(this.opts.cacheDir, { recursive: true });
+    await Bun.write(join(this.opts.cacheDir, "prototypes.json"), JSON.stringify({ modsKey, data }));
+    console.log(`Loaded prototypes from the game (${Object.keys(data.recipes).length} recipes, ${(performance.now() - started).toFixed(0)} ms).`);
+    this.setPrototypes({ modsKey, data, source: "game" });
+  }
+
+  /** Drops the connection; the loop reconnects (and re-checks the mod list). */
+  disconnect(): void {
+    this.rcon?.close();
+    this.rcon = null;
+  }
 
   /** Keeps trying to connect in the background; the server works without the game. */
   start(): void {
@@ -61,9 +112,10 @@ export class GameLink {
     while (!this.stopped) {
       if (!this.rcon) {
         try {
-          const settings = await readRconSettings();
+          const settings = await (this.opts.settings ?? readRconSettings)();
           if (!settings) throw new Error("RCON isn't enabled in config.ini");
           this.rcon = await RconClient.connect({ ...settings, timeoutMs: 10_000 });
+          await this.syncPrototypes();
           this.lastError = undefined;
           this.emit();
         } catch (e) {

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { DigestSchema } from "@companion/interfaces";
-import { buildMessages, formatSnapshot, SYSTEM_RULES, userTurn } from "./prompt";
+import { buildMessages, formatSnapshot, systemPrompt, userTurn } from "./prompt";
 
 const digest = DigestSchema.parse({
   tick: 100, player: { name: "p", surface: "gleba", position: { x: 1, y: 2 } },
@@ -19,11 +19,14 @@ test("snapshot is compact text with rounded rates", () => {
 });
 
 test("messages keep a stable prefix: system, history as sent, then the new turn last", () => {
-  const first = userTurn("why?", "state A");
+  const first = userTurn("why?", { snapshot: "state A" });
   const history = [first, { role: "assistant" as const, content: "because" }];
-  const next = userTurn("and now?", "state B");
-  const msgs = buildMessages(history, next);
-  expect(msgs[0]).toEqual({ role: "system", content: SYSTEM_RULES });
+  const next = userTurn("and now?", { recipes: ["bioflux: 15 yumako-mash, 12 jelly -> 4 bioflux (6s organic)"], snapshot: "state B" });
+  const system = systemPrompt(null);
+  const msgs = buildMessages(system, history, next);
+  expect(msgs[0]).toEqual({ role: "system", content: system });
   expect(msgs.slice(1, 3)).toEqual(history); // identical to what was sent last turn
-  expect(msgs.at(-1)!.content.endsWith("state B")).toBe(true);
+  const last = msgs.at(-1)!.content;
+  expect(last.endsWith("state B")).toBe(true); // snapshot always last
+  expect(last.indexOf("bioflux:")).toBeLessThan(last.indexOf("state B"));
 });

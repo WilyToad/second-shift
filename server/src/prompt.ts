@@ -2,17 +2,20 @@
 //   1. system rules (never changes)
 //   2. conversation history, stored exactly as sent (append-only)
 //   3. the new question with the latest game snapshot, always last
-import type { Digest } from "@companion/interfaces";
+import type { Digest, Prototypes } from "@companion/interfaces";
+import { formatItemTraits, formatMachines } from "./grounding";
 import type { ChatMessage } from "./model";
 
 export const SYSTEM_RULES = `You are Factorio Companion, an assistant riding along in the player's helmet in a live, heavily modded Factorio 2.0 game (Space Age plus mods such as maraxsis, Cerys, factorissimo-2).
 
 Rules:
-- Ground every claim in the game state given with the question. If the state doesn't contain what's needed, say what's missing instead of guessing.
+- Ground every claim in the data you're given: the save data below, the recipe and technology lines sent with each question, and the game state sent with each question. If the data doesn't contain what's needed, say what's missing instead of guessing.
+- Recipe lines read "name: ingredients -> products (seconds category, locked) [conditions] made in: machines". "made in" is exact and computed from the save; don't infer crafters from category names. "locked" means not unlocked yet. [pressure>=2000] limits where it can be crafted. 2@50% is probabilistic.
 - Your memory of Factorio is vanilla and may be wrong for this save. Don't name items, recipes or technologies, or state recipe details, unless they appear in the provided data.
 - Science rates are given as "now" (last minute) and "10h" (10-hour average). If "now" is 0 but "10h" isn't, science has stalled: say so and point to likely causes visible in the data (for example, nothing being researched).
 - You can't take actions in the game yet. Describe what the player could do.
-- Be brief and concrete: numbers with units (per minute), surface names, item names.`;
+- Answer in about 120 words or fewer unless the player asks for detail. Give the answer, not your reasoning; never show self-corrections.
+- Be concrete: numbers with units (per minute), surface names, item names.`;
 
 const round = (n: number) => (n >= 100 ? Math.round(n) : Math.round(n * 10) / 10);
 const rates = (list: { name: string; per_minute: number }[]) =>
@@ -34,10 +37,20 @@ export function formatSnapshot(digest: Digest, ageMs: number): string {
   return lines.join("\n");
 }
 
-export function userTurn(question: string, snapshot: string | null): ChatMessage {
-  return { role: "user", content: snapshot ? `${question}\n\n${snapshot}` : `${question}\n\n[game state unavailable: the game isn't connected]` };
+/** Stable system prompt: rules plus the small, rarely changing slice of save data (PLAN §6). */
+export function systemPrompt(prototypes: Prototypes | null): string {
+  if (!prototypes) return `${SYSTEM_RULES}\n\n[save data not loaded yet: recipes and machines are unknown]`;
+  return `${SYSTEM_RULES}\n\n[save data: machines]\n${formatMachines(prototypes)}\n\n[save data: items that spoil or burn]\n${formatItemTraits(prototypes)}`;
 }
 
-export function buildMessages(history: ChatMessage[], nextUser: ChatMessage): ChatMessage[] {
-  return [{ role: "system", content: SYSTEM_RULES }, ...history, nextUser];
+/** The volatile tail, in order: question, retrieved recipe lines, game state last. */
+export function userTurn(question: string, { recipes = [], snapshot = null }: { recipes?: string[]; snapshot?: string | null } = {}): ChatMessage {
+  const parts = [question];
+  if (recipes.length) parts.push(`[recipes and technologies from this save]\n${recipes.join("\n")}`);
+  parts.push(snapshot ?? "[game state unavailable: the game isn't connected]");
+  return { role: "user", content: parts.join("\n\n") };
+}
+
+export function buildMessages(system: string, history: ChatMessage[], nextUser: ChatMessage): ChatMessage[] {
+  return [{ role: "system", content: system }, ...history, nextUser];
 }

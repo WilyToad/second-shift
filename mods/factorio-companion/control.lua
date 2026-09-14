@@ -40,7 +40,7 @@ end
 local MACHINE_TYPES = {
   "assembling-machine", "furnace", "rocket-silo", "mining-drill", "lab", "beacon",
   "transport-belt", "underground-belt", "splitter", "inserter",
-  "boiler", "generator", "reactor", "agricultural-tower",
+  "boiler", "generator", "reactor", "agricultural-tower", "character",
 }
 
 -- Runtime view of what is actually loaded in this save (modded), for grounding the agent.

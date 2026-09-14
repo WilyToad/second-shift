@@ -9,11 +9,28 @@ function amount(p: { amount?: number; amount_min?: number; amount_max?: number; 
   return p.probability !== undefined && p.probability < 1 ? `${base}@${Math.round(p.probability * 100)}%` : base;
 }
 
-export function recipeLine(name: string, r: Recipe): string {
+/** Which machines (and whether the player's character) can craft each recipe category. */
+export function craftersByCategory(p: Prototypes): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const hasCharacter = Object.values(p.machines).some((m) => m.type === "character");
+  for (const [name, m] of Object.entries(p.machines)) {
+    for (const category of m.crafting_categories ?? []) out.set(category, [...(out.get(category) ?? []), m.type === "character" ? "by hand" : name]);
+  }
+  if (!hasCharacter) {
+    // Older captures lack the character prototype; fall back to the naming convention.
+    for (const category of new Set(Object.values(p.recipes).map((r) => r.category))) {
+      if (category === "crafting" || category.endsWith("hand-crafting")) out.set(category, [...(out.get(category) ?? []), "by hand"]);
+    }
+  }
+  return out;
+}
+
+export function recipeLine(name: string, r: Recipe, crafters?: Map<string, string[]>): string {
   const ins = r.ingredients.map((i) => `${amount(i)} ${i.name}`).join(", ") || "nothing";
   const outs = r.products.map((p) => `${amount(p)} ${p.name}`).join(", ") || "nothing";
   const where = r.surface_conditions?.length ? ` [${r.surface_conditions.map((c) => `${c.property}${c.min !== undefined ? `>=${num(c.min)}` : ""}${c.max !== undefined ? `<=${num(c.max)}` : ""}`).join(" ")}]` : "";
-  return `${name}: ${ins} -> ${outs} (${num(r.energy)}s ${r.category}${r.enabled ? "" : ", locked"})${where}`;
+  const madeIn = crafters ? ` made in: ${(crafters.get(r.category) ?? []).join(", ") || "nothing in this save"}` : "";
+  return `${name}: ${ins} -> ${outs} (${num(r.energy)}s ${r.category}${r.enabled ? "" : ", locked"})${where}${madeIn}`;
 }
 
 export function formatRecipes(p: Prototypes, filter: (name: string, r: Recipe) => boolean = () => true): string {
@@ -34,9 +51,10 @@ export function formatMachines(p: Prototypes): string {
     if (m.mining_speed !== undefined) parts.push(`mining ${num(m.mining_speed)}`);
     if (m.belt_speed !== undefined) parts.push(`belt ${num(m.belt_speed * 60 * 8)}/s`);
     if (m.module_slots) parts.push(`modules ${m.module_slots}`);
+    if (m.type === "character") return null;
     if (m.crafting_categories?.length) parts.push(`categories ${m.crafting_categories.join(", ")}`);
     return `${name}: ${parts.join(", ")}`;
-  }).join("\n");
+  }).filter((line) => line !== null).join("\n");
 }
 
 export function formatItemTraits(p: Prototypes): string {

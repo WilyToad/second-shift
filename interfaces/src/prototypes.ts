@@ -57,7 +57,7 @@ export const TechnologySchema = z.strictObject({
 export const MachineSchema = z.strictObject({
   type: z.string(),
   size: z.tuple([z.number(), z.number()]),
-  module_slots: z.number(),
+  module_slots: z.number().optional(),
   crafting_categories: luaArray(z.string()).optional(),
   crafting_speed: z.number().optional(),
   energy_usage: z.number().optional(),
