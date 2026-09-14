@@ -27,3 +27,4 @@ Times are commit times (local).
 - **Review:** the page layout hasn't been looked at in a real browser. Please open http://127.0.0.1:5170 (it needs `bun run start` and the game hosted) and check how it looks at your monitor size.
 - FC-042 done: `rate_chart` blocks drawn by the page from recorded history. Charts and tool calls are gated per turn in code. Grounding 10/10, rails 6/6, charts 2/2.
 - S04 closed (visual layout check pending). New backlog item FC-079: first-token latency with the game running has crept to median ~2.9 s, max ~4.1 s.
+- S05 "Fast in real play" planned and activated (delegated): FC-080 latency breakdown, FC-079 latency target, FC-081 smaller tail, FC-076 conversation trimming.
