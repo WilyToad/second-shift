@@ -80,6 +80,10 @@ Most Factorio Lua online (and in model training data) targets 1.1. In 2.0:
   turns false into nil. Use an explicit `if` or a plain boolean expression. (This bit three times.)
 - Bump `DUMP_VERSION` in `control.lua` whenever `dump_prototypes` changes shape; the server's prototype cache is keyed on it.
 - `helpers.table_to_json` writes empty tables as `{}`. Parse replies through the `interfaces` schemas.
+- Anything that decides what goes into `storage` must itself live in `storage`. A module-local (say, a chunk
+  iterator) survives on the host but is gone on a peer that just loaded the map, so the two drift apart (desync).
+  Module-local caches are fine only if they feed RCON replies and nothing else.
+- `/sc storage.x` is the level script's storage, not the mod's. Reset mod state through a mod-side test handler.
 
 ## Mod performance rules (huge factories)
 

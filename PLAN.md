@@ -318,6 +318,38 @@ Planet"):** 0.66 ms/tick (~1,500 UPS), worst tick ~3.3 ms, without the mod. Mod 
 command only, no tick handlers): no measurable cost. This save is mid-size, not a megabase; find
 or build a heavier save before trusting the budget at scale.
 
+**Megabase profile (S11, 2026-09-14, `bun scripts/megabase.ts`):** test tooling adds a lab-tile surface
+with 22,254 assemblers (built through build events, never saved) to reach 25,000 registered machines.
+Lua time per call from `helpers.create_profiler`:
+
+| Path | Dev save (2,746 machines) | Megabase (25,000) |
+|---|---|---|
+| Status polling, one tick | 0.055 ms | 0.051 ms (refresh every 1,250 ticks) |
+| Rate refresh step (every 30 ticks) | 0.060 ms (max 0.17) | 0.054 ms (max 0.18) |
+| Alert sampler, 10 filtered `get_alerts` (every 30 ticks) | 0.027 ms | 0.040 ms |
+| Events poll (every 250 ms) | 0.017 ms | 0.022 ms |
+| Digest (every 2 s, incl. JSON) | 0.46 ms | 0.48 ms |
+| `find_entities`, 32-tile radius | 0.10 ms | 0.11 ms |
+| `find_machines`, all 22,254 matching machines | — | 0.79 ms (**was 5.9 ms, max 10.9**) |
+| `find_machines`, player's surface, every recipe | 0.14 ms | 0.16 ms |
+| `dump_prototypes` (mod change or research completed) | 27 ms | 26 ms |
+| Registry scan, per tick (one-time) | listing Nauvis's 11,844 chunks: one ~7 ms tick | median 0.11 ms, p95 0.40 ms; a few ticks 1–2 ms |
+
+What changed to get there (FC-102):
+- **`find_machines` visits chunks, not machines.** Machines are indexed by surface → recipe →
+  chunk, and each chunk group keeps its own status counts. Counts come from the groups, visibility
+  is one check per chunk, and only up to 200 references touch individual machines. The old version
+  walked every registered machine on every call.
+- **Machines keep their name and position** (they never move), so lookups make no API calls
+  except a validity check on the references they return.
+- **The scan stops after 100 entities or 16 chunks per tick.** Its progress stays in `storage`, including
+  each surface's chunk list (two flat number arrays). Walking the chunk iterator across ticks would avoid
+  the listing tick, but the iterator can only live in a local, and a peer that just loaded the map
+  wouldn't have it (desync). Deterministic wins over smooth for a once-per-save job.
+- **Still open (FC-104):** listing a big surface's chunks takes one ~7 ms tick (Nauvis on the dev save),
+  and a few scan ticks reach 1–2 ms while the registry tables grow past 8k and 16k entries. Both happen
+  once per save. The 26 ms prototype dump on every research completion is a visible one-frame hitch (FC-103).
+
 **Measure every mod change** with `factorio --benchmark <save copy> --benchmark-ticks N`,
 with and without the companion mod, and watch the in-game time-usage debug view (F4 →
 show-time-usage). Proposed budget: under 0.1 ms per tick on average, no single tick over 1 ms.

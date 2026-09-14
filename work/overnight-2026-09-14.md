@@ -51,3 +51,7 @@ Times are commit times (local).
 - S10 "Accurate plans" planned and activated (delegated): FC-098 productivity in plans, FC-099 refresh on research, FC-100 eval reference with productivity, FC-075 paused detection.
 - **S10 closed**: plans include built-in and researched productivity (dump v5), recipe data refreshes when research completes (0.5 s), paused game shown. The latency check caught snapshot bloat on planning questions (follow-ups ~3 s); fixed, now 1.55–1.73 s. All suites pass.
 - S11 "Megabase scale" planned and activated (delegated): FC-070 synthetic megabase in the running dev game, FC-101 profile every mod path at scale, FC-102 fix what's over budget.
+- **S11 closed** (megabase scale): test tooling builds 25,000 machines in the running dev game (nothing saved). `find_machines` was 5.9 ms per call at that size; now 0.79 ms (per-chunk index with status counts). Per-tick costs stay flat (polling 0.05 ms, rate refresh 0.05 ms, alerts 0.04 ms). All suites pass; blueprint e2e was 7/8 once (model invented a problem in a clean blueprint) and 8/8 on rerun. Table in PLAN §5.
+- Caught before committing: my first scan fix kept a chunk iterator in a module-local, which would desync a multiplayer peer that loads mid-scan. Scan progress is back in `storage`. The cost is one ~7 ms tick to list Nauvis's chunks, once per save (FC-104).
+- New backlog: FC-103 (the 26 ms prototype dump runs on every research completion, one dropped frame), FC-104 (scan outlier ticks).
+

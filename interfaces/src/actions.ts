@@ -109,6 +109,8 @@ export const actions = {
     kind: "look",
   },
   debug_machine_tick: { args: z.object({}), data: MachineProgressSchema, kind: "look" },
+  debug_reset_machines: { args: z.object({}), data: MachineProgressSchema, kind: "look" },
+  debug_refresh_rates: { args: z.object({}), data: z.object({}).passthrough(), kind: "look" },
 } as const;
 
 export type ActionName = keyof typeof actions;

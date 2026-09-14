@@ -71,6 +71,12 @@ return function(handlers)
 
   util.on_nth_tick(REFRESH_EVERY_TICKS, refresh_step)
 
+  -- Test tooling: one rate refresh step on demand, so its cost can be profiled over RCON.
+  handlers.debug_refresh_rates = function()
+    refresh_step()
+    return {}
+  end
+
   handlers.digest = function()
     local force = game.forces.player
     local player = companion_player()
