@@ -7,7 +7,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 3 — Pleasant console and more actions
 
-- [ ] FC-049 Screenshots and their game cost (PLAN §8 Q7)
 
 ## Phase 3b — Character control
 

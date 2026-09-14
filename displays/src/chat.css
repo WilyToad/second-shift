@@ -115,3 +115,4 @@ button.cancel { background: transparent; color: var(--muted); border: 1px solid 
 .progress > span { display: block; height: 100%; background: var(--agent); }
 .queue { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
 .queue li::before { content: "then "; color: var(--faint); }
+.shot img { display: block; width: 100%; max-width: 100%; height: auto; border-bottom: 1px solid var(--seam); image-rendering: auto; }

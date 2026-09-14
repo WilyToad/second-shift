@@ -1,4 +1,7 @@
 import { expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ActionName } from "@companion/interfaces";
 import { DigestSchema, PrototypesSchema } from "@companion/interfaces";
 import { encodeBlueprintString } from "./blueprint";
@@ -329,5 +332,33 @@ test("the conversation is saved after each answer, restored by a new agent, and 
   second.reset();
   expect(saved).toBeNull();
   expect(second.transcript()).toEqual([]);
+});
+
+test("a screenshot of the last result is taken where it is, waited for, and shown on the page", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "fc-out-"));
+  mkdirSync(join(dir, "companion"));
+  const rails = [{ name: "straight-rail", x: 10, y: -7 }, { name: "straight-rail", x: 14, y: -7 }];
+  const calls: { action: ActionName; args: any }[] = [];
+  const game: GameActions = {
+    latest: () => undefined,
+    async call(action: ActionName, args?: any): Promise<any> {
+      calls.push({ action, args });
+      if (action === "find_entities") return { surface: "gleba", center: { x: 0, y: 0 }, direction: "around", radius: 32, area: { left_top: { x: -32, y: -32 }, right_bottom: { x: 32, y: 32 } }, count: 2, by_name: { "straight-rail": 2 }, not_visible: 0, entities: rails, truncated: false };
+      if (action === "highlight") return { drawn: 2, seconds: 30 };
+      if (action === "screenshot") {
+        writeFileSync(join(dir, "companion", "shot-5-1.jpg"), "jpeg bytes");
+        return { path: "companion/shot-5-1.jpg", surface: "gleba", x: args.x, y: args.y, size: 1024, zoom: 0.5, tiles: 64 };
+      }
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  const events: ServerMessage[] = [];
+  const model = fakeModel([{ tool: "find_entities", args: { what: "rails" } }, { tool: "screenshot", args: { at: "last_result" } }, { text: "There they are." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: (m) => events.push(m), scriptOutput: dir });
+  await agent.ask("Find the rails near me and show me a screenshot of them");
+  expect(calls.find((c) => c.action === "screenshot")?.args).toEqual({ x: 12, y: -7, size: 1024, zoom: 0.5 });
+  expect(events.find((e) => e.type === "image")).toEqual({ type: "image", url: "/shots/shot-5-1.jpg", caption: "rails: 64 tiles across around (12, -7) on gleba" });
+  const toolReply = model.seen[2]!.find((m) => m.role === "tool" && m.content.startsWith("A screenshot"));
+  expect(toolReply?.content).toContain("don't describe its contents");
 });
 

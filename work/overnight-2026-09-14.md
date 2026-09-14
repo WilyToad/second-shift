@@ -78,4 +78,6 @@ Times are commit times (local).
 - S18 "Picks up where you left off" planned and activated (delegated): FC-063 conversation saved and restored across server restarts and page reloads.
 - **S18 closed** (picks up where you left off): the conversation survives server restarts and page reloads (`data/session.json`, rewritten after each answer; "New conversation" clears it). Verified across a real restart: the follow-up knew the earlier question, first token 0.78 s.
 - **Correction to S16/FC-110:** the blueprint "invented a problem" misses were most likely a bug in the test (its pattern matched "no problems found"), not the model. Fixed. Also fixed: a science question now gets a chart even when the model forgets one.
+- S19 "Show me" planned and activated (delegated): FC-049 screenshots on request, with their game cost measured first.
+- **S19 closed** (show me): "show me a screenshot of where I'm standing" (or of the last search result) shows a real in-game picture in chat. Cost measured: ~0.1 ms of Lua, the game stays at 60 UPS, image ready in ~40 ms. The server keeps only the newest 20 files and serves nothing else. **For you to look at:** the screenshot card in the page.
 

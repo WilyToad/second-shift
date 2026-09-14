@@ -107,6 +107,11 @@ export const actions = {
   add_map_tag: { args: z.object({ x: z.number().optional(), y: z.number().optional(), text: z.string().max(200) }), data: z.object({ x: z.number(), y: z.number(), text: z.string() }), kind: "small_request" },
   camera_to: { args: z.object({ x: z.number(), y: z.number(), surface: z.string().optional() }), data: z.object({ surface: z.string(), x: z.number(), y: z.number() }), kind: "small_request" },
   mark_upgrade: { args: TargetsSchema.extend({ target: z.string().optional() }), data: ApplyResultSchema, kind: "map_change" },
+  screenshot: {
+    args: z.object({ x: z.number().optional(), y: z.number().optional(), size: z.number().optional(), zoom: z.number().optional() }),
+    data: z.object({ path: z.string(), surface: z.string(), x: z.number(), y: z.number(), size: z.number(), zoom: z.number(), tiles: z.number() }),
+    kind: "look",
+  },
   set_recipe: {
     args: TargetsSchema.extend({ recipe: z.string() }),
     data: ApplyResultSchema.omit({ undo_items: true }).extend({ returned: z.number(), spilled: z.number() }),

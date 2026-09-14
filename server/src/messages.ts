@@ -27,6 +27,7 @@ export type ServerMessage =
   | { type: "series"; series: SeriesMap }
   | { type: "plan"; plan: Plan }
   | { type: "blueprint"; blueprint: BlueprintCard }
+  | { type: "image"; url: string; caption: string }
   | { type: "transcript"; items: { kind: "user" | "agent"; text: string }[] }
   | { type: "reset" };
 

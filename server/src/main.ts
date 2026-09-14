@@ -9,6 +9,9 @@ import { craftersByCategory } from "./grounding";
 import { alignToCacheBlock, buildMessages, systemPrompt, userTurn } from "./prompt";
 import { RecipeRetriever } from "./retrieval";
 import { buildSeries } from "./series";
+import { join } from "node:path";
+import { USER_DIR } from "./factorio";
+import { SHOT_NAME } from "./screenshots";
 
 export type { ClientMessage, ServerMessage } from "./messages";
 
@@ -38,13 +41,22 @@ const agent = new Agent({
   fallbackSnapshot: (): Snapshot | undefined => (replayDigest ? { digest: replayDigest, receivedAt: Date.now() } : undefined),
   emit: (m) => broadcast(m),
   turnLog: process.env.COMPANION_TURN_LOG ?? new URL("../../data/eval/turns.jsonl", import.meta.url).pathname,
+  scriptOutput: join(USER_DIR, "script-output"),
   session: fileSession(process.env.COMPANION_SESSION ?? new URL("../../data/session.json", import.meta.url).pathname),
 });
 
 const server = Bun.serve({
   port: PORT,
   hostname: "127.0.0.1",
-  routes: { "/": chatPage },
+  routes: {
+    "/": chatPage,
+    // Screenshots the game wrote on request (FC-049); only names the mod generates are served.
+    "/shots/:name": (req) => {
+      const name = req.params.name;
+      if (!SHOT_NAME.test(name)) return new Response("Not found", { status: 404 });
+      return new Response(Bun.file(join(USER_DIR, "script-output", "companion", name)), { headers: { "content-type": "image/jpeg", "cache-control": "no-store" } });
+    },
+  },
   fetch(req, srv) {
     if (new URL(req.url).pathname === "/ws" && srv.upgrade(req)) return;
     return new Response("Not found", { status: 404 });

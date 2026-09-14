@@ -132,7 +132,7 @@ here is image generation. Rendering takes milliseconds; the real cost is spec to
 | `action_preview` | Approval card: what will change, how many entities, where. Paired with in-world highlights. | Action spec, dry-run result from the mod |
 | `camera_jump` | A card proposing a camera move the player didn't ask for | Surface + position |
 | `entity_map` | Simple top-down map of an area with problem entities marked | Entity positions from state |
-| `screenshot` | An in-game screenshot of an area (`game.take_screenshot`) | Game, via script-output. Cost unmeasured. |
+| `screenshot` | An in-game screenshot of an area (`game.take_screenshot`) | Game, via script-output. Built in S19: ~0.1 ms in Lua, JPEG ready in 40–60 ms, no UPS drop (measured). |
 | `comparison` | Side-by-side table (e.g. quality vs productivity modules) | Model-provided rows |
 
 Inline game icons (`[item=…]`-style tags) use the icon sheets from the Factorio app bundle and
@@ -613,6 +613,11 @@ judge by time to first token.
    - No UDP flag needed. Add UDP push later only if polling latency matters.
 6. ~~**Language.**~~ Decided: TypeScript on Bun (§4).
 7. **Screenshot cost.** Does `game.take_screenshot` hitch the game? Measure before relying on it.
+   **Measured 2026-09-14 (`scripts/probes/screenshot-cost.ts`, hosted dev game):** the Lua call takes 0.10–0.23 ms
+   at any size, and the game kept 60 UPS through every capture (the render happens on the client). File ready after:
+   PNG 512 px 58 ms (668 KB), 1024 px ~100 ms (2.6 MB), 2048 px ~280 ms (10 MB); JPEG q80 1024 px ~40 ms (486 KB),
+   2048 px ~60 ms (2.2 MB). **Decision:** 1024 px JPEG at zoom 0.5 (64 tiles across) on request only. A frame-level
+   render hitch on the client wasn't measured (UPS doesn't show it).
 8. **Engine aggregates vs polling.** Which digest fields can come from engine aggregates
    (production stats, alerts, research) and which need amortized status polling? This decides
    how well the mod holds up on a huge base.

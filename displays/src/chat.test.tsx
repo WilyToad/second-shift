@@ -105,3 +105,20 @@ test("a page that connects later shows the conversation so far", async () => {
   expect(root.querySelectorAll(".msg.user").length).toBe(1);
 });
 
+test("a screenshot shows as an image with its caption", async () => {
+  const { render } = await import("preact");
+  const { Thread } = await import("./chat");
+  const { onMessage } = await import("./store");
+  onMessage({ type: "reset" });
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  render(<Thread />, root);
+  onMessage({ type: "user", text: "Show me my spot" });
+  onMessage({ type: "image", url: "/shots/shot-5-1.jpg", caption: "Your spot: 64 tiles across around (9, 0) on gleba" });
+  onMessage({ type: "done", totalMs: 900 });
+  await new Promise((r) => setTimeout(r, 10));
+  const img = root.querySelector(".shot img")!;
+  expect(img.getAttribute("src")).toBe("/shots/shot-5-1.jpg");
+  expect(img.getAttribute("alt")).toBe("Your spot: 64 tiles across around (9, 0) on gleba");
+});
+

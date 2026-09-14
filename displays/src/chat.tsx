@@ -25,6 +25,14 @@ function Item({ item }: { item: ThreadItem }) {
           <AgentText text={item.text.value} />
           {item.plan.value && <div class="msg"><RecipeGraph plan={item.plan.value} /></div>}
           {item.blueprint.value && <div class="msg"><BlueprintView card={item.blueprint.value} /></div>}
+          {item.images.value.map((shot) => (
+            <div class="msg" key={shot.url}>
+              <figure class="vis shot">
+                <img src={shot.url} alt={shot.caption} loading="lazy" />
+                <figcaption class="vis-note">{shot.caption}<span class="tag"> · screenshot</span></figcaption>
+              </figure>
+            </div>
+          ))}
           {item.meta.value && <div class="meta">{item.meta}</div>}
         </>
       );

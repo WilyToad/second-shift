@@ -1,5 +1,6 @@
 // The agent loop: retrieval + snapshot → model → tools → answer, with approvals for map changes.
 // Looks run immediately; map changes wait for the player to confirm a card in the web page.
+import { join } from "node:path";
 import { readFileSync, rmSync } from "node:fs";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -9,6 +10,7 @@ import { blueprintsIn, decodeBlueprintString, encodeBlueprintString, type Bluepr
 import { describeRow, productionRow, type RowBuild } from "./blueprint-template";
 import type { BlueprintCard } from "./messages";
 import { ChartBlockFilter, stripChartBlocks } from "./stream-filter";
+import { pruneShots, waitForShot } from "./screenshots";
 import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
 import type { Snapshot } from "./game";
 import type { ServerMessage } from "./messages";
@@ -154,6 +156,14 @@ export const TOOLS: ToolSpec[] = [
   {
     type: "function",
     function: {
+      name: "screenshot",
+      description: "Show the player a picture of their spot or of the last result (only where they can see).",
+      parameters: { type: "object", properties: { at: { type: "string", enum: ["here", "last_result"] } } },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "set_recipe",
       description: "Ask the player to approve changing the recipe of the assembling machines in the last result. Nothing happens until they confirm.",
       parameters: { type: "object", properties: { recipe: { type: "string", description: "What they should make, as the player said it." } }, required: ["recipe"] },
@@ -208,6 +218,7 @@ export function needsWorldTools(question: string, hasLastResult: boolean): boole
   if (/\b(find|search|look for|highlight|show me|where are|count|which)\b/.test(q)) return true;
   if (/\b(mark|unmark|deconstruct\w*|remove|delete|clear|cancel|upgrade\w*|queue|start research\w*|research it|tag|pin|camera|jump|take me|paste|place|build it)\b/.test(q)) return true;
   if (/\b(set|switch|change)\b.*\b(to|recipe)\b/.test(q)) return true;
+  if (/\b(screenshot|picture|photo|what does .+ look like)\b/.test(q)) return true;
   if (/\bhow many\b/.test(q) && !/\b(need|needs|take|takes|require|requires|make|makes|per)\b/.test(q)) return true;
   if (hasLastResult && /\b(them|those|these|it|that)\b/.test(q)) return true;
   return false;
@@ -312,6 +323,8 @@ export class Agent {
       turnLog?: string;
       /** Where the conversation is kept between server runs (FC-063). */
       session?: SessionStore;
+      /** The game's script-output directory, where screenshots land (FC-049). */
+      scriptOutput?: string;
     },
   ) {
     const saved = deps.session?.load();
@@ -556,6 +569,8 @@ export class Agent {
           return this.proposeOnLastResult(call.function.name);
         case "mark_upgrade":
           return this.proposeOnLastResult("mark_upgrade", args.to ? String(args.to) : undefined);
+        case "screenshot":
+          return await this.screenshot(args.at === "last_result" ? "last_result" : "here");
         case "set_recipe":
           return this.proposeRecipe(String(args.recipe ?? ""));
         case "queue_research":
@@ -666,6 +681,22 @@ export class Agent {
       if (usual) return usual;
     }
     return null;
+  }
+
+  /** Look: a picture of the player's spot or the last result, shown on the page (not sent to the model). */
+  private async screenshot(at: "here" | "last_result"): Promise<string> {
+    const dir = this.deps.scriptOutput;
+    if (!dir) return "Error: screenshots aren't available (the game's output folder isn't known).";
+    const last = at === "last_result" && this.lastResult && this.now() - this.lastResult.at <= RESULT_TTL_MS ? this.lastResult.refs : null;
+    const spot = last?.length
+      ? { x: last.reduce((n, r) => n + r.x, 0) / last.length, y: last.reduce((n, r) => n + r.y, 0) / last.length }
+      : undefined;
+    const r = await this.deps.game.call("screenshot", { ...(spot ?? {}), size: 1024, zoom: 0.5 });
+    const name = await waitForShot(dir, r.path);
+    pruneShots(join(dir, "companion"));
+    const where = `${Math.round(r.tiles)} tiles across around (${Math.round(r.x)}, ${Math.round(r.y)}) on ${r.surface}`;
+    this.deps.emit({ type: "image", url: `/shots/${name}`, caption: `${spot ? this.lastResult!.label : "Your spot"}: ${where}` });
+    return `A screenshot is now shown to the player: ${where}. You can't see it; don't describe its contents.`;
   }
 
   private proposeRecipe(what: string): string {
