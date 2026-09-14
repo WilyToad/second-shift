@@ -650,8 +650,11 @@ judge by time to first token.
     charted; which entity settings can be changed)? Action checks must match exactly.
     **2026-09-13:** no authoritative source found. The API's `deconstruct_area` defaults to
     *not* skipping fog of war, which hints the game allows more. Adopted the conservative rule:
-    search and mark only in chunks the force can see now (`force.is_chunk_visible`). Waiting for
-    the player to test in-game.
+    search and mark only in chunks the force can see now (`force.is_chunk_visible`).
+    **2026-09-14, player-verified:** in remote view, a deconstruction planner drag is blocked both over fog of
+    war (charted, not currently seen) and over uncharted map. The conservative rule matches the game for marks.
+    Still open: which entity settings can be changed remotely (for example, whether a recipe change returns
+    ingredients to the inventory).
 11. **Character control vs player input.** Does the player's own movement override
     `walking_state` and `mining_state`? Should any player input cancel an agent action?
 12. ~~**Prototype data source.**~~ **Decided 2026-09-13: runtime view over RCON.** The mod's

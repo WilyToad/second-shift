@@ -11,9 +11,10 @@
 - [x] FC-077 Verify the character prototype dump in-game and refresh the prototype cache
   - Acceptance: after launch, recipe lines show "by hand" from the character's real crafting categories; `data/captures/prototypes.json` refreshed
   - The server refetched on its own (mod list changed, 52 ms). The character hand-crafts `electronics`, `pressing`, `organic-or-assembling`, `maraxsis-hydro-plant-or-assembling` and more, which the naming heuristic would have missed
-- [!] FC-028 Pin down remote-view rules so action checks match the game (PLAN §8 Q10)
+- [x] FC-028 Pin down remote-view rules so action checks match the game (PLAN §8 Q10)
   - Acceptance: documented in PLAN what 2.0 lets a player do remotely (radar coverage vs charted) for deconstruction marks and entity search, verified in-game
   - Waiting for player verification. No authoritative source found; adopted the conservative rule (only chunks the force can currently see, `force.is_chunk_visible`) in `scripts/helmet.lua`. The player needs to try a deconstruction drag over fog of war in remote view
+  - Player-verified 2026-09-14: in remote view the deconstruction planner drag is blocked over fog of war and over uncharted map, which is what `helmet.lua` already enforces
 - [x] FC-024 Find and count entities near the player
   - Acceptance: "how many rails to my right?" returns a count and the area it searched
   - Notes: area-limited search only (PLAN §5); "right" = east; default radius stated in the answer
@@ -62,7 +63,7 @@ of war).
 - ✓ Refusals: "delete them instantly" (no such tool; model offers the planner route), the character,
   an entity in an unseen chunk (`scripts/test-helmet.ts`, 13/13).
 - ✓ Profiler: find 0.13 ms, highlight 0.10 ms, mark 0.14 ms for 8 entities.
-- **Pending:** confirm what the game allows in fog of war (conservative rule in place).
+- ✓ Player-verified 2026-09-14: the game blocks marking in fog of war and uncharted map, matching the rule.
 
 **What we learned:**
 - A Lua `a and b or c` idiom silently turned "allowed" into "gone"; in-game tests caught it.
