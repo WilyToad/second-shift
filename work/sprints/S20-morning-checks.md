@@ -18,6 +18,10 @@
   - Acceptance: player check of a hand recipe change from map view; the companion's `set_recipe` matches it as closely as the API allows; in-game tests
   - Player check: an assembler 80 tiles away holding 20 iron plates, recipe changed by hand in map view: the plates went to the machine's `crafter_trash` slots (not the inventory, not the ground). Scripts can't insert into those slots (size 0, `can_insert` false, resize doesn't help; `scripts/probes/crafter-trash.ts`). **Decided with the player (option 1):** in reach of the character → the character's inventory (like a hand change next to the machine); otherwise spill next to the machine marked for the player's robots. `test-settings` 12/12 in-game (in reach: +20 plates to the inventory; out of reach: 10 plates on the ground, all marked); agent unit test; `e2e-settings` 3/3. Not player-checked: a hand recipe change while standing next to the machine (assumed inventory, per the docs' remote-view note)
 
+- [x] FC-072 Close the hosted game port to the LAN (macOS firewall or another approach)
+  - Acceptance: the player decides whether the open game port needs more than the current protections
+  - **Decided by the player: leave it.** The GUI client ignores `--bind` when hosting (S12), so UDP 34197 listens on all interfaces; in place: random game password, max_players 1, no LAN or public listing. RCON stays on 127.0.0.1. Revisit if the game is ever hosted on an untrusted network (a macOS firewall rule blocking incoming connections for Factorio would close it)
+
 ## Notes
 
 Started 2026-09-14 morning with the player. FC-027 (Ctrl+Z) and FC-028 (fog of war) were verified first and recorded in S03. FC-115 (the selection shortcut) was verified next and recorded in S17.

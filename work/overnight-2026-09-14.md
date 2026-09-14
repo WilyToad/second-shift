@@ -11,7 +11,7 @@ Nothing is pushed; only the dev save copy runs; manual checks are left for the p
 - [ ] Visual check: open http://127.0.0.1:5170 (after `bun run launch -- --dev` and `bun run start`) and look at the console layout, the blueprint sketch card and the screenshot card at your monitor size
 - [x] FC-115: click "Show the companion a build" on the shortcut bar, drag over a build, and check the review appears in the page (verified with the player)
 - [x] FC-093 note: when you change a machine's recipe by hand in remote view, do its ingredients go to your inventory? The companion assumes they do (checked: they go to the machine's trash slots; the companion now matches as closely as the API allows, see S20 FC-116)
-- [ ] FC-072: the hosted game's port 34197 listens on all interfaces (`--bind` is ignored when hosting); it's password-protected with max_players 1. Decide whether to add a macOS firewall rule
+- [x] FC-072: the hosted game's port 34197 listens on all interfaces (`--bind` is ignored when hosting); it's password-protected with max_players 1. Decide whether to add a macOS firewall rule (decided: leave it)
 
 ## Summary of the night (S11–S19)
 
