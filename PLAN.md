@@ -536,8 +536,15 @@ judge by time to first token.
      `--benchmark` only to catch whole-game regressions.
 9. **Undo.** Do actions passed `player` / `undo_index` really land on the player's Ctrl+Z history,
    and does Ctrl+Z reverse them? Verify with deconstruction marks first.
+   **2026-09-13:** yes for the history. `order_deconstruction(force, player, 0 then 1)` on 8 rails
+   added one undo item holding 8 `removed-entity` actions, like one planner drag. Waiting for the
+   player to confirm Ctrl+Z restores them.
 10. **Exact remote-view rules.** What does 2.0 let a player do remotely (radar coverage vs merely
     charted; which entity settings can be changed)? Action checks must match exactly.
+    **2026-09-13:** no authoritative source found. The API's `deconstruct_area` defaults to
+    *not* skipping fog of war, which hints the game allows more. Adopted the conservative rule:
+    search and mark only in chunks the force can see now (`force.is_chunk_visible`). Waiting for
+    the player to test in-game.
 11. **Character control vs player input.** Does the player's own movement override
     `walking_state` and `mining_state`? Should any player input cancel an agent action?
 12. ~~**Prototype data source.**~~ **Decided 2026-09-13: runtime view over RCON.** The mod's

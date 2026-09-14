@@ -120,7 +120,9 @@ return function(handlers)
     local done, rejected = 0, {}
     for _, ref in ipairs(targets) do
       local e = resolve(player, ref)
-      local reason = e and helmet.why_not_deconstruct(player, e) or "gone"
+      -- Not `e and why_not(...) or "gone"`: why_not returns nil when allowed, which that idiom turns into "gone".
+      local reason = "gone"
+      if e then reason = helmet.why_not_deconstruct(player, e) end
       if not reason and mark and e.to_be_deconstructed() then reason = "already_marked" end
       if not reason and not mark and not e.to_be_deconstructed() then reason = "not_marked" end
       if reason then

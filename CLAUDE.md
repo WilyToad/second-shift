@@ -68,6 +68,8 @@ Most Factorio Lua online (and in model training data) targets 1.1. In 2.0:
 - `game.recipe_prototypes` / `game.technology_prototypes` / `game.item_prototypes` → `prototypes.recipe` / `prototypes.technology` / `prototypes.item`
 - `info.json` needs `"factorio_version": "2.0"`
 - Use `script.on_nth_tick` for periodic export. 60 ticks = 1 s.
+- Lua gotcha: `x and f(x) or default` returns `default` whenever `f(x)` is nil or false. Use an explicit `if`.
+- `helpers.table_to_json` writes empty tables as `{}`. Parse replies through the `interfaces` schemas.
 
 ## Mod performance rules (huge factories)
 
@@ -120,6 +122,8 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun run start` runs the server (web chat on http://127.0.0.1:5170). It reconnects to the game
   on its own and warms the model at startup.
 - `bun test`, `bun run typecheck`, `bun run check` (all of it), `bun run board` (sprint progress).
+- `bun scripts/test-helmet.ts` (dev save hosted) runs the in-game helmet-rule tests. Run it after any change
+  to mod actions or `scripts/helmet.lua`.
 - Captures for offline work go in `data/captures/` (gitignored).
 - `COMPANION_REPLAY_DIGEST=data/captures/digest.json bun run start` uses a captured digest while the
   game is closed, so offline answers see a realistic prompt.
