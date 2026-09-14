@@ -55,7 +55,7 @@ const ApplyResultSchema = z.object({
 export const GameEventSchema = z.object({
   seq: z.number(),
   tick: z.number(),
-  kind: z.enum(["alert", "research_finished"]),
+  kind: z.enum(["alert", "research_finished", "selection"]),
   severity: z.enum(["critical", "warning", "info"]),
   type: z.string().optional(),
   count: z.number().optional(),
@@ -129,6 +129,16 @@ export const actions = {
   },
   debug_machine_tick: { args: z.object({}), data: MachineProgressSchema, kind: "look" },
   debug_reset_machines: { args: z.object({}), data: MachineProgressSchema, kind: "look" },
+  get_selection: {
+    args: z.object({ seq: z.number() }),
+    data: z.object({ seq: z.number(), count: z.number(), surface: z.string(), blueprint: z.string().optional() }),
+    kind: "look",
+  },
+  debug_select_area: {
+    args: z.object({ radius: z.number().positive().max(200).optional(), x: z.number().optional(), y: z.number().optional() }),
+    data: z.object({ seq: z.number(), count: z.number(), surface: z.string() }),
+    kind: "look",
+  },
   debug_refresh_rates: { args: z.object({}), data: z.object({}).passthrough(), kind: "look" },
 } as const;
 

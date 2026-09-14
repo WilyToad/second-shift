@@ -15,6 +15,7 @@ function ago(tick: number, now: number | undefined): string {
 
 function describe(e: GameEvent): string {
   if (e.kind === "research_finished") return `Research complete: ${words(e.research ?? "")}`;
+  if (e.kind === "selection") return e.count ? `Build selected for review (${e.count} entities)` : "Selection had nothing to review";
   const what = e.entity ? `${words(e.entity)}: ` : "";
   return `${what}${words(e.type ?? "alert")}${e.count && e.count > 1 ? ` (${e.count})` : ""}`;
 }

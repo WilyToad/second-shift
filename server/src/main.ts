@@ -1,7 +1,7 @@
 // Factorio Companion server: game link + model + web chat on localhost.
 import chatPage from "../../displays/src/chat.html";
 import { DigestSchema } from "@companion/interfaces";
-import { Agent, TOOLS } from "./agent";
+import { Agent, SELECTED_PREFIX, TOOLS } from "./agent";
 import { GameLink, type Snapshot } from "./game";
 import type { ClientMessage, ServerMessage } from "./messages";
 import { OmlxClient, readOmlxApiKey } from "./model";
@@ -106,7 +106,20 @@ game.onStatus((s) => {
     broadcast({ type: "digest", digest: s.latest.digest, receivedAt: s.latest.receivedAt });
   }
 });
-game.onEvents((events, dropped) => broadcast({ type: "events", events, ...(dropped ? { dropped } : {}) }));
+game.onEvents((events, dropped) => {
+  broadcast({ type: "events", events, ...(dropped ? { dropped } : {}) });
+  // The player dragged the companion's selection tool over a build: review it like a pasted blueprint (FC-046).
+  for (const e of events) if (e.kind === "selection" && e.count) busy = busy.then(() => reviewSelection(e.seq));
+});
+
+async function reviewSelection(seq: number): Promise<void> {
+  try {
+    const selection = await game.call("get_selection", { seq });
+    if (selection.blueprint) await agent.ask(`${SELECTED_PREFIX} ${selection.blueprint}`);
+  } catch (e) {
+    broadcast({ type: "error", message: `Couldn't fetch the selected build: ${(e as Error).message}` });
+  }
+}
 // New prototype data changes the system prompt, so rebuild retrieval and re-warm the cache.
 game.onPrototypes((p) => {
   retriever = new RecipeRetriever(p.data);

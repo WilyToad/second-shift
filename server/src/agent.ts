@@ -200,6 +200,10 @@ export function targetRate(question: string): number | null {
   return parseTarget(question)?.perMinute ?? null;
 }
 
+/** The question the server asks for the player when they select a build with the in-game tool (main.ts). */
+export const SELECTED_PREFIX = "Review the build I just selected:";
+const SELECTED = /^Review the build I just selected:/;
+
 /** Is the player asking for a blueprint built to a rate ("a blueprint for 120 gears per minute")? */
 export function wantsBlueprint(question: string): boolean {
   return /\b(blueprints?|layouts?|schematics?)\b/i.test(question) && parseTarget(question) !== null;
@@ -320,7 +324,7 @@ export class Agent {
         ? "A blueprint was built in code from the save's data and the player sees it with a copy button. In 60 words or fewer, using only the numbers in the generated blueprint line: what it makes, what to feed it on the input belt, that a pole must connect it to power, and that you can paste it as ghosts if they ask; no other calculations; no tool call (don't paste it until they ask); never write a blueprint string; no chart."
         : "The blueprint couldn't be built; in 40 words or fewer give the reason from the data and what request would work; no chart."})`
       : pasted.summaries.length
-      ? `${noted}\n\n(Review from the checked summary in 90 words or fewer: lead with the total entity count and the main counts, then list every problem the checks found, or say they found none; for rates or bottlenecks use the throughput line's numbers; it isn't built, so offer no actions on its entities; no tool call or chart.)`
+      ? `${noted}\n\n(Review from the checked summary in 90 words or fewer: lead with the total entity count and the main counts, then list every problem the checks found, or say they found none; for rates or bottlenecks use the throughput line's numbers; ${SELECTED.test(question) ? "it's already built in their game, so don't offer to paste it" : "it isn't built, so offer no actions on its entities"}; no tool call or chart.)`
       : top && notes.length
       // The plan's own headline number goes in the guidance: answers sometimes listed inputs but skipped it (FC-114).
       ? `${noted}\n\n(Answer from the computed plan in 80 words or fewer: start with ${top.machines}× ${top.machine} for ${plan!.perMinute}/min ${top.item}, then the inputs; ${notes.join(", ")}.)`

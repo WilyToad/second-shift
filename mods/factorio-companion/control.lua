@@ -4,7 +4,7 @@
 
 local PROTOCOL = 1
 -- Bump when dump_prototypes changes shape, so the server's prototype cache refreshes.
-local DUMP_VERSION = 7
+local DUMP_VERSION = 8
 
 local handlers = {}
 
@@ -30,6 +30,7 @@ require("scripts.actions")(handlers)
 require("scripts.events")(handlers)
 require("scripts.machines").register(handlers)
 require("scripts.planning")(handlers)
+require("scripts.selection")(handlers)
 
 local function fail(id, code, message)
   return { id = id, ok = false, error = { code = code, message = message } }

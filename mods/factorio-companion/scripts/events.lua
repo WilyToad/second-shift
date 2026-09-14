@@ -4,7 +4,6 @@
 local util = require("scripts.util")
 local companion_player = util.companion_player
 
-local MAX_EVENTS = 200
 local SAMPLE_EVERY_TICKS = 30
 
 -- Alert types and how urgent they are for the feed.
@@ -15,19 +14,8 @@ local WATCHED = {
   platform_tile_building_blocked = "warning",
 }
 
-local function state()
-  storage.events = storage.events or { seq = 0, list = {}, counts = {} }
-  return storage.events
-end
-
-local function push(event)
-  local s = state()
-  s.seq = s.seq + 1
-  event.seq = s.seq
-  event.tick = game.tick
-  s.list[#s.list + 1] = event
-  if #s.list > MAX_EVENTS then table.remove(s.list, 1) end
-end
+local feed = require("scripts.feed")
+local state, push = feed.state, feed.push
 
 local function sample_alerts()
   local player = companion_player()
