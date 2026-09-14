@@ -340,6 +340,20 @@ recipes, technologies, items, planets, as actually loaded. The agent grounds on 
 never on recalled recipes. Treat any model statement about a recipe it can't cite from the
 dump as a hallucination.
 
+
+**Measured 2026-09-13 (FC-011, `scripts/probes/recipe-digest.ts`):** as compact one-line text, the
+save's data is 34.7k tokens of recipes (21.9k unlocked only), 22.0k of technologies, 2.0k of
+machines and 0.6k of spoil/fuel traits: 59.3k in total. With all of it in the cached prefix, the
+first question took 42.3 s and a warm follow-up 4.17 s. Warm first-token time grows with context
+length (15k → 0.93 s, 26.7k → 4.05 s with a ~2.7k uncached tail, 59k → 4.17 s), and uncached tail
+tokens cost ~0.75 s per 1k.
+
+**Decision (FC-011):** a small cached prefix (rules, machines, item traits, ~3k tokens). The server
+retrieves the recipe/technology lines relevant to each question in code (name and alias matching,
+one level of ingredients and uses, capped) and puts them in the uncached tail next to the
+snapshot, with no extra model round trip. Retrieved lines stay in history like the snapshot.
+Lookup tools are a later fallback for what matching misses. Target tail: question + ≤ ~1.5k
+tokens of retrieved lines + snapshot.
 ---
 
 ## 7. Phases

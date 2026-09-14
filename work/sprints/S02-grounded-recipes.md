@@ -11,9 +11,10 @@
 - [x] FC-010 Typed zod schema for `dump_prototypes`
   - Acceptance: the capture from the dev save validates; a renamed field fails the test
   - Validated against `data/captures/prototypes.json`, captured live from the dev save with the current dump code
-- [ ] FC-011 Spike: recipe digest in the prompt vs lookup tools
+- [x] FC-011 Spike: recipe digest in the prompt vs lookup tools
   - Acceptance: measure the compact digest's token count; decide in PLAN whether recipes go in the cached prefix, behind tools, or both
-- [ ] FC-012 Recipe data in the prompt or tools per FC-011, refreshed when the mod list changes
+  - Result: full data is 59k tokens (42 s cold, 4.2 s warm), too slow. Decided: small cached prefix + server-side retrieval into the tail (PLAN §6)
+- [~] FC-012 Small cached prefix + server-side recipe retrieval (per FC-011), refreshed when the mod list changes
   - Acceptance: changing the mod set (info.mods) triggers a refetch; nothing else does
 - [ ] FC-013 Verify the warm path at full prompt size
   - Acceptance: first token under 3 s on the second question; cached tokens reported; numbers recorded in PLAN §5
