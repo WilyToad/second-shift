@@ -659,8 +659,9 @@ judge by time to first token.
     **2026-09-14, player-verified (FC-093):** changing a recipe by hand from map view moves the machine's
     ingredients into its trash slots (`crafter_trash`, documented as "items that are ejected when changing the recipe
     via remote view"), not the player's inventory. Scripts can't fill those slots (size 0, inserts refused), so the
-    companion (decided with the player): leftovers go to the character's inventory when the machine is in reach,
-    otherwise spill next to the machine marked for the player's robots.
+    companion (decided with the player): leftovers go to the character's inventory when the machine is in reach
+    (player-verified: a hand change next to the machine does the same), otherwise spill next to the machine marked
+    for the player's robots.
     Still open: other entity settings remotely (train stop limits, filters).
 11. **Character control vs player input.** Does the player's own movement override
     `walking_state` and `mining_state`? Should any player input cancel an agent action?
