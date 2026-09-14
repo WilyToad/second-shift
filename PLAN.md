@@ -304,6 +304,11 @@ Two different kinds of lag, in order of how much each decision is worth:
 7. **No unfiltered hot events** (`on_entity_damaged`, heavy `on_tick` work).
 8. **No periodic file writes.** Files are for one-off dumps and explicit captures only.
 
+**Baseline (2026-09-13, `bun scripts/benchmark.ts`, dev save = copy of "Space Age Boom - Bio
+Planet"):** 0.66 ms/tick (~1,500 UPS), worst tick ~3.3 ms, without the mod. Mod skeleton (RCON
+command only, no tick handlers): no measurable cost. This save is mid-size, not a megabase; find
+or build a heavier save before trusting the budget at scale.
+
 **Measure every mod change** with `factorio --benchmark <save copy> --benchmark-ticks N`,
 with and without the companion mod, and watch the in-game time-usage debug view (F4 →
 show-time-usage). Proposed budget: under 0.1 ms per tick on average, no single tick over 1 ms.

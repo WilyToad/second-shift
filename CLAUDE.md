@@ -113,6 +113,8 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun run link-mod` (once, game closed) symlinks the mod into the Factorio mods folder.
 - `bun run launch -- --dev` hosts `data/saves/dev.zip` (a copy of the big save) privately with no
   autosaves, waits for RCON and checks the mod answers. The mod code reloads only on game restart.
+- `bun scripts/benchmark.ts [--ticks N --runs N]` (game closed) benchmarks the dev save with and
+  without the mod using mirrored mod folders. Run it after every mod change.
 - `bun test`, `bun run typecheck`.
 - Captures for offline work go in `data/captures/` (gitignored).
 
