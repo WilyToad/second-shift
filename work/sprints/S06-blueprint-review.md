@@ -8,8 +8,9 @@
 
 ## Items
 
-- [ ] FC-030 Blueprint string encoder/decoder in TypeScript
+- [x] FC-030 Blueprint string encoder/decoder in TypeScript
   - Acceptance: decode/encode round-trip is lossless on real strings (blueprints and books); the game imports the re-encoded string with the same entity count
+  - `server/src/blueprint.ts`: decode/encode, books flattened with paths. A real 49-entity blueprint exported from the dev save round-trips losslessly and the game imports the re-encoded string with 49 entities (`scripts/lib/devgame.ts` export/import helpers)
 - [ ] FC-082 Entity sizes and collision boxes in the prototype dump
   - Acceptance: every buildable entity has type, tile size and collision box; schema-validated; dump size and time recorded
 - [ ] FC-031 Blueprint checker: entities exist, no overlaps, recipe fits machine

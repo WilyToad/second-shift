@@ -31,6 +31,17 @@ export async function connectDevGame() {
     async countMarked(refs: Ref[]): Promise<number> {
       return Number(await sc(`local p = game.connected_players[1] local n = 0 for _, r in pairs(${refsLua(refs)}) do local e = p.surface.find_entity(r.name, r) if e and e.to_be_deconstructed() then n = n + 1 end end rcon.print(n)`));
     },
+    /** Exports a blueprint of the square around the player as a blueprint string. */
+    async exportBlueprintAround(radius = 12): Promise<string> {
+      return sc(`local p = game.connected_players[1] local inv = game.create_inventory(1) local st = inv[1] st.set_stack("blueprint")
+        st.create_blueprint({ surface = p.surface, force = p.force, area = { { p.position.x - ${radius}, p.position.y - ${radius} }, { p.position.x + ${radius}, p.position.y + ${radius} } } })
+        local out = st.is_blueprint_setup() and st.export_stack() or "" inv.destroy() rcon.print(out)`);
+    },
+    /** Imports a blueprint string in the game; returns the entity count it holds (-1 if the import failed). */
+    async importBlueprintCount(bp: string): Promise<number> {
+      return Number(await sc(`local inv = game.create_inventory(1) local st = inv[1] local result = st.import_stack([=[${bp}]=])
+        local n = -1 if result ~= -1 and st.valid_for_read and st.is_blueprint and st.is_blueprint_setup() then n = st.get_blueprint_entity_count() end inv.destroy() rcon.print(n)`));
+    },
     async destroy(refs: Ref[]): Promise<void> {
       if (refs.length) await sc(`local p = game.connected_players[1] for _, r in pairs(${refsLua(refs)}) do local e = p.surface.find_entity(r.name, r) if e then e.destroy() end end rcon.print("ok")`);
     },

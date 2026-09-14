@@ -4,6 +4,7 @@
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
-    "@companion/interfaces": "workspace:*"
+    "@companion/interfaces": "workspace:*",
+    "zod": "4.6.5"
   }
 }

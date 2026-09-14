@@ -30,6 +30,7 @@
       "name": "@companion/server",
       "dependencies": {
         "@companion/interfaces": "workspace:*",
+        "zod": "4.6.5",
       },
     },
   },

@@ -33,3 +33,4 @@ Times are commit times (local).
 - FC-081 done: uncached question tail −47% (1,004 → 531 tokens) from tighter retrieval. First token median 1.11 s, max 1.80 s; grounding 10/10. Added a server-side chart fallback (the model sometimes skipped chart blocks on trend questions); charts 6/6 over 3 runs. One misstep caught by the latency report: aligning exactly to 4,096 forgot the probe's template tokens and cost a whole cache block; fixed with a 24-token margin.
 - FC-076 done: conversation compaction + cache re-warm; 16-question conversation follow-ups median 1.59 s, p90 2.23 s, max 2.51 s. **S05 closed**: all latency targets met with the game running.
 - S06 "Blueprint review" planned and activated (delegated): FC-030 codec, FC-082 entity sizes, FC-031 checker, FC-032 review in chat.
+- FC-030 done: blueprint string codec; a real 49-entity blueprint from the dev save round-trips and re-imports in-game with 49 entities.
