@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Second Shift social card</title>
+<!-- Link-preview card. Rendered by website/social/render.ts at 1200×630 (og.png) and 1280×640 (GitHub social preview). -->
+<link rel="stylesheet" href="../../brand/tokens.css">
+<style>
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: var(--ground); color: var(--text); font-family: var(--ui); }
+  .card { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: 46% 54%; }
+  .art { position: absolute; inset: 0; background: url("../src/media/night-shift-floor.jpg") 20% 40% / cover; opacity: 0.6; }
+  .art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, var(--ground) 8%, rgba(28,26,24,.8) 44%, rgba(28,26,24,.3) 100%); }
+  .copy { position: relative; padding: 64px 0 56px 64px; display: flex; flex-direction: column; justify-content: space-between; }
+  .copy img { height: 40px; width: auto; align-self: flex-start; }
+  h1 { font: 800 76px/0.98 var(--display); margin: 0; text-wrap: balance; }
+  p { margin: 18px 0 0; font-size: 22px; line-height: 1.4; color: var(--muted); max-width: 26ch; }
+  .url { font: 500 18px var(--mono); color: var(--agent); }
+  .shot { position: relative; align-self: center; margin-right: -80px; }
+  .shot img { width: 100%; border: 1px solid var(--seam); border-radius: 6px; box-shadow: 0 30px 80px -20px rgba(0,0,0,.8); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="art"></div>
+    <div class="copy">
+      <img src="../../brand/logo/lockup.svg" alt="Second Shift">
+      <div>
+        <h1>A second engineer in your helmet.</h1>
+        <p>A local AI companion for Factorio 2.0 that answers from your own save.</p>
+      </div>
+      <span class="url">github.com/WilyToad/second-shift</span>
+    </div>
+    <div class="shot"><img src="../src/media/ask-chart.jpg" alt=""></div>
+  </div>
+</body>
+</html>

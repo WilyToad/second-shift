@@ -23,6 +23,7 @@
     "interfaces/src",
     "server/src",
     "displays/src",
-    "scripts"
+    "scripts",
+    "website"
   ]
 }

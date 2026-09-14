@@ -50,8 +50,10 @@
   - Acceptance: a new player can go from clone to a first answer following only the README (requirements, setup, launch, first questions, what the companion can and can't do, troubleshooting, development); MIT license; no personal paths
   - `README.md`: lockup header (light and dark), tagline, chart GIF, features with real captures (plan, blueprint paste + build timelapse, selection review), the helmet rule and approval table, requirements stated as they are today (macOS on Apple Silicon, Steam, Bun, oMLX with a ~70 GB model; other providers planned), five-step setup checked against the scripts (including the autosave warning and `--dev` for a copy), first questions, how it works (Mermaid diagram, 0.082 ms/tick from PLAN §5), troubleshooting from the scripts' real error messages, development. `LICENSE` MIT (WilyToad). The oMLX link was left out: its project URL couldn't be confirmed from the install. Found while writing: the system prompt names this save's mods (FC-131, backlog). Personal paths remain in CLAUDE.md, PLAN.md and work logs; they're a release-cleanup item, not README content
 
-- [ ] FC-123 Website, built and tested locally
+- [x] FC-123 Website, built and tested locally
   - Acceptance: a static site in `website/` built with Bun, following the brand guide, with Codex-generated artwork and real captures; checked at desktop and phone widths in the browser
+  - `website/`: one page (hero with the night-floor artwork behind a live console clip, features with 2× clips, the helmet rule, how it works with an HTML diagram and measured numbers, setup, footer with the Wube trademark note). Built with `Bun.build` from HTML (hashed assets, 7.3 MB); `site:dev`, `site:build`, `site:serve` scripts; typechecked. Artwork by Codex CLI image generation (`night-shift-floor`, `visor-reflection`, prompts in `art/PROMPTS.md`). Social card rendered from HTML to `og.png` (1200 × 630) and `docs/media/social-preview.png` (1280 × 640) for the GitHub repo settings
+  - Checked in headless Chromium: 1440 px and 390 px full pages, no horizontal overflow; one polish pass (tighter hero, brighter art, the hero clip opens on the finished answer instead of an empty thread)
 - [ ] FC-124 Deploy the website to Cloudflare
   - Notes: needs the player's go and the address on wilytoad.com
 

@@ -15,7 +15,10 @@
     "launch": "bun scripts/launch.ts",
     "start": "bun server/src/main.ts",
     "board": "bun scripts/board.ts",
-    "check": "bun test && tsc --noEmit -p . && bun scripts/board.ts --check"
+    "check": "bun test && tsc --noEmit -p . && bun scripts/board.ts --check",
+    "site:dev": "bun website/src/index.html --port 5181",
+    "site:build": "bun website/build.ts",
+    "site:serve": "bun website/serve.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
