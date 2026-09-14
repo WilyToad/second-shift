@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { ActionName } from "@companion/interfaces";
-import { Agent, needsWorldTools, type GameActions } from "./agent";
+import { Agent, needsWorldTools, wantsChart, type GameActions } from "./agent";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
 
@@ -95,4 +95,9 @@ test("acting without a search, or with an unknown tool, is refused without touch
 test("world questions are told apart from recipe questions", () => {
   for (const q of ["How many rails are near me on the right?", "Mark them for deconstruction", "find inserters around me", "delete all the rails instantly"]) expect(needsWorldTools(q, true)).toBe(true);
   for (const q of ["What's the recipe for carbon fiber?", "How many copper cables does a green circuit take?", "What do I need before I can research agricultural science?", "How do I craft a quantum widget?"]) expect(needsWorldTools(q, false)).toBe(false);
+});
+
+test("trend questions ask for charts; recipe and research questions don't", () => {
+  for (const q of ["How is my science doing? Show me a chart.", "Is my iron plate production holding steady?", "has bioflux dropped?"]) expect(wantsChart(q)).toBe(true);
+  for (const q of ["What do I need before I can research agricultural science?", "What's the recipe for carbon fiber?"]) expect(wantsChart(q)).toBe(false);
 });

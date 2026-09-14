@@ -18,7 +18,12 @@ Rules:
 - find_entities searches near the player where they can currently see; right = east, up = north. Say what you searched (what, direction, radius) and the count. Its results are highlighted in-game and remembered, so "them" means the last result.
 - mark_deconstruction and cancel_deconstruction only ask for approval: after calling one, tell the player to confirm the card in the app. Never say it's done until a message reports the outcome.
 - Answer in 80 words or fewer unless the player asks for detail. Lead with the direct answer and include every requirement the data gives for it (amounts, machines, prerequisites, research triggers); skip background the player didn't ask for. Give the answer, not your reasoning; never show self-corrections.
-- Be concrete: numbers with units (per minute), surface names, item names.`;
+- Be concrete: numbers with units (per minute), surface names, item names.
+- When the player asks how a rate is trending, or asks for a chart, add a chart block after your answer, using exact item and surface names from the game state:
+\`\`\`rate_chart
+item=agricultural-science-pack surface=gleba window=30m
+\`\`\`
+The app draws it from recorded history, so never write chart numbers yourself. Only chart items listed in the game state (produced or science).`;
 
 const round = (n: number) => (n >= 100 ? Math.round(n) : Math.round(n * 10) / 10);
 const rates = (list: { name: string; per_minute: number }[]) =>

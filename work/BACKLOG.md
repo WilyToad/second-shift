@@ -32,6 +32,9 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Tech debt and risks
 
+- [ ] FC-079 Get first-token latency back under target with the game running
+  - Notes: S04 measured median ~2.6–2.9 s, max ~4.1 s, answers ~110 tokens (S02: ~1.6 s, ~70 tokens, game closed). Suspects: bigger system prompt (tools + chart rule), live snapshot tail, 2,048-token block alignment, GPU contention (~12%)
+
 - [ ] FC-070 Find or build a heavier benchmark save (megabase scale)
 - [ ] FC-071 Resolve the "Factorio Companion" name clash with ob1-s/factorio-AI-coop
 - [ ] FC-072 Close the hosted game port to the LAN (macOS firewall or another approach)

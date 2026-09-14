@@ -71,6 +71,11 @@ export function needsWorldTools(question: string, hasLastResult: boolean): boole
   return false;
 }
 
+/** Is the player asking about a trend over time, where a rate_chart helps? */
+export function wantsChart(question: string): boolean {
+  return /\b(chart|graph|plot|trend\w*|over time|history|holding|steady|stable|drop\w*|fall\w*|ris\w*|increas\w*|decreas\w*|slow\w* down|how('s| is) .+ doing)\b/i.test(question);
+}
+
 const plural = (n: number, word: string) => `${n} ${n === 1 ? word : word.endsWith("y") ? `${word.slice(0, -1)}ies` : `${word}s`}`;
 
 export class Agent {
@@ -112,8 +117,11 @@ export class Agent {
     // Outcomes of approvals since the last turn go in front of the question, keeping history append-only.
     const noted = this.notes.length ? `[since your last reply: ${this.notes.join("; ")}]\n\n${question}` : question;
     this.notes = [];
+    // Turn guidance decided in code, kept in the uncached tail so the system prompt stays stable.
     const world = needsWorldTools(question, this.lastResult !== null);
-    const guided = world ? noted : `${noted}\n\n(Answer from the data provided; no tool call is needed for this question.)`;
+    const chart = wantsChart(question);
+    const notes = [world ? "" : "no tool call is needed", chart ? "" : "no chart block"].filter(Boolean);
+    const guided = notes.length ? `${noted}\n\n(Answer from the data provided in 80 words or fewer; ${notes.join(", ")}.)` : noted;
     const working: ChatMessage[] = [userTurn(guided, { recipes: found?.lines ?? [], snapshot })];
     this.deps.emit({ type: "user", text: question });
 

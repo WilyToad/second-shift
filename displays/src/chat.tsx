@@ -1,6 +1,19 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { RateChart, segments } from "./components";
 import { send, thread, type ThreadItem } from "./store";
+
+function AgentText({ text }: { text: string }) {
+  return (
+    <div class="msg agent">
+      {segments(text).map((seg, i) =>
+        seg.kind === "text" ? <span key={i}>{seg.text}</span>
+        : seg.kind === "pending" ? <div key={i} class="vis-empty">Drawing chart…</div>
+        : <RateChart key={i} spec={seg} />,
+      )}
+    </div>
+  );
+}
 
 function Item({ item }: { item: ThreadItem }) {
   switch (item.kind) {
@@ -9,7 +22,7 @@ function Item({ item }: { item: ThreadItem }) {
     case "agent":
       return (
         <>
-          <div class="msg agent">{item.text}</div>
+          <AgentText text={item.text.value} />
           {item.meta.value && <div class="meta">{item.meta}</div>}
         </>
       );

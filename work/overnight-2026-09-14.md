@@ -25,3 +25,5 @@ Times are commit times (local).
 - FC-040 + FC-021 done: three-column console (alerts | chat | live state) with sparklines and a stalled-science flag. In-game alert reached the page in 307–424 ms.
 - **Bug found and fixed:** after FC-020 the digest's production data was empty. `script.on_nth_tick(30, …)` in the events module silently replaced the rate refresher registered for the same interval. Added `util.on_nth_tick` (shared dispatcher) and a gotcha note in CLAUDE.md. The console e2e now requires non-empty production data.
 - **Review:** the page layout hasn't been looked at in a real browser. Please open http://127.0.0.1:5170 (it needs `bun run start` and the game hosted) and check how it looks at your monitor size.
+- FC-042 done: `rate_chart` blocks drawn by the page from recorded history. Charts and tool calls are gated per turn in code. Grounding 10/10, rails 6/6, charts 2/2.
+- S04 closed (visual layout check pending). New backlog item FC-079: first-token latency with the game running has crept to median ~2.9 s, max ~4.1 s.
