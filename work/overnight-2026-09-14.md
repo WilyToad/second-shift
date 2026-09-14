@@ -71,4 +71,5 @@ Times are commit times (local).
 - Benchmark after tonight's mod changes (game closed): the mod costs 0.082 ms/tick on average, within the 0.1 ms budget. Only 3 of 1,800 ticks went over 1 ms, all in the one-time registry scan: 7.5 ms and 6.5 ms when it lists a big surface's chunks, and one 2.6 ms tick. Recorded in PLAN §5; FC-104 tracks it.
 - S15 "Machine settings" planned and activated (delegated): FC-093 set recipe on searched machines (helmet-checked, approval card), FC-044 layout sketch for pasted blueprints.
 - FC-093 done: "switch the assembling machines around me to copper cable" finds them, shows a card, and changes the recipe after approval. The helmet rule applies (not yours, not visible, locked/hidden recipe, wrong category, furnaces). Held ingredients go to your inventory. **For you to check:** whether changing a recipe by hand in remote view also returns ingredients to your inventory in the real game.
+- FC-044 done, **S15 closed**: pasted blueprints now show the layout sketch card too. All suites pass, but a full run now shows about one model miss somewhere (each passed on rerun); they're listed in FC-110.
 

@@ -134,7 +134,8 @@ export function RecipeGraph({ plan }: { plan: Plan }) {
 /** A blueprint built in code: a top-down tile sketch and a button that copies the string (S14). */
 export function BlueprintView({ card }: { card: BlueprintCard }) {
   const copied = useSignal<"idle" | "copied" | "select">("idle");
-  const T = 14, PAD = 6;
+  // Tile size shrinks for big blueprints so the sketch stays about a panel wide.
+  const T = Math.max(2, Math.min(14, Math.floor(760 / card.width))), PAD = 6;
   const width = card.width * T + PAD * 2, height = card.height * T + PAD * 2;
   const copy = async () => {
     try {

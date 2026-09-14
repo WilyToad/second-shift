@@ -72,3 +72,17 @@ test("a built blueprint shows a layout sketch and copies its string", async () =
   expect(clipboard).toStartWith("0eNq");
   expect(card.querySelector("button")!.textContent).toBe("Copied");
 });
+
+test("a big pasted blueprint's sketch shrinks its tiles to stay panel-sized", async () => {
+  const { render } = await import("preact");
+  const { BlueprintView } = await import("./components");
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  render(<BlueprintView card={{ label: "rail loop", string: "0eNq", summary: "2 entities · pasted", width: 400, height: 20, sketch: [
+    { name: "straight-rail", kind: "straight-rail", x: 0, y: 0, w: 2, h: 2 },
+    { name: "straight-rail", kind: "straight-rail", x: 398, y: 18, w: 2, h: 2 },
+  ] }} />, root);
+  await new Promise((r) => setTimeout(r, 10));
+  // 760 / 400 tiles → 2 px per tile (the minimum), plus 6 px padding each side.
+  expect(root.querySelector("svg")!.getAttribute("width")).toBe(String(400 * 2 + 12));
+});

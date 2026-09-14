@@ -157,6 +157,11 @@ test("a pasted blueprint reaches the model only as a checked summary", async () 
   expect(prompt).toContain("assembling-machine-3 can't craft bioflux (category organic)");
   expect(events.find((e) => e.type === "user")).toEqual({ type: "user", text: "Review this blueprint: [blueprint 1]" });
   expect(agent.history.some((m) => m.content.includes(raw))).toBe(false);
+  // The page gets a sketch with the original string to copy back (FC-044).
+  const card = events.find((e) => e.type === "blueprint");
+  if (card?.type !== "blueprint") throw new Error("no sketch card");
+  expect(card.blueprint).toMatchObject({ label: "smelter", string: raw, summary: "2 entities · pasted", width: 9.5, height: 9.5 });
+  expect(card.blueprint.sketch.map((e) => [e.name, e.x, e.y, e.w])).toEqual([["assembling-machine-3", 0, 0, 3], ["quantum-widget", 8.5, 8.5, 1]]);
 });
 
 test("planning tools: explicit research runs now, unprompted becomes a card, pastes and upgrades need approval", async () => {

@@ -4,7 +4,7 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ActionArgs, ActionData, ActionName, Digest, EntityRef, FindEntitiesResult, Prototypes } from "@companion/interfaces";
 import { summarizePasted } from "./blueprint-review";
-import { encodeBlueprintString } from "./blueprint";
+import { blueprintsIn, decodeBlueprintString, encodeBlueprintString, type Blueprint } from "./blueprint";
 import { describeRow, productionRow, type RowBuild } from "./blueprint-template";
 import type { BlueprintCard } from "./messages";
 import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
@@ -204,22 +204,27 @@ export function wantsBlueprint(question: string): boolean {
   return /\b(blueprints?|layouts?|schematics?)\b/i.test(question) && parseTarget(question) !== null;
 }
 
-/** Top-down sketch of a generated build, in tiles from the blueprint's top-left corner. */
-export function blueprintCard(build: RowBuild, footprints: Record<string, { type: string; size: [number, number] }>): BlueprintCard {
-  const parts = build.blueprint.entities.map((e) => {
+const MAX_SKETCH_ENTITIES = 4000;
+
+/** Top-down sketch of a blueprint, in tiles from its top-left corner; big blueprints keep their first entities. */
+export function sketchBlueprint(bp: Blueprint, footprints: Record<string, { type: string; size: [number, number] }>, meta: { label: string; string: string; summary: string }): BlueprintCard {
+  const parts = bp.entities.slice(0, MAX_SKETCH_ENTITIES).map((e) => {
     const [w, h] = footprints[e.name]?.size ?? [1, 1];
     return { name: e.name, kind: footprints[e.name]?.type ?? "entity", x: e.position.x - w / 2, y: e.position.y - h / 2, w, h, ...(e.direction !== undefined ? { direction: e.direction } : {}) };
   });
-  const minX = Math.min(...parts.map((p) => p.x)), minY = Math.min(...parts.map((p) => p.y));
+  const minX = parts.length ? Math.min(...parts.map((p) => p.x)) : 0;
+  const minY = parts.length ? Math.min(...parts.map((p) => p.y)) : 0;
   const sketch = parts.map((p) => ({ ...p, x: p.x - minX, y: p.y - minY }));
-  return {
+  return { ...meta, width: Math.max(1, ...sketch.map((p) => p.x + p.w)), height: Math.max(1, ...sketch.map((p) => p.y + p.h)), sketch };
+}
+
+/** The card for a blueprint built in code. */
+export function blueprintCard(build: RowBuild, footprints: Record<string, { type: string; size: [number, number] }>): BlueprintCard {
+  return sketchBlueprint(build.blueprint, footprints, {
     label: build.blueprint.label ?? build.item,
     string: encodeBlueprintString({ blueprint: build.blueprint }),
     summary: `${build.machines} ${build.machine} · ${build.inputs.map((i) => `${Math.round(i.perMinute)}/min ${i.name}`).join(" + ")} in · ${build.belt}, ${build.inserter}, ${build.pole}`,
-    width: Math.max(...sketch.map((p) => p.x + p.w)),
-    height: Math.max(...sketch.map((p) => p.y + p.h)),
-    sketch,
-  };
+  });
 }
 
 /** Is the player asking about a trend over time, where a rate_chart helps? */
@@ -331,6 +336,20 @@ export class Agent {
     };
     this.deps.emit({ type: "user", text: pasted.display });
     if (plan) this.deps.emit({ type: "plan", plan });
+    // Pasted blueprints get the same sketch card, with the player's original string to copy back (FC-044).
+    const protosForSketch = this.deps.prototypes();
+    if (protosForSketch) {
+      for (const raw of pasted.raws) {
+        try {
+          const first = blueprintsIn(decodeBlueprintString(raw))[0];
+          if (!first) continue;
+          const bp = first.blueprint;
+          this.deps.emit({ type: "blueprint", blueprint: sketchBlueprint(bp, protosForSketch.entities, { label: first.path || "pasted blueprint", string: raw, summary: `${bp.entities.length} entities${bp.entities.length > MAX_SKETCH_ENTITIES ? ` (first ${MAX_SKETCH_ENTITIES} drawn)` : ""} · pasted` }) });
+        } catch {
+          // The summary already says it couldn't be read.
+        }
+      }
+    }
     if (requested?.build) {
       const card = blueprintCard(requested.build, this.deps.prototypes()!.entities);
       this.lastBlueprint = { raw: card.string, at: this.now() };

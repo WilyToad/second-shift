@@ -52,6 +52,8 @@ const ask = async (text: string) => {
 
 const good = await ask(`Review this blueprint: ${original}`);
 check("original: the chat shows a placeholder, not the raw string", !good.user.includes(original.slice(0, 40)), good.user);
+const sketch = got.find((m) => m.type === "blueprint" && m.blueprint.string === original);
+check("original: the page gets a layout sketch with the original string to copy", sketch?.type === "blueprint" && sketch.blueprint.sketch.length === bp.entities.length, sketch?.type === "blueprint" ? `${sketch.blueprint.sketch.length} entities drawn, ${sketch.blueprint.width}×${sketch.blueprint.height} tiles` : "no card");
 check(`original: answer has the entity total and the top count (${topName} ${topCount})`, good.answer.includes(String(bp.entities.length)) && good.answer.includes(String(topCount)), good.answer.trim().slice(0, 400));
 check("original: no invented problems", !/quantum|can't craft|cannot craft|\b(overlap|overlaps) (at|on)\b|problems? (found|:)|issues?:/i.test(good.answer), good.answer.trim().slice(0, 200));
 
