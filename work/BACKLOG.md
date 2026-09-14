@@ -7,7 +7,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 3 — Pleasant console and more actions
 
-- [ ] FC-097 Throughput analysis of a blueprint (machines vs belt and inserter limits)
 - [ ] FC-044 `layout_sketch` component with copyable blueprint string
 - [ ] FC-046 Blueprint selection tool in the mod
 - [ ] FC-048 Template-based blueprint creation

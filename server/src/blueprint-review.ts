@@ -2,6 +2,7 @@
 import type { Prototypes } from "@companion/interfaces";
 import { blueprintsIn, BlueprintStringError, decodeBlueprintString } from "./blueprint";
 import { checkBlueprint, describeIssue } from "./blueprint-check";
+import { blueprintThroughput, describeThroughput } from "./blueprint-throughput";
 
 const PASTED = /0[A-Za-z0-9+/]{60,}={0,2}/g;
 const MAX_BLUEPRINTS = 5;
@@ -28,7 +29,8 @@ export function summarizePasted(question: string, prototypes: Prototypes | null)
         const recipes = Object.keys(r.recipes).length ? ` | recipes: ${top(r.recipes, 8)}` : "";
         const checks = r.issues.length ? ` | problems: ${r.issues.map(describeIssue).join("; ")}` : " | checks: no problems found";
         const skipped = r.skippedOverlap ? ` (${r.skippedOverlap} rails/signals not overlap-checked)` : "";
-        return `${path}: ${r.size.width}×${r.size.height} tiles, ${r.entities} entities: ${top(r.counts, 12)}${recipes}${checks}${skipped}`;
+        const throughput = describeThroughput(blueprintThroughput(blueprint, prototypes));
+        return `${path}: ${r.size.width}×${r.size.height} tiles, ${r.entities} entities: ${top(r.counts, 12)}${recipes}${checks}${skipped}${throughput ? `\n  ${throughput}` : ""}`;
       });
       const more = all.length > MAX_BLUEPRINTS ? ` (+${all.length - MAX_BLUEPRINTS} more blueprints in the book)` : "";
       summaries.push(`[pasted blueprint ${n}, checked against this save]\n${lines.join("\n")}${more}`);

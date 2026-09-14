@@ -10,7 +10,7 @@ export type Plan = { item: string; perMinute: number; steps: PlanStep[]; raw: Re
 const round = (n: number, digits = 2) => Math.round(n * 10 ** digits) / 10 ** digits;
 
 /** Expected output of `item` per craft; productivity multiplies all but the part marked ignored_by_productivity. */
-function outputPerCraft(recipe: Recipe, item: string, productivity = 0): number {
+export function outputPerCraft(recipe: Recipe, item: string, productivity = 0): number {
   return recipe.products.filter((p) => p.name === item).reduce((n, p) => {
     const amount = p.amount ?? ((p.amount_min ?? 0) + (p.amount_max ?? 0)) / 2;
     const ignored = Math.min(Number((p as { ignored_by_productivity?: number }).ignored_by_productivity ?? 0), amount);

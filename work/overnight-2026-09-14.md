@@ -59,4 +59,4 @@ Times are commit times (local).
 - FC-072 blocked: the GUI client ignores `--bind` when hosting (rechecked). The remaining options touch your config.ini or macOS firewall, so it's back in the backlog for you.
 - **S12 closed** (no hitches): all suites pass.
 - **Review:** FC-072, the hosted dev game's port 34197 is open on all interfaces. It's password-protected with max_players 1. If you want it closed, a macOS firewall rule for Factorio is the likely route; your call.
-
+- S13 "Blueprint throughput" planned and activated (delegated): FC-097 per-minute flows and belt load for pasted blueprints, FC-105 inserter limits, FC-106 e2e question.
