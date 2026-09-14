@@ -28,3 +28,22 @@ test("rate chart draws from recorded series, and says so when there is none", as
   expect(root.textContent).toContain("49/min");
   expect(root.textContent).toContain("No recorded history for carbon on vulcanus yet.");
 });
+
+test("recipe graph draws steps, raw inputs and edges from a computed plan", async () => {
+  const { render } = await import("preact");
+  const { RecipeGraph } = await import("./components");
+  const root = document.createElement("div");
+  render(<RecipeGraph plan={{
+    item: "electronic-circuit", perMinute: 120, notes: ["no modules"],
+    raw: { "iron-plate": 120, "copper-plate": 180 },
+    steps: [
+      { item: "electronic-circuit", recipe: "electronic-circuit", machine: "assembling-machine-2", machineSpeed: 0.75, unlocked: true, perMinute: 120, machines: 1.33, inputs: ["iron-plate", "copper-cable"] },
+      { item: "copper-cable", recipe: "copper-cable", machine: "assembling-machine-2", machineSpeed: 0.75, unlocked: true, perMinute: 360, machines: 2, inputs: ["copper-plate"] },
+    ],
+  }} />, root);
+  expect(root.querySelectorAll(".graph-node").length).toBe(4);
+  expect(root.querySelectorAll(".graph-node.raw").length).toBe(2);
+  expect(root.querySelectorAll(".graph-edge").length).toBe(3);
+  expect(root.textContent).toContain("1.33× assembling machine 2");
+  expect(root.textContent).toContain("180/min input");
+});

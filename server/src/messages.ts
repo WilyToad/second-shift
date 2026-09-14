@@ -1,5 +1,6 @@
 // WebSocket messages between the server and the web page.
 import type { Digest, GameEvent } from "@companion/interfaces";
+import type { Plan } from "./planner";
 import type { SeriesMap } from "./series";
 
 export type ServerMessage =
@@ -14,6 +15,7 @@ export type ServerMessage =
   | { type: "events"; events: GameEvent[]; dropped?: number }
   | { type: "digest"; digest: Digest; receivedAt: number }
   | { type: "series"; series: SeriesMap }
+  | { type: "plan"; plan: Plan }
   | { type: "reset" };
 
 export type ClientMessage =

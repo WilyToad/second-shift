@@ -3,7 +3,7 @@
 import type { Prototypes, Recipe } from "@companion/interfaces";
 import { craftersByCategory } from "./grounding";
 
-export type PlanStep = { item: string; recipe: string; machine: string; machineSpeed: number; unlocked: boolean; perMinute: number; machines: number };
+export type PlanStep = { item: string; recipe: string; machine: string; machineSpeed: number; unlocked: boolean; perMinute: number; machines: number; inputs: string[] };
 export type Plan = { item: string; perMinute: number; steps: PlanStep[]; raw: Record<string, number>; notes: string[] };
 
 const round = (n: number, digits = 2) => Math.round(n * 10 ** digits) / 10 ** digits;
@@ -56,6 +56,7 @@ export class Planner {
     const raw: Record<string, number> = {};
     const notes = new Set<string>(["no modules, beacons or productivity bonuses assumed; byproducts ignored"]);
     const order: string[] = [];
+    const inputs = new Map<string, Set<string>>();
 
     const visit = (name: string, rate: number, depth: number, stack: string[]) => {
       const recipeName = depth <= maxDepth && !stack.includes(name) ? this.recipeFor(name) : null;
@@ -71,7 +72,10 @@ export class Planner {
       for (const ing of recipe.ingredients) {
         // Catalysts (e.g. filters returned by the recipe) only cost what isn't given back.
         const net = ing.amount - outputPerCraft(recipe, ing.name);
-        if (net > 0) visit(ing.name, craftsPerMinute * net, depth + 1, [...stack, name]);
+        if (net > 0) {
+          (inputs.get(name) ?? inputs.set(name, new Set()).get(name)!).add(ing.name);
+          visit(ing.name, craftsPerMinute * net, depth + 1, [...stack, name]);
+        }
       }
     };
     visit(item, perMinute, 0, []);
@@ -84,7 +88,7 @@ export class Planner {
       const perMachine = (60 * machine.speed / recipe.energy) * outputPerCraft(recipe, name);
       if (!machine.unlocked) notes.add(`${machine.name} isn't unlocked yet`);
       if (!recipe.enabled) notes.add(`recipe ${recipeName} isn't unlocked yet`);
-      return { item: name, recipe: recipeName, machine: machine.name, machineSpeed: machine.speed, unlocked: machine.unlocked && recipe.enabled, perMinute: round(rate), machines: round(rate / perMachine) };
+      return { item: name, recipe: recipeName, machine: machine.name, machineSpeed: machine.speed, unlocked: machine.unlocked && recipe.enabled, perMinute: round(rate), machines: round(rate / perMachine), inputs: [...(inputs.get(name) ?? [])] };
     });
     return { item, perMinute, steps, raw: Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, round(v)])), notes: [...notes] };
   }

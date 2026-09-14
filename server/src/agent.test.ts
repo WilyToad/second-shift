@@ -3,7 +3,7 @@ import type { ActionName } from "@companion/interfaces";
 import { DigestSchema, PrototypesSchema } from "@companion/interfaces";
 import { encodeBlueprintString } from "./blueprint";
 import { RecipeRetriever } from "./retrieval";
-import { Agent, compactHistory, fallbackChart, needsWorldTools, wantsChart, type GameActions } from "./agent";
+import { Agent, compactHistory, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsChart, type GameActions } from "./agent";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
 
@@ -204,4 +204,16 @@ test("planning tools: explicit research runs now, unprompted becomes a card, pas
   await agent.approve(card.id);
   expect(calls.at(-1)).toEqual({ action: "place_blueprint", args: { blueprint: raw, x: 5, y: 6 } });
   expect(events.at(-1)).toMatchObject({ type: "approval_result", status: "done", message: "Placed 3 of 3 ghosts at (5, 6)." });
+});
+
+test("target rates are parsed per minute", () => {
+  expect(targetRate("how many assemblers for 60 gears per minute?")).toBe(60);
+  expect(targetRate("I want 2/s electronic circuits")).toBe(120);
+  expect(targetRate("45 a minute of plastic")).toBe(45);
+  expect(targetRate("what's the recipe for plastic?")).toBeNull();
+});
+
+test("the planned item is the one next to the number, not the machine being counted", () => {
+  expect(parseTarget("How many biochambers for 60 bioflux per minute?")).toEqual({ perMinute: 60, phrase: "bioflux" });
+  expect(parseTarget("How many chemical plants for 120 plastic bars per minute?")).toEqual({ perMinute: 120, phrase: "plastic bars" });
 });

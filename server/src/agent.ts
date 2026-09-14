@@ -9,6 +9,7 @@ import type { Snapshot } from "./game";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, ToolCall, ToolSpec } from "./model";
 import { buildMessages, formatSnapshot, userTurn } from "./prompt";
+import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
 
 export interface GameActions {
@@ -173,6 +174,19 @@ export function needsWorldTools(question: string, hasLastResult: boolean): boole
   return false;
 }
 
+/** A production target in the question ("60 bioflux per minute", "2/s") as items per minute, plus the words naming what. */
+export function parseTarget(question: string): { perMinute: number; phrase: string } | null {
+  // Up to four words may sit between the number and the unit: "60 electronic circuits per minute".
+  const m = /(\d+(?:\.\d+)?)\s*((?:[a-z-]+\s+){0,4}?)(?:\/\s*|per\s+|an?\s+|each\s+|every\s+)(minute|min|m|second|sec|s)\b/i.exec(question);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return { perMinute: /^s/i.test(m[3]!) ? n * 60 : n, phrase: m[2]!.trim() };
+}
+
+export function targetRate(question: string): number | null {
+  return parseTarget(question)?.perMinute ?? null;
+}
+
 /** Is the player asking about a trend over time, where a rate_chart helps? */
 export function wantsChart(question: string): boolean {
   return /\b(chart|graph|plot|trend\w*|over time|history|holding|steady|stable|drop\w*|fall\w*|ris\w*|increas\w*|decreas\w*|slow\w* down|how('s| is) .+ doing)\b/i.test(question);
@@ -203,6 +217,7 @@ export class Agent {
   readonly history: ChatMessage[] = [];
   private lastResult: LastResult | null = null;
   private lastBlueprint: { raw: string; at: number } | null = null;
+  private planner: { source: Prototypes; planner: Planner } | null = null;
   private currentQuestion = "";
   private pending = new Map<string, Pending>();
   private notes: string[] = [];
@@ -257,7 +272,10 @@ export class Agent {
       : notes.length ? `${noted}\n\n(Answer from the data provided in 60 words or fewer; ${notes.join(", ")}.)` : noted;
     // Research questions get the live list of what can be queued right now (decided in code, not guessed).
     const researchLines = /\b(research\w*|tech\w*|unlock\w*|queue)\b/i.test(question) ? await this.researchOptions() : [];
-    const working: ChatMessage[] = [userTurn(guided, { recipes: [...researchLines, ...(found?.lines ?? [])], snapshot })];
+    // Rate targets get an exact plan computed in code; the model narrates it (S09).
+    const plan = this.planFor(question, found?.items ?? []);
+    const planLines = plan ? [formatPlan(plan)] : [];
+    const working: ChatMessage[] = [userTurn(guided, { recipes: [...planLines, ...researchLines, ...(found?.lines ?? [])], snapshot })];
     const record: TurnRecord = {
       at: new Date(this.now()).toISOString(), question, world, chart, rounds: [], totalMs: 0,
       chars: {
@@ -269,6 +287,7 @@ export class Agent {
       },
     };
     this.deps.emit({ type: "user", text: pasted.display });
+    if (plan) this.deps.emit({ type: "plan", plan });
 
     let ttftMs: number | undefined;
     try {
@@ -327,6 +346,22 @@ export class Agent {
       // Warming is an optimization; the next question just pays the prefill instead.
     }
     this.logLine({ kind: "compaction", at: new Date(this.now()).toISOString(), beforeTokens: result.beforeTokens, afterTokens: result.afterTokens, warmMs: performance.now() - started });
+  }
+
+  private planFor(question: string, items: string[]): Plan | null {
+    const target = parseTarget(question);
+    const protos = this.deps.prototypes();
+    if (!target || !protos) return null;
+    const rate = target.perMinute;
+    const producible = (i: string) => Object.values(protos.recipes).some((r) => r.products.some((p) => p.name === i));
+    // The thing next to the number is what to make ("60 bioflux per minute"); machine words elsewhere
+    // ("how many biochambers") are what to count, not what to plan.
+    const named = target.phrase ? (this.deps.retriever()?.match(target.phrase) ?? []).map((e) => e.name) : [];
+    const item = named.find(producible) ?? items.find((i) => producible(i) && !protos.machines[i]);
+    if (!item) return null;
+    if (this.planner?.source !== protos) this.planner = { source: protos, planner: new Planner(protos) };
+    const plan = this.planner.planner.plan(item, rate);
+    return plan.steps.length ? plan : null;
   }
 
   private async researchOptions(): Promise<string[]> {

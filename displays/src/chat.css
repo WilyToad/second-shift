@@ -93,6 +93,15 @@ button.cancel { background: transparent; color: var(--muted); border: 1px solid 
 .chart-area { fill: rgba(124, 196, 216, 0.10); } .chart-line { fill: none; stroke: var(--agent); stroke-width: 2; stroke-linejoin: round; }
 .chart-end { fill: var(--agent); stroke: var(--inset); stroke-width: 2; }
 .end-label { fill: var(--text); font: 12px var(--mono); }
+.graph-scroll { overflow-x: auto; padding: 6px; }
+.graph-scroll svg { width: auto; max-width: none; }
+.graph-edge { fill: none; stroke: var(--faint); stroke-width: 1.4; }
+.graph-node rect { fill: var(--panel); stroke: var(--seam); }
+.graph-node.raw rect { fill: var(--inset); stroke-dasharray: 3 3; }
+.graph-node.locked rect { stroke: var(--amber); }
+.graph-name { fill: var(--text); font: 600 12px var(--ui); }
+.graph-sub { fill: var(--muted); font: 11px var(--mono); }
+.vis-note { padding: 4px 10px 8px; font-size: 12px; color: var(--faint); }
 .progress { height: 6px; border-radius: 3px; background: var(--inset); overflow: hidden; margin-top: 6px; }
 .progress > span { display: block; height: 100%; background: var(--agent); }
 .queue { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }

@@ -1,5 +1,6 @@
 // Visual components the agent can put in an answer as terse fenced specs (PLAN §3 visual component
 // library). The model only names what to draw; the data comes from the page's recorded history.
+import type { Plan } from "../../server/src/planner";
 import type { Point } from "../../server/src/series";
 import { series } from "./store";
 
@@ -73,6 +74,57 @@ export function RateChart({ spec }: { spec: RateChartSpec }) {
         <circle class="chart-end" cx={x(latest.t)} cy={y(latest.v)} r="4" />
         <text class="end-label" x={x(latest.t) - 8} y={Math.max(y(latest.v) - 10, T + 10)} text-anchor="end">{label(latest.v)}/min</text>
       </svg>
+    </figure>
+  );
+}
+
+const pretty = (name: string) => name.replace(/-/g, " ");
+
+/** The computed plan as a left-to-right chain: raw inputs, intermediates, then the target (S09). */
+export function RecipeGraph({ plan }: { plan: Plan }) {
+  // Column = longest distance from the raw inputs, so each step sits right of everything it consumes.
+  const steps = new Map(plan.steps.map((s) => [s.item, s]));
+  const column = new Map<string, number>();
+  const depth = (item: string, seen: string[] = []): number => {
+    if (column.has(item)) return column.get(item)!;
+    const step = steps.get(item);
+    const d = !step || seen.includes(item) ? 0 : 1 + Math.max(0, ...step.inputs.map((i) => depth(i, [...seen, item])));
+    column.set(item, d);
+    return d;
+  };
+  const nodes = [...Object.keys(plan.raw), ...plan.steps.map((s) => s.item)].filter((v, i, a) => a.indexOf(v) === i);
+  nodes.forEach((n) => depth(n));
+  const columns = Math.max(...nodes.map((n) => column.get(n)!)) + 1;
+  const byColumn = Array.from({ length: columns }, (_, c) => nodes.filter((n) => column.get(n) === c));
+  const NW = 170, NH = 44, GX = 40, GY = 12, PAD = 10;
+  const width = PAD * 2 + columns * NW + (columns - 1) * GX;
+  const height = PAD * 2 + Math.max(...byColumn.map((c) => c.length)) * (NH + GY) - GY;
+  const pos = new Map<string, { x: number; y: number }>();
+  byColumn.forEach((items, c) => items.forEach((item, r) => pos.set(item, { x: PAD + c * (NW + GX), y: PAD + r * (NH + GY) })));
+  const edges = plan.steps.flatMap((s) => s.inputs.filter((i) => pos.has(i)).map((i) => [i, s.item] as const));
+  return (
+    <figure class="vis">
+      <figcaption class="vis-head">{plan.perMinute}/min {pretty(plan.item)}<span class="tag">recipe_graph · computed plan</span></figcaption>
+      <div class="graph-scroll">
+        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Production chain for ${plan.perMinute} ${pretty(plan.item)} per minute`}>
+          {edges.map(([from, to]) => {
+            const a = pos.get(from)!, b = pos.get(to)!;
+            const x1 = a.x + NW, y1 = a.y + NH / 2, x2 = b.x, y2 = b.y + NH / 2;
+            return <path key={`${from}>${to}`} class="graph-edge" d={`M${x1} ${y1} C${x1 + GX / 2} ${y1} ${x2 - GX / 2} ${y2} ${x2} ${y2}`} />;
+          })}
+          {nodes.map((n) => {
+            const p = pos.get(n)!, step = steps.get(n);
+            return (
+              <g key={n} class={`graph-node${step ? "" : " raw"}${step && !step.unlocked ? " locked" : ""}`}>
+                <rect x={p.x} y={p.y} width={NW} height={NH} rx="3" />
+                <text class="graph-name" x={p.x + 8} y={p.y + 17}>{pretty(n).slice(0, 24)}</text>
+                <text class="graph-sub" x={p.x + 8} y={p.y + 34}>{step ? `${step.machines}× ${pretty(step.machine)}`.slice(0, 26) : `${plan.raw[n]}/min input`}</text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div class="vis-note">{plan.notes.join(" · ")}</div>
     </figure>
   );
 }

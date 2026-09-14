@@ -47,3 +47,4 @@ Times are commit times (local).
 - **S08 closed**: planning actions end to end (research queue, tags, camera, upgrades, blueprint paste) with cards and helmet tests; all 10 suites pass. The latency guard caught a regression from the new tools (6k system prompt, follow-ups 2.8 s); fixed by moving machines to retrieval, compacting past questions, and an alignment convergence bug. Follow-ups back to ~1.9–2.0 s.
 - S09 "Production planning" planned and activated (delegated): FC-094 ratio calculator, FC-095 plans in rate questions, FC-043 recipe_graph, FC-096 ratio eval (FC-047 folded in).
 - FC-094 done: ratio calculator from the save's recipes; the dump gained a raw-resource list after the first version expanded iron ore through asteroid crushing.
+- **S09 closed**: production planning. Ratio eval 8/8 twice against an independent reference (vanilla, Gleba, maraxsis); plans drawn as a recipe graph; all suites pass. Follow-ups 2.25–2.44 s, close to the 2.5 s target.

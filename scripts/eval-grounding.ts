@@ -58,7 +58,8 @@ for (const c of cases) {
   await send({ type: "reset" });
   const done = await send({ type: "ask", text: c.question });
   const missing = c.mustInclude.filter((t) => !includes(answer, t));
-  const refused = /\b(no|not|cannot|can't|isn't|doesn't|don't|couldn't|unknown|unable)\b/i.test(answer) && !/->|→/.test(answer);
+  // Accept straight and curly apostrophes ("don’t").
+  const refused = /\b(no|not|cannot|can['’]t|isn['’]t|doesn['’]t|don['’]t|couldn['’]t|unknown|unable)\b/i.test(answer) && !/->|→/.test(answer);
   const pass = done.type === "done" && (c.negative ? refused : missing.length === 0);
   results.push({ ...c, pass, missing, answer, toolCalls: tools, ttftMs: done.ttftMs, totalMs: done.totalMs, completionTokens: done.completionTokens, promptTokens: done.promptTokens, cachedTokens: done.cachedTokens });
   console.log(`${pass ? "PASS" : "FAIL"}  ${(done.ttftMs / 1000).toFixed(1)}s first / ${(done.totalMs / 1000).toFixed(1)}s total / ${done.completionTokens} tok / prompt ${done.promptTokens} (${done.cachedTokens} cached)${tools ? ` / ${tools} tool` : ""}  ${c.question}${missing.length ? `\n      missing: ${missing.join(", ")}` : ""}`);

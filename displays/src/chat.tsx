@@ -1,6 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { RateChart, segments } from "./components";
+import { RateChart, RecipeGraph, segments } from "./components";
 import { send, thread, type ThreadItem } from "./store";
 
 function AgentText({ text }: { text: string }) {
@@ -23,6 +23,7 @@ function Item({ item }: { item: ThreadItem }) {
       return (
         <>
           <AgentText text={item.text.value} />
+          {item.plan.value && <div class="msg"><RecipeGraph plan={item.plan.value} /></div>}
           {item.meta.value && <div class="meta">{item.meta}</div>}
         </>
       );
