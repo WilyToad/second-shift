@@ -374,6 +374,14 @@ token in 2.1 s and the whole answer in 3.8 s. A follow-up about iron plates (1,4
 benchmark is within noise. Model load on a cold oMLX is ~22 s, absorbed by the warm-up at server
 start.
 
+Follow-up the same day: the first science answer was technically right ("no science output") but
+missed that science had *stalled* (0/min now, ~15–17/min over 10 h), and it listed vanilla pack
+names that weren't in the data. The digest now reports every science pack with current and 10-hour
+rates, and the rules forbid naming items that aren't in the data. Re-asked, the model reported
+the stall, cited "nothing researching" and the 10-hour averages. First token 2.1 s; the full
+232-token answer took 7.1 s at ~45 tok/s, so long answers exceed 5 s total. Keep answers short or
+judge by time to first token.
+
 **Phase 2 — make it useful, and let it act**
 - Prototype dump + grounding
 - Prefix-cache-aware prompt assembly (§5) — verify the ~2 s warm path holds
@@ -487,6 +495,11 @@ start.
    - Resulting `digest` handler: ~0.19 ms per call (was ~1.6 ms), 4 KB JSON.
    - Benchmark with the refresher running: no measurable cost (−0.027 ms/tick, within run-to-run
      noise of about ±0.03 ms).
+   - **The benchmark can't resolve costs this small.** Run-to-run noise is ~0.05 ms/tick, and
+     `--benchmark` doesn't run RCON, so the digest path isn't in it. Derived cost from the
+     profiler: refresh ~0.1 ms per 30 ticks + digest ~0.2 ms per 120 ticks (2 s poll) ≈
+     **0.005 ms/tick**. Use `helpers.create_profiler` numbers for the mod's budget, and
+     `--benchmark` only to catch whole-game regressions.
 9. **Undo.** Do actions passed `player` / `undo_index` really land on the player's Ctrl+Z history,
    and does Ctrl+Z reverse them? Verify with deconstruction marks first.
 10. **Exact remote-view rules.** What does 2.0 let a player do remotely (radar coverage vs merely

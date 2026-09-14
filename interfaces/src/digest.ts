@@ -21,6 +21,7 @@ export const DigestSchema = z.object({
     platform: z.string().optional(),
     produced: luaArray(RateSchema),
     consumed: luaArray(RateSchema),
+    science: luaArray(RateSchema.extend({ per_minute_10h: z.number() })).default([]),
     age_ticks: z.number(),
   })),
   alerts: luaArray(z.object({ surface: z.string().optional(), type: z.string(), count: z.number() })),

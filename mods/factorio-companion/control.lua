@@ -149,12 +149,25 @@ local function top_rates(stats, category, limit)
     if rate > 0 then rates[#rates + 1] = { name = name, per_minute = rate } end
   end
   table.sort(rates, function(a, b) return a.per_minute > b.per_minute end)
-  local out, science = {}, {}
-  for i, entry in ipairs(rates) do
-    if i <= limit then out[#out + 1] = entry
-    elseif entry.name:find("science%-pack$") then science[#science + 1] = entry end
+  local out = {}
+  for i = 1, math.min(limit, #rates) do out[i] = rates[i] end
+  return out
+end
+
+-- Every science pack this surface has ever produced, with the current and 10-hour rates, so a
+-- stall (0 now, >0 over 10 h) is visible. Science is listed separately from the top items.
+local function science_rates(stats)
+  local out = {}
+  for name in pairs(stats.input_counts) do
+    if name:find("science%-pack$") then
+      out[#out + 1] = {
+        name = name,
+        per_minute = stats.get_flow_count({ name = name, category = "input", precision_index = defines.flow_precision_index.one_minute }),
+        per_minute_10h = stats.get_flow_count({ name = name, category = "input", precision_index = defines.flow_precision_index.ten_hours }),
+      }
+    end
   end
-  for _, entry in ipairs(science) do out[#out + 1] = entry end -- science packs always included
+  table.sort(out, function(a, b) return a.name < b.name end)
   return out
 end
 
@@ -177,6 +190,7 @@ local function refresh_step()
   local stats = game.forces.player.get_item_production_statistics(job.surface)
   local entry = rate_cache[job.surface.name] or {}
   entry[job.category] = top_rates(stats, job.category, TOP_ITEMS)
+  if job.category == "input" then entry.science = science_rates(stats) end
   entry.tick = game.tick
   rate_cache[job.surface.name] = entry
 end
@@ -194,12 +208,13 @@ handlers.digest = function()
   local surfaces = {}
   for _, surface in pairs(game.surfaces) do
     local cached = rate_cache[surface.name]
-    if cached and cached.input and #cached.input > 0 then
+    if cached and cached.input and (#cached.input > 0 or #(cached.science or {}) > 0) then
       surfaces[#surfaces + 1] = {
         name = surface.name,
         platform = surface.platform and surface.platform.name or nil,
         produced = cached.input,
         consumed = cached.output or {},
+        science = cached.science or {},
         age_ticks = game.tick - cached.tick,
       }
     end

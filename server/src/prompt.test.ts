@@ -5,7 +5,7 @@ import { buildMessages, formatSnapshot, SYSTEM_RULES, userTurn } from "./prompt"
 const digest = DigestSchema.parse({
   tick: 100, player: { name: "p", surface: "gleba", position: { x: 1, y: 2 } },
   research: { current: "carbon-fiber", progress: 0.62, queue: ["carbon-fiber", "stack-inserter"] },
-  surfaces: [{ name: "gleba", produced: [{ name: "agricultural-science-pack", per_minute: 37.94 }], consumed: {}, age_ticks: 30 }],
+  surfaces: [{ name: "gleba", produced: [{ name: "bioflux", per_minute: 37.94 }], consumed: {}, science: [{ name: "agricultural-science-pack", per_minute: 0, per_minute_10h: 15.64 }], age_ticks: 30 }],
   alerts: {},
 });
 
@@ -13,7 +13,8 @@ test("snapshot is compact text with rounded rates", () => {
   const text = formatSnapshot(digest, 4200);
   expect(text).toContain("[game state at tick 100, 4 s old]");
   expect(text).toContain("research: carbon-fiber 62%; queued: stack-inserter");
-  expect(text).toContain("gleba produced/min: agricultural-science-pack 37.9");
+  expect(text).toContain("gleba produced/min: bioflux 37.9");
+  expect(text).toContain("gleba science/min (now | 10h avg): agricultural-science-pack 0 | 15.6");
   expect(text).toContain("urgent alerts: none");
 });
 
