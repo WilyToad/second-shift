@@ -60,3 +60,6 @@ Times are commit times (local).
 - **S12 closed** (no hitches): all suites pass.
 - **Review:** FC-072, the hosted dev game's port 34197 is open on all interfaces. It's password-protected with max_players 1. If you want it closed, a macOS firewall rule for Factorio is the likely route; your call.
 - S13 "Blueprint throughput" planned and activated (delegated): FC-097 per-minute flows and belt load for pasted blueprints, FC-105 inserter limits, FC-106 e2e question.
+- FC-097 done: pasted blueprints now get per-minute inputs/outputs and belt load. On the real Gleba blueprint: 4 magazine assemblers need 1,200 iron plate/min (44% of one express belt).
+- FC-105 done: inserter limits (dump v6). Pickup/drop geometry checked against inserters built from a real blueprint item in the dev game (on a temporary surface, deleted after).
+

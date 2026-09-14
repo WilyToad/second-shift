@@ -30,5 +30,11 @@ export function applyResearchState(data: Prototypes, state: ResearchState): { da
     technologies[name] = { ...tech, researched: researched.has(name) };
     changed.push(`technology ${name}`);
   }
-  return { data: changed.length ? { ...data, recipes, technologies } : data, changed };
+  let inserter_bonuses = data.inserter_bonuses;
+  const b = state.inserter_bonuses;
+  if (b && (b.stack !== inserter_bonuses.stack || b.bulk !== inserter_bonuses.bulk)) {
+    inserter_bonuses = b;
+    changed.push("inserter bonuses");
+  }
+  return { data: changed.length ? { ...data, recipes, technologies, inserter_bonuses } : data, changed };
 }

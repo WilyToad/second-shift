@@ -9,6 +9,11 @@ return function(handlers)
     "boiler", "generator", "reactor", "agricultural-tower", "character",
   }
 
+  -- Researched hand size bonuses: `stack` for ordinary inserters, `bulk` for bulk-type ones.
+  local function inserter_bonuses(force)
+    return { stack = force.inserter_stack_size_bonus, bulk = force.bulk_inserter_capacity_bonus }
+  end
+
   -- What research can change: enabled recipes, recipe productivity bonuses and researched technologies.
   -- The server patches its cached dump with this instead of dumping everything again (~26 ms).
   -- With `technologies`, only those technologies and the recipes their effects touch (~0.05 ms; used
@@ -16,6 +21,7 @@ return function(handlers)
   -- where it also catches recipes other mods enabled from scripts).
   handlers.research_state = function(args)
     local force = game.forces.player
+    local bonuses = inserter_bonuses(force)
     -- Compact on purpose: a table per recipe made the whole-force reply 5.4 ms instead of 1.3 ms.
     local enabled, bonus, researched = {}, {}, {}
     local function recipe(name, fr)
@@ -29,7 +35,7 @@ return function(handlers)
     if not args.technologies then
       for name, fr in pairs(force.recipes) do recipe(name, fr) end
       for name, ft in pairs(force.technologies) do technology(name, ft) end
-      return { enabled_recipes = enabled, productivity_bonus = bonus, researched_technologies = researched }
+      return { enabled_recipes = enabled, productivity_bonus = bonus, researched_technologies = researched, inserter_bonuses = bonuses }
     end
     local recipes, technologies = {}, {}
     for _, name in ipairs(args.technologies) do
@@ -46,7 +52,7 @@ return function(handlers)
         end
       end
     end
-    return { recipes = recipes, technologies = technologies, enabled_recipes = enabled, productivity_bonus = bonus, researched_technologies = researched }
+    return { recipes = recipes, technologies = technologies, enabled_recipes = enabled, productivity_bonus = bonus, researched_technologies = researched, inserter_bonuses = bonuses }
   end
 
   handlers.dump_prototypes = function()
@@ -131,6 +137,15 @@ return function(handlers)
             return (p and p > 0) and p or nil
           end),
         }
+        if e.type == "inserter" then
+          -- Swing speed, hand size and reach, for blueprint throughput. Positions are for facing north.
+          local m = machines[name]
+          m.rotation_speed = e.get_inserter_rotation_speed()
+          m.bulk = e.bulk
+          m.hand_bonus = e.inserter_stack_size_bonus
+          m.pickup = { e.inserter_pickup_position[1] or e.inserter_pickup_position.x, e.inserter_pickup_position[2] or e.inserter_pickup_position.y }
+          m.drop = { e.inserter_drop_position[1] or e.inserter_drop_position.x, e.inserter_drop_position[2] or e.inserter_drop_position.y }
+        end
       end
     end
 
@@ -164,6 +179,9 @@ return function(handlers)
     for name in pairs(prototypes.asteroid_chunk) do raw_set[name] = true end
     local raw_resources = sorted_keys(raw_set)
 
-    return { recipes = recipes, items = items, fluids = fluids, technologies = technologies, machines = machines, entities = entities, raw_resources = raw_resources }
+    return {
+      recipes = recipes, items = items, fluids = fluids, technologies = technologies, machines = machines, entities = entities, raw_resources = raw_resources,
+      inserter_bonuses = inserter_bonuses(force),
+    }
   end
 end

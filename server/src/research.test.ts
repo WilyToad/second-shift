@@ -33,3 +33,11 @@ test("a whole-force state sets every recipe, removes zero bonuses, and reports n
   expect(again.changed).toEqual([]);
   expect(again.data).toBe(next);
 });
+
+test("researched inserter hand size bonuses are patched too", () => {
+  const parsed = { ...data, inserter_bonuses: { stack: 0, bulk: 0 } } as Prototypes;
+  const state = { enabled_recipes: ["iron-gear-wheel"], productivity_bonus: {}, researched_technologies: [], recipes: [], technologies: [], inserter_bonuses: { stack: 1, bulk: 3 } };
+  const { data: next, changed } = applyResearchState(parsed, state);
+  expect(changed).toEqual(["inserter bonuses"]);
+  expect(next.inserter_bonuses).toEqual({ stack: 1, bulk: 3 });
+});

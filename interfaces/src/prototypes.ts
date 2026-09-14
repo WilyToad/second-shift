@@ -66,7 +66,15 @@ export const MachineSchema = z.strictObject({
   mining_speed: z.number().optional(),
   belt_speed: z.number().optional(),
   base_productivity: z.number().optional(), // e.g. foundry, electromagnetic plant, biochamber: 0.5
+  // Inserters: revolutions per tick, bulk type, built-in hand size bonus, pickup/drop offsets when facing north.
+  rotation_speed: z.number().optional(),
+  bulk: z.boolean().optional(),
+  hand_bonus: z.number().optional(),
+  pickup: z.tuple([z.number(), z.number()]).optional(),
+  drop: z.tuple([z.number(), z.number()]).optional(),
 });
+
+export const InserterBonusesSchema = z.object({ stack: z.number(), bulk: z.number() });
 
 /** A buildable entity's footprint: tile size and collision box [left, top, right, bottom] around its position. */
 export const EntityFootprintSchema = z.strictObject({
@@ -85,6 +93,8 @@ export const PrototypesSchema = z.strictObject({
   entities: z.record(z.string(), EntityFootprintSchema).default({}),
   // Gathered, not crafted: mined resources, harvested plants/fish, pumped tile fluids, asteroid chunks.
   raw_resources: luaArray(z.string()).default([]),
+  // Researched inserter hand size bonuses (dump v6).
+  inserter_bonuses: InserterBonusesSchema.default({ stack: 0, bulk: 0 }),
 });
 export type Prototypes = z.infer<typeof PrototypesSchema>;
 export type Recipe = z.infer<typeof RecipeSchema>;

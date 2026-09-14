@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { DigestSchema } from "./digest";
 import { luaArray } from "./protocol";
-import { PrototypesSchema } from "./prototypes";
+import { InserterBonusesSchema, PrototypesSchema } from "./prototypes";
 
 export const InfoSchema = z.object({
   protocol: z.number(),
@@ -88,6 +88,7 @@ export const actions = {
       enabled_recipes: luaArray(z.string()),
       productivity_bonus: z.record(z.string(), z.number()), // only non-zero bonuses
       researched_technologies: luaArray(z.string()),
+      inserter_bonuses: InserterBonusesSchema.optional(),
     }),
     kind: "look",
   },

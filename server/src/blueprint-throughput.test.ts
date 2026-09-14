@@ -18,6 +18,8 @@ const p = PrototypesSchema.parse({
     "transport-belt": { type: "transport-belt", size: [1, 1], belt_speed: 0.03125 },
     "fast-transport-belt": { type: "transport-belt", size: [1, 1], belt_speed: 0.0625 },
     beacon: { type: "beacon", size: [3, 3] },
+    inserter: { type: "inserter", size: [1, 1], rotation_speed: 0.014, bulk: false, hand_bonus: 0, pickup: [0, -1], drop: [0, 1.2] },
+    "bulk-inserter": { type: "inserter", size: [1, 1], rotation_speed: 0.04, bulk: true, hand_bonus: 0, pickup: [0, -1], drop: [0, 1.2] },
   },
 });
 const bp = (entities: object[]) => BlueprintSchema.parse({ item: "blueprint", entities: entities.map((e, i) => ({ entity_number: i + 1, position: { x: i * 4, y: 0 }, ...e })) });
@@ -62,3 +64,25 @@ test("says what it couldn't count", () => {
   expect(t.notes).toEqual(["modules and beacons not counted (1 machines with modules, 1 beacons)", "1 machines of higher quality counted at normal speed", "1 furnaces pick their recipe from their input, not counted"]);
   expect(describeThroughput(blueprintThroughput(bp([{ name: "stone-furnace" }]), p))).toBe("throughput: nothing countable (1 furnaces pick their recipe from their input, not counted)");
 });
+
+test("inserters that can't keep up with their machine, from pickup and drop geometry", () => {
+  // Gear assembler at tiles 0-2: 1.5 crafts/s → 3 plates/s in, 1.5 gears/s out.
+  // North of it an inserter facing north drops into it; south, one facing north picks up from it;
+  // east, one facing east (pickup +x, drop -x) also drops into it. No research: hand 1, 0.84 items/s each.
+  const layout = [
+    { name: "assembling-machine-2", recipe: "iron-gear-wheel", position: { x: 1.5, y: 1.5 } },
+    { name: "inserter", position: { x: 1.5, y: -0.5 }, direction: 0 },
+    { name: "inserter", position: { x: 1.5, y: 3.5 }, direction: 0 },
+    { name: "inserter", position: { x: 3.5, y: 1.5 }, direction: 4 },
+  ].map((e, i) => ({ entity_number: i + 1, ...e }));
+  const t = blueprintThroughput(BlueprintSchema.parse({ item: "blueprint", entities: layout }), p);
+  expect(t.limits.map((l) => [l.side, l.machines, l.needPerSecond, Math.round(l.capacityPerSecond * 100) / 100])).toEqual([["output", 1, 1.5, 0.84], ["input", 1, 3, 1.68]]);
+  expect(describeThroughput(t)).toContain("inserters too slow (estimated from swing time): 1× assembling-machine-2 (iron-gear-wheel) output needs 1.5/s but its inserters move about 0.8/s");
+
+  // Researched bonuses and a bulk inserter on the output: 12 × 0.04 × 60 = 28.8/s, no limit there.
+  const researched = { ...p, inserter_bonuses: { stack: 2, bulk: 11 } };
+  const bulk = layout.map((e) => (e.entity_number === 3 ? { ...e, name: "bulk-inserter" } : e));
+  const t2 = blueprintThroughput(BlueprintSchema.parse({ item: "blueprint", entities: bulk }), researched);
+  expect(t2.limits).toEqual([]); // input: 2 inserters × hand 3 × 0.84 = 5.04/s ≥ 3/s
+});
+
