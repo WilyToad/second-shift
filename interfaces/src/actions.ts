@@ -28,6 +28,8 @@ export const FindEntitiesArgsSchema = z.object({
   direction: z.enum(DIRECTIONS).default("around"),
   radius: z.number().positive().max(128).default(32),
   mine: z.boolean().optional(),
+  /** "character": around where the character stands (default); "view": around where the player is looking. */
+  from: z.enum(["character", "view"]).optional(),
 });
 
 export const FindEntitiesSchema = z.object({
@@ -39,6 +41,7 @@ export const FindEntitiesSchema = z.object({
   count: z.number(),
   by_name: z.preprocess((v) => (Array.isArray(v) ? {} : v), z.record(z.string(), z.number())),
   not_visible: z.number(),
+  from: z.enum(["character", "view"]).optional(),
   entities: luaArray(EntityRefSchema),
   truncated: z.boolean(),
 });
@@ -104,11 +107,11 @@ export const actions = {
     kind: "look",
   },
   queue_research: { args: z.object({ technology: z.string() }), data: z.object({ queued: z.string(), queue: luaArray(z.string()) }), kind: "small_request" },
-  add_map_tag: { args: z.object({ x: z.number().optional(), y: z.number().optional(), text: z.string().max(200) }), data: z.object({ x: z.number(), y: z.number(), text: z.string() }), kind: "small_request" },
+  add_map_tag: { args: z.object({ x: z.number().optional(), y: z.number().optional(), surface: z.string().optional(), text: z.string().max(200) }), data: z.object({ x: z.number(), y: z.number(), text: z.string() }), kind: "small_request" },
   camera_to: { args: z.object({ x: z.number(), y: z.number(), surface: z.string().optional() }), data: z.object({ surface: z.string(), x: z.number(), y: z.number() }), kind: "small_request" },
   mark_upgrade: { args: TargetsSchema.extend({ target: z.string().optional() }), data: ApplyResultSchema, kind: "map_change" },
   screenshot: {
-    args: z.object({ x: z.number().optional(), y: z.number().optional(), size: z.number().optional(), zoom: z.number().optional() }),
+    args: z.object({ x: z.number().optional(), y: z.number().optional(), size: z.number().optional(), zoom: z.number().optional(), from: z.enum(["character", "view"]).optional() }),
     data: z.object({ path: z.string(), surface: z.string(), x: z.number(), y: z.number(), size: z.number(), zoom: z.number(), tiles: z.number() }),
     kind: "look",
   },

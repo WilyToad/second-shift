@@ -237,6 +237,30 @@ export function targetRate(question: string): number | null {
   return parseTarget(question)?.perMinute ?? null;
 }
 
+/**
+ * Where "me" is when the player is in remote view (FC-092, decided with the player): "here", "this" and "on screen"
+ * follow where they're looking; "near me", "to my right" and "where I'm standing" follow their character. With
+ * neither, searches use the character and placements (paste, tag, screenshot) use the view.
+ */
+const CHARACTER_WORDS = /\b(near me|around me|next to me|close to me|by me|to my (left|right)|of me|where i'?m standing|where i am|my character)\b/i;
+const VIEW_WORDS = /\b(here|this spot|on (the )?screen|in view|where i'?m looking|what i'?m looking at)\b/i;
+export function anchorFor(question: string, kind: "search" | "place"): "character" | "view" {
+  if (CHARACTER_WORDS.test(question)) return "character";
+  if (VIEW_WORDS.test(question)) return "view";
+  return kind === "search" ? "character" : "view";
+}
+
+/** The spot and surface for an anchor, from the digest; the note says which one was used when they differ. */
+export function anchorSpot(digest: Digest | undefined, from: "character" | "view"): { x: number; y: number; surface?: string; note: string } | null {
+  const p = digest?.player;
+  if (!p) return null;
+  const view = { x: p.position.x, y: p.position.y, surface: p.surface };
+  const character = p.character_position ? { x: p.character_position.x, y: p.character_position.y, surface: p.character_surface ?? p.surface } : view;
+  const apart = p.remote_view && (character.surface !== view.surface || Math.hypot(character.x - view.x, character.y - view.y) > 16);
+  const note = !apart ? "" : from === "character" ? " (you're in map view: used your character's spot, not the map view)" : " (you're in map view: used the spot you're looking at, not your character)";
+  return { ...(from === "character" ? character : view), note };
+}
+
 /** The question the server asks for the player when they select a build with the in-game tool (main.ts). */
 export const SELECTED_PREFIX = "Review the build I just selected:";
 const SELECTED = /^Review the build I just selected:/;
@@ -596,9 +620,11 @@ export class Agent {
     if (!filter) return `I don't know what "${what}" refers to in this save. Nothing was searched.`;
     const direction = (["right", "left", "up", "down", "around"] as const).find((d) => d === args.direction) ?? "around";
     const radius = Math.min(Math.max(Number(args.radius) || 32, 1), 128);
-    const r: FindEntitiesResult = await this.deps.game.call("find_entities", { types: filter.types, names: filter.names, direction, radius });
+    const from = anchorFor(this.currentQuestion, "search");
+    const r: FindEntitiesResult = await this.deps.game.call("find_entities", { types: filter.types, names: filter.names, direction, radius, from });
     const compass = { right: "east", left: "west", up: "north", down: "south", around: "all directions" }[direction];
-    const where = `within ${radius} tiles ${direction === "around" ? "around" : `to the ${direction} (${compass}) of`} the player on ${r.surface}`;
+    const note = anchorSpot(this.deps.game.latest()?.digest, from)?.note ?? "";
+    const where = `within ${radius} tiles ${direction === "around" ? "around" : `to the ${direction} (${compass}) of`} the player on ${r.surface}${note}`;
     this.lastResult = { refs: r.entities, label: what, count: r.count, at: this.now(), where };
     if (r.count > 0) await this.deps.game.call("highlight", { entities: r.entities, seconds: HIGHLIGHT_SECONDS });
     const kinds = Object.entries(r.by_name).map(([n, c]) => `${n} ${c}`).join(", ");
@@ -691,11 +717,12 @@ export class Agent {
     const spot = last?.length
       ? { x: last.reduce((n, r) => n + r.x, 0) / last.length, y: last.reduce((n, r) => n + r.y, 0) / last.length }
       : undefined;
-    const r = await this.deps.game.call("screenshot", { ...(spot ?? {}), size: 1024, zoom: 0.5 });
+    const from = anchorFor(this.currentQuestion, "place");
+    const r = await this.deps.game.call("screenshot", { ...(spot ?? { from }), size: 1024, zoom: 0.5 });
     const name = await waitForShot(dir, r.path);
     pruneShots(join(dir, "companion"));
     const where = `${Math.round(r.tiles)} tiles across around (${Math.round(r.x)}, ${Math.round(r.y)}) on ${r.surface}`;
-    this.deps.emit({ type: "image", url: `/shots/${name}`, caption: `${spot ? this.lastResult!.label : "Your spot"}: ${where}` });
+    this.deps.emit({ type: "image", url: `/shots/${name}`, caption: `${spot ? this.lastResult!.label : from === "character" ? "Your character" : "Your view"}: ${where}` });
     return `A screenshot is now shown to the player: ${where}. You can't see it; don't describe its contents.`;
   }
 
@@ -744,15 +771,16 @@ export class Agent {
     const kind = args.kind === "camera" ? "camera" : "tag";
     const digest = this.deps.game.latest()?.digest;
     const atLast = args.at === "last_result" && this.lastResult?.refs[0];
-    const spot = atLast ? { x: this.lastResult!.refs[0]!.x, y: this.lastResult!.refs[0]!.y } : digest?.player ? { x: digest.player.position.x, y: digest.player.position.y } : null;
+    const here = anchorSpot(digest, anchorFor(this.currentQuestion, "place"));
+    const spot = atLast ? { x: this.lastResult!.refs[0]!.x, y: this.lastResult!.refs[0]!.y } : here ? { x: here.x, y: here.y, ...(here.surface ? { surface: here.surface } : {}) } : null;
     if (!spot) return "Error: the player's position isn't known yet.";
     const run = async (): Promise<string> => {
       if (kind === "camera") {
         const r = await this.deps.game.call("camera_to", spot);
-        return `Camera moved to (${r.x}, ${r.y}) on ${r.surface}. Press Esc in-game to return.`;
+        return `Camera moved to (${r.x}, ${r.y}) on ${r.surface}. Press Esc in-game to return.${atLast ? "" : here?.note ?? ""}`;
       }
       const r = await this.deps.game.call("add_map_tag", { ...spot, text: String(args.text ?? "companion") });
-      return `Map tag "${r.text}" added at (${r.x}, ${r.y}).`;
+      return `Map tag "${r.text}" added at (${r.x}, ${r.y}).${atLast ? "" : here?.note ?? ""}`;
     };
     const wanted = kind === "camera" ? /\b(camera|jump|show me|take me|go to|look at)\b/i : /\b(tag|pin|label|mark (it )?on (the )?map)\b/i;
     if (!this.asked(wanted)) return this.card(kind === "camera" ? `Move your camera to (${Math.floor(spot.x)}, ${Math.floor(spot.y)})?` : `Add a map tag at (${Math.floor(spot.x)}, ${Math.floor(spot.y)})?`, kind === "camera" ? "Opens remote view there; nothing in the factory changes." : `Tag text: ${String(args.text ?? "companion")}`, run);
@@ -768,9 +796,13 @@ export class Agent {
   private proposeBlueprint(): string {
     const bp = this.lastBlueprint;
     if (!bp || this.now() - bp.at > RESULT_TTL_MS) return "Error: no blueprint has been pasted or built recently. Ask the player to paste one or request one first.";
-    const position = this.deps.game.latest()?.digest.player?.position;
+    const digest = this.deps.game.latest()?.digest;
+    const from = anchorFor(this.currentQuestion, "place");
+    const position = anchorSpot(digest, from);
     if (!position) return "Error: the player's position isn't known yet.";
-    return this.card(`Paste the blueprint at your position (${position.x}, ${position.y})?`, "Placed as ghosts, like pasting it yourself; construction robots build it and Ctrl+Z undoes it.", async () => {
+    // A paste lands on the surface the player is looking at, like pasting by hand.
+    if (from === "character" && position.surface !== digest?.player?.surface) return `Error: the player's character is on ${position.surface} but they're viewing ${digest?.player?.surface}; a paste can only go where they're looking. Ask them to go back to their character or say "paste it here".`;
+    return this.card(`Paste the blueprint at ${from === "character" ? "your character" : "your position"} (${position.x}, ${position.y})?`, `Placed as ghosts, like pasting it yourself; construction robots build it and Ctrl+Z undoes it.${position.note}`, async () => {
       const r = await this.deps.game.call("place_blueprint", { blueprint: bp.raw, x: position.x, y: position.y });
       return `Placed ${r.placed} of ${r.expected} ghosts at (${r.x}, ${r.y})${r.placed < r.expected ? " (some spots were blocked)" : ""}.`;
     });

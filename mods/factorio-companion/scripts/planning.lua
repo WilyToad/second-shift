@@ -77,9 +77,11 @@ return function(handlers)
   -- Small request: a map tag where the player could place one (charted map on their surface).
   handlers.add_map_tag = function(args)
     local player = require_player()
+    local surface = args.surface and game.get_surface(args.surface) or player.surface
+    if not surface then reject("unknown_surface", "No surface named " .. tostring(args.surface) .. ".") end
     local position = { x = tonumber(args.x) or player.position.x, y = tonumber(args.y) or player.position.y }
-    if not player.force.is_chunk_charted(player.surface, chunk_of(position)) then reject("not_charted", "That spot isn't on the player's map yet.") end
-    local tag = player.force.add_chart_tag(player.surface, { position = position, text = tostring(args.text or ""), last_user = player })
+    if not player.force.is_chunk_charted(surface, chunk_of(position)) then reject("not_charted", "That spot isn't on the player's map yet.") end
+    local tag = player.force.add_chart_tag(surface, { position = position, text = tostring(args.text or ""), last_user = player })
     if not tag then reject("tag_refused", "The game didn't accept a tag there.") end
     return { x = math.floor(position.x), y = math.floor(position.y), text = tag.text }
   end
@@ -130,20 +132,21 @@ return function(handlers)
   local shots = 0
   handlers.screenshot = function(args)
     local player = require_player()
-    local position = { x = tonumber(args.x) or player.position.x, y = tonumber(args.y) or player.position.y }
-    if not helmet.visible(player.force, player.surface, position) then reject("not_visible", "The player can't see that spot right now.") end
+    local anchor, surface = util.anchor(player, args.from)
+    local position = { x = tonumber(args.x) or anchor.x, y = tonumber(args.y) or anchor.y }
+    if not helmet.visible(player.force, surface, position) then reject("not_visible", "The player can't see that spot right now.") end
     local size = math.max(256, math.min(2048, math.floor(tonumber(args.size) or 1024)))
     local zoom = math.max(0.1, math.min(2, tonumber(args.zoom) or 0.5))
     -- The counter only names files in the reply; nothing in storage depends on it.
     shots = shots + 1
     local path = "companion/shot-" .. game.tick .. "-" .. shots .. ".jpg"
     game.take_screenshot({
-      player = player, by_player = player, surface = player.surface, position = position,
+      player = player, by_player = player, surface = surface, position = position,
       resolution = { size, size }, zoom = zoom, path = path, quality = 80,
       show_gui = false, show_entity_info = true, anti_alias = false,
     })
     -- At zoom 1 a tile is 32 px.
-    return { path = path, surface = player.surface.name, x = position.x, y = position.y, size = size, zoom = zoom, tiles = size / (32 * zoom) }
+    return { path = path, surface = surface.name, x = position.x, y = position.y, size = size, zoom = zoom, tiles = size / (32 * zoom) }
   end
 
   -- Map change (approval in the app): set the recipe of assembling machines, as the player could in the

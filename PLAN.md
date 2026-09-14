@@ -653,6 +653,9 @@ judge by time to first token.
     search and mark only in chunks the force can see now (`force.is_chunk_visible`).
     **2026-09-14, player-verified:** in remote view, a deconstruction planner drag is blocked both over fog of
     war (charted, not currently seen) and over uncharted map. The conservative rule matches the game for marks.
+    **2026-09-14, decided with the player (FC-092):** "here / this / on screen" means where the player is looking;
+    "near me / to my right / where I'm standing" means the character; otherwise searches use the character and
+    placements use the view, and answers say which was used when they differ.
     Still open: which entity settings can be changed remotely (for example, whether a recipe change returns
     ingredients to the inventory).
 11. **Character control vs player input.** Does the player's own movement override

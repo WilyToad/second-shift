@@ -139,6 +139,10 @@ return function(handlers)
         name = player.name,
         surface = player.surface.name,
         position = { x = math.floor(player.position.x), y = math.floor(player.position.y) },
+        -- In remote view `position` is where the player is looking; the character stays here (FC-092).
+        remote_view = player.controller_type == defines.controllers.remote,
+        character_surface = player.physical_surface.name,
+        character_position = { x = math.floor(player.physical_position.x), y = math.floor(player.physical_position.y) },
       } or nil,
       research = {
         current = force.current_research and force.current_research.name or nil,

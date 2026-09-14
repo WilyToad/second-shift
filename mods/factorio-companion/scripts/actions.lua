@@ -36,13 +36,15 @@ return function(handlers)
   handlers.find_entities = function(args)
     local player = require_player()
     local radius = math.min(tonumber(args.radius) or 32, MAX_RADIUS)
-    local area = relative_area(player.position, args.direction or "around", radius)
+    -- "near me" searches around the character, "here/on screen" around where the player is looking (FC-092).
+    local center, surface = util.anchor(player, args.from)
+    local area = relative_area(center, args.direction or "around", radius)
     local filter = { area = { area.left_top, area.right_bottom } }
     if args.types and #args.types > 0 then filter.type = args.types end
     if args.names and #args.names > 0 then filter.name = args.names end
     if args.mine then filter.force = player.force end
 
-    local found = player.surface.find_entities_filtered(filter)
+    local found = surface.find_entities_filtered(filter)
     local visible_chunk = {}
     local entities, by_name, hidden = {}, {}, 0
     local count, not_visible = 0, 0
@@ -51,7 +53,7 @@ return function(handlers)
         hidden = hidden + 1
       else
         local key = math.floor(e.position.x / 32) .. ":" .. math.floor(e.position.y / 32)
-        if visible_chunk[key] == nil then visible_chunk[key] = helmet.visible(player.force, player.surface, e.position) end
+        if visible_chunk[key] == nil then visible_chunk[key] = helmet.visible(player.force, surface, e.position) end
         if visible_chunk[key] then
           count = count + 1
           by_name[e.name] = (by_name[e.name] or 0) + 1
@@ -62,8 +64,9 @@ return function(handlers)
       end
     end
     return {
-      surface = player.surface.name,
-      center = { x = player.position.x, y = player.position.y },
+      surface = surface.name,
+      center = { x = center.x, y = center.y },
+      from = args.from == "view" and "view" or "character",
       direction = args.direction or "around",
       radius = radius,
       area = area,

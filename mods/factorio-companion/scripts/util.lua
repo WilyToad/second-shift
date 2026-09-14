@@ -40,4 +40,11 @@ function util.reject(code, message)
   error({ code = code, message = message }, 0)
 end
 
+--- Where "me" is (FC-092): "view" is where the player is looking (remote view moves it), "character" is
+--- where their character stands. Returns position, surface.
+function util.anchor(player, from)
+  if from == "view" then return player.position, player.surface end
+  return player.physical_position, player.physical_surface
+end
+
 return util

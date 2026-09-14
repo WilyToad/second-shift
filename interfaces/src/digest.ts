@@ -24,6 +24,10 @@ export const DigestSchema = z.object({
     name: z.string(),
     surface: z.string(),
     position: z.object({ x: z.number(), y: z.number() }),
+    // FC-092: in remote view `position` is where the player looks; the character is here.
+    remote_view: z.boolean().optional(),
+    character_surface: z.string().optional(),
+    character_position: z.object({ x: z.number(), y: z.number() }).optional(),
   }).optional(),
   research: z.object({
     current: z.string().optional(),

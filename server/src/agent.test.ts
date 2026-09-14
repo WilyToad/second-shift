@@ -6,7 +6,7 @@ import type { ActionName } from "@companion/interfaces";
 import { DigestSchema, PrototypesSchema } from "@companion/interfaces";
 import { encodeBlueprintString } from "./blueprint";
 import { RecipeRetriever } from "./retrieval";
-import { Agent, compactHistory, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsBlueprint, wantsChart, type GameActions, type SessionData, type SessionStore } from "./agent";
+import { Agent, anchorFor, anchorSpot, compactHistory, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsBlueprint, wantsChart, type GameActions, type SessionData, type SessionStore } from "./agent";
 import { rowPrototypes } from "./fixtures/row-prototypes";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
@@ -360,5 +360,33 @@ test("a screenshot of the last result is taken where it is, waited for, and show
   expect(events.find((e) => e.type === "image")).toEqual({ type: "image", url: "/shots/shot-5-1.jpg", caption: "rails: 64 tiles across around (12, -7) on gleba" });
   const toolReply = model.seen[2]!.find((m) => m.role === "tool" && m.content.startsWith("A screenshot"));
   expect(toolReply?.content).toContain("don't describe its contents");
+});
+
+test("in remote view, 'here' follows the view and 'near me' follows the character (FC-092)", () => {
+  expect(anchorFor("How many belts are near me on the right?", "search")).toBe("character");
+  expect(anchorFor("What's this spot on screen?", "search")).toBe("view");
+  expect(anchorFor("Paste it here", "place")).toBe("view");
+  expect(anchorFor("Take a screenshot of where I'm standing", "place")).toBe("character");
+  expect(anchorFor("How many assemblers are there?", "search")).toBe("character");
+  expect(anchorFor("Put a map tag that says ore", "place")).toBe("view");
+
+  const remote = DigestSchema.parse({ tick: 1, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {},
+    player: { name: "p", surface: "nauvis", position: { x: 500, y: 0 }, remote_view: true, character_surface: "nauvis", character_position: { x: 0, y: 0 } } });
+  expect(anchorSpot(remote, "character")).toEqual({ x: 0, y: 0, surface: "nauvis", note: " (you're in map view: used your character's spot, not the map view)" });
+  expect(anchorSpot(remote, "view")).toEqual({ x: 500, y: 0, surface: "nauvis", note: " (you're in map view: used the spot you're looking at, not your character)" });
+  const walking = DigestSchema.parse({ tick: 1, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {},
+    player: { name: "p", surface: "nauvis", position: { x: 3, y: 4 }, remote_view: false, character_surface: "nauvis", character_position: { x: 3, y: 4 } } });
+  expect(anchorSpot(walking, "view")?.note).toBe("");
+});
+
+test("a paste 'near me' while viewing another surface is refused with a way forward", async () => {
+  const { agent, model } = setup([{ tool: "place_blueprint" }, { text: "You're viewing another surface." }]);
+  (agent as any).lastBlueprint = { raw: "0eNq", at: Date.now() };
+  const game = (agent as any).deps.game as GameActions;
+  game.latest = () => ({ receivedAt: 0, digest: DigestSchema.parse({ tick: 1, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {},
+    player: { name: "p", surface: "vulcanus", position: { x: 9, y: 9 }, remote_view: true, character_surface: "nauvis", character_position: { x: 0, y: 0 } } }) });
+  await agent.ask("Paste that blueprint near me");
+  const reply = model.seen[1]!.find((m) => m.role === "tool")!.content;
+  expect(reply).toContain("character is on nauvis but they're viewing vulcanus");
 });
 
