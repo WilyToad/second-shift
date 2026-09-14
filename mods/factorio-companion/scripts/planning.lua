@@ -51,6 +51,29 @@ return function(handlers)
     return { queued = tech.name, queue = queue }
   end
 
+  -- Look: technologies the player could queue right now (prerequisites done, researched by labs), cheapest first.
+  handlers.research_options = function()
+    local player = require_player()
+    local out = {}
+    for name, tech in pairs(player.force.technologies) do
+      if tech.enabled and not tech.researched and not tech.prototype.hidden and not tech.prototype.research_trigger then
+        local ready = true
+        for _, pre in pairs(tech.prerequisites) do if not pre.researched then ready = false; break end end
+        if ready then
+          local packs = {}
+          for _, ing in pairs(tech.research_unit_ingredients) do packs[#packs + 1] = ing.name end
+          out[#out + 1] = { name = name, count = tech.research_unit_count, packs = packs }
+        end
+      end
+    end
+    table.sort(out, function(a, b) return a.count * #a.packs < b.count * #b.packs end)
+    local top = {}
+    for i = 1, math.min(25, #out) do top[i] = out[i] end
+    local queue = {}
+    for _, t in pairs(player.force.research_queue or {}) do queue[#queue + 1] = t.name end
+    return { options = top, available = #out, queue = queue }
+  end
+
   -- Small request: a map tag where the player could place one (charted map on their surface).
   handlers.add_map_tag = function(args)
     local player = require_player()

@@ -100,6 +100,23 @@ return function(handlers)
       end
     end
 
-    return { recipes = recipes, items = items, fluids = fluids, technologies = technologies, machines = machines, entities = entities }
+    -- Things a player gathers rather than crafts: mined resources, harvested plants and fish, pumped tile
+    -- fluids and asteroid chunks. Production planning stops expanding at these.
+    local raw_set = {}
+    local function add_products(props)
+      if props and props.minable and props.products then
+        for _, product in pairs(props.products) do raw_set[product.name] = true end
+      end
+    end
+    for _, e in pairs(prototypes.get_entity_filtered({ { filter = "type", type = { "resource", "plant", "fish", "tree" } } })) do
+      add_products(e.mineable_properties)
+    end
+    for _, tile in pairs(prototypes.tile) do
+      if tile.fluid then raw_set[tile.fluid.name] = true end
+    end
+    for name in pairs(prototypes.asteroid_chunk) do raw_set[name] = true end
+    local raw_resources = sorted_keys(raw_set)
+
+    return { recipes = recipes, items = items, fluids = fluids, technologies = technologies, machines = machines, entities = entities, raw_resources = raw_resources }
   end
 end

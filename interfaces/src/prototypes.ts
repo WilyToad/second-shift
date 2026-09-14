@@ -80,6 +80,8 @@ export const PrototypesSchema = z.strictObject({
   machines: z.record(z.string(), MachineSchema),
   // Older captures predate this section.
   entities: z.record(z.string(), EntityFootprintSchema).default({}),
+  // Gathered, not crafted: mined resources, harvested plants/fish, pumped tile fluids, asteroid chunks.
+  raw_resources: luaArray(z.string()).default([]),
 });
 export type Prototypes = z.infer<typeof PrototypesSchema>;
 export type Recipe = z.infer<typeof RecipeSchema>;

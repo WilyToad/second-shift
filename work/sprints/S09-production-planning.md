@@ -8,8 +8,9 @@
 
 ## Items
 
-- [ ] FC-094 Ratio calculator
+- [x] FC-094 Ratio calculator
   - Acceptance: for an item and target rate, expands the recipe tree (canonical recipes, cycles cut, depth capped), picks a crafter the player can use, and returns machines per step and raw input rates; unit tests with hand-checked vanilla ratios
+  - `server/src/planner.ts`: canonical unlocked recipes, fastest unlocked crafter, merged intermediates, catalysts counted net, cycles cut. The mod dump now lists raw resources (mined, harvested, pumped, asteroid chunks; DUMP_VERSION 3) so plans stop at ore and oil instead of asteroid crushing or barrel emptying. Hand-checked tests (circuits, gears, catalysts)
 - [ ] FC-047 Throughput analysis for builds and blueprints
   - Acceptance: folded into FC-094/FC-095 for planning questions; blueprint throughput stays for later
 - [ ] FC-095 Computed plans in rate questions
