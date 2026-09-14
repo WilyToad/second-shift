@@ -29,9 +29,13 @@ export function recipeLine(name: string, r: Recipe, crafters?: Map<string, strin
   const ins = r.ingredients.map((i) => `${amount(i)} ${i.name}`).join(", ") || "nothing";
   const outs = r.products.map((p) => `${amount(p)} ${p.name}`).join(", ") || "nothing";
   const bound = (op: string, v: number | undefined) => (v === undefined || Math.abs(v) > 1e300 ? "" : `${op}${num(v)}`); // engine uses ±DBL_MAX for "no limit"
-  const where = r.surface_conditions?.length ? ` [${r.surface_conditions.map((c) => `${c.property}${bound(">=", c.min)}${bound("<=", c.max)}`).join(" ")}]` : "";
+  const condition = (c: { property: string; min?: number; max?: number }) =>
+    c.min !== undefined && c.min === c.max ? `${c.property}=${num(c.min)}` : `${c.property}${bound(">=", c.min)}${bound("<=", c.max)}`;
+  const where = r.surface_conditions?.length ? ` [${r.surface_conditions.map(condition).join(" ")}]` : "";
+  // With crafters listed the category name is redundant (and it misled the model), so it's dropped.
   const madeIn = crafters ? ` made in: ${(crafters.get(r.category) ?? []).join(", ") || "nothing in this save"}` : "";
-  return `${name}: ${ins} -> ${outs} (${num(r.energy)}s ${r.category}${r.enabled ? "" : ", locked"})${where}${madeIn}`;
+  const category = crafters ? "" : ` ${r.category}`;
+  return `${name}: ${ins} -> ${outs} (${num(r.energy)}s${category}${r.enabled ? "" : ", locked"})${where}${madeIn}`;
 }
 
 export function formatRecipes(p: Prototypes, filter: (name: string, r: Recipe) => boolean = () => true): string {

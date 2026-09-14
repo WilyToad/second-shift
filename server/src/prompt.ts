@@ -68,6 +68,7 @@ export function systemPrompt(prototypes: Prototypes | null): string {
 }
 
 export const CACHE_BLOCK_TOKENS = 2048;
+const ALIGN_MARGIN_TOKENS = 24;
 
 /**
  * oMLX caches whole 2,048-token blocks, so a stable prefix that ends mid-block gets that block
@@ -78,14 +79,18 @@ export const CACHE_BLOCK_TOKENS = 2048;
 export async function alignToCacheBlock(system: string, referenceLines: string[], measure: (system: string) => Promise<number>, heading = "[save data: recipe categories and what crafts them]"): Promise<{ system: string; tokens: number; target: number }> {
   const base = await measure(system);
   const target = Math.ceil(base / CACHE_BLOCK_TOKENS) * CACHE_BLOCK_TOKENS;
-  if (base >= target - 16) return { system, tokens: base, target }; // already at a boundary
+  if (base >= target - CACHE_BLOCK_TOKENS + ALIGN_MARGIN_TOKENS && base <= target - CACHE_BLOCK_TOKENS + ALIGN_MARGIN_TOKENS * 3) return { system, tokens: base, target: target - CACHE_BLOCK_TOKENS }; // already just past a boundary
   const charsPerToken = system.length / base;
   let candidate = system;
   let tokens = base;
   let used = 0;
   // A few measured rounds: estimate how many lines are needed, then top up if still short.
-  for (let round = 0; round < 4 && tokens < target + 8 && used < referenceLines.length; round++) {
-    const missingChars = (target + 16 - tokens) * charsPerToken;
+  // `measure` includes a placeholder user turn (~10 template tokens), so the stable part must clear the
+  // boundary by a small margin; stopping right at 4,096 measured left block 2 uncached (S05). Tokens past
+  // the margin are re-read on every turn, so stop at the first line that crosses it.
+  const goal = target + ALIGN_MARGIN_TOKENS;
+  for (let round = 0; round < 6 && tokens < goal && used < referenceLines.length; round++) {
+    const missingChars = Math.max(goal - tokens, 1) * charsPerToken * 0.9;
     let added = 0;
     while (used < referenceLines.length && added < missingChars) {
       const line = referenceLines[used++]!;

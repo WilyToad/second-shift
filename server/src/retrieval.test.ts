@@ -11,14 +11,15 @@ const mini = PrototypesSchema.parse({
     "copper-cable": { category: "crafting", energy: 0.5, enabled: true, maximum_productivity: 3, ingredients: [{ type: "item", name: "copper-plate", amount: 1 }], products: [{ type: "item", name: "copper-cable", amount: 2 }] },
   },
   items: { "electronic-circuit": { type: "item", stack_size: 200 }, "copper-cable": { type: "item", stack_size: 200 }, "iron-plate": { type: "item", stack_size: 100 } },
-  fluids: {}, technologies: {}, machines: {},
+  fluids: {}, technologies: {},
+  machines: { "assembling-machine-1": { type: "assembling-machine", size: [3, 3], crafting_categories: ["crafting", "electronics"], crafting_speed: 0.5 } },
 });
 
 test("nicknames and plurals match, and ingredients' recipes come along", () => {
   const r = new RecipeRetriever(mini).retrieve("How many green circuits per minute?");
   expect(r.matched).toContain("item:electronic-circuit");
   expect(r.lines[0]).toStartWith("electronic-circuit: 1 iron-plate, 3 copper-cable -> 1 electronic-circuit");
-  expect(r.lines[0]).toEndWith("made in: nothing in this save"); // mini fixture has no machines
+  expect(r.lines[0]).toEndWith("(0.5s) made in: assembling-machine-1");
   expect(r.lines.some((l) => l.startsWith("copper-cable:"))).toBe(true);
 });
 

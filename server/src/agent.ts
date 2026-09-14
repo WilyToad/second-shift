@@ -2,7 +2,7 @@
 // Looks run immediately; map changes wait for the player to confirm a card in the web page.
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import type { ActionArgs, ActionData, ActionName, EntityRef, FindEntitiesResult, Prototypes } from "@companion/interfaces";
+import type { ActionArgs, ActionData, ActionName, Digest, EntityRef, FindEntitiesResult, Prototypes } from "@companion/interfaces";
 import { resolveEntityFilter } from "./entities";
 import type { Snapshot } from "./game";
 import type { ServerMessage } from "./messages";
@@ -90,6 +90,25 @@ export function wantsChart(question: string): boolean {
   return /\b(chart|graph|plot|trend\w*|over time|history|holding|steady|stable|drop\w*|fall\w*|ris\w*|increas\w*|decreas\w*|slow\w* down|how('s| is) .+ doing)\b/i.test(question);
 }
 
+/**
+ * A rate_chart block for a trend question whose answer didn't include one: the first asked-about item
+ * the digest tracks, on the surface named in the question, else the player's, else the busiest.
+ */
+export function fallbackChart(question: string, items: string[], digest: Digest | undefined): string | null {
+  if (!digest) return null;
+  const q = question.toLowerCase().replace(/[-_]/g, " ");
+  for (const item of items) {
+    const surfaces = digest.surfaces
+      .map((s) => ({ s, rate: [...s.produced, ...s.science].find((r) => r.name === item)?.per_minute }))
+      .filter((x) => x.rate !== undefined);
+    if (!surfaces.length) continue;
+    const named = surfaces.filter((x) => q.includes(x.s.name.replace(/-/g, " ")) || (x.s.name.endsWith("factory-floor") && q.includes("factory floor")));
+    const pick = named[0] ?? surfaces.find((x) => x.s.name === digest.player?.surface) ?? surfaces.sort((a, b) => b.rate! - a.rate!)[0]!;
+    return `\n\n\`\`\`rate_chart\nitem=${item} surface=${pick.s.name} window=30m\n\`\`\``;
+  }
+  return null;
+}
+
 const plural = (n: number, word: string) => `${n} ${n === 1 ? word : word.endsWith("y") ? `${word.slice(0, -1)}ies` : `${word}s`}`;
 
 export class Agent {
@@ -169,7 +188,12 @@ export class Agent {
           ms: result.totalMs, toolCalls: result.toolCalls.length,
         });
         if (result.toolCalls.length === 0) {
-          working.push({ role: "assistant", content: result.text });
+          let text = result.text;
+          if (chart && !text.includes("```rate_chart")) {
+            const block = fallbackChart(question, found?.items ?? [], snap?.digest);
+            if (block) { text += block; this.deps.emit({ type: "token", text: block }); }
+          }
+          working.push({ role: "assistant", content: text });
           this.history.push(...working);
           record.visibleTtftMs = ttftMs;
           record.totalMs = performance.now() - started;

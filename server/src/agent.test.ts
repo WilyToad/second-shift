@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type { ActionName } from "@companion/interfaces";
-import { Agent, needsWorldTools, wantsChart, type GameActions } from "./agent";
+import { DigestSchema } from "@companion/interfaces";
+import { Agent, fallbackChart, needsWorldTools, wantsChart, type GameActions } from "./agent";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
 
@@ -100,4 +101,17 @@ test("world questions are told apart from recipe questions", () => {
 test("trend questions ask for charts; recipe and research questions don't", () => {
   for (const q of ["How is my science doing? Show me a chart.", "Is my iron plate production holding steady?", "has bioflux dropped?"]) expect(wantsChart(q)).toBe(true);
   for (const q of ["What do I need before I can research agricultural science?", "What's the recipe for carbon fiber?"]) expect(wantsChart(q)).toBe(false);
+});
+
+test("fallback chart picks the asked-about item on the named surface", () => {
+  const digest = DigestSchema.parse({
+    tick: 1, player: { name: "p", surface: "gleba", position: { x: 0, y: 0 } }, research: { progress: 0, queue: {} }, alerts: {},
+    surfaces: [
+      { name: "nauvis", produced: [{ name: "iron-plate", per_minute: 50 }], consumed: {}, science: {}, age_ticks: 0 },
+      { name: "nauvis-factory-floor", produced: [{ name: "iron-plate", per_minute: 700 }], consumed: {}, science: {}, age_ticks: 0 },
+    ],
+  });
+  expect(fallbackChart("Is my iron plate production on the factory floor holding steady?", ["iron-plate"], digest)).toContain("item=iron-plate surface=nauvis-factory-floor");
+  expect(fallbackChart("is iron plate holding steady?", ["iron-plate"], digest)).toContain("surface=nauvis-factory-floor"); // busiest when not named and not on player's surface
+  expect(fallbackChart("is bioflux steady?", ["bioflux"], digest)).toBeNull();
 });

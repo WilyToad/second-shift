@@ -85,28 +85,39 @@ export class RecipeRetriever {
   }
 
   /** Relevant lines for a question, capped. Returns the names it matched for transparency. */
-  retrieve(question: string, maxLines = 40): { matched: string[]; items: string[]; lines: string[] } {
+  retrieve(question: string, maxLines = 24): { matched: string[]; items: string[]; lines: string[] } {
     const entries = this.match(question);
     const recipes: string[] = [];
     const techs: string[] = [];
-    const addRecipe = (name: string) => { if (this.p.recipes[name] && !recipes.includes(name)) recipes.push(name); };
+    const hasMachines = this.crafters.size > 0;
+    // Skip recipes nothing in the save can craft, and recycling loops, unless asked for by name.
+    const useful = (name: string) => {
+      const r = this.p.recipes[name];
+      return !!r && (!hasMachines || (this.crafters.get(r.category)?.length ?? 0) > 0) && !r.category.startsWith("recycling");
+    };
+    const addRecipe = (name: string, force = false) => { if (this.p.recipes[name] && !recipes.includes(name) && (force || useful(name))) recipes.push(name); };
+    // The canonical recipe for an item first (named like the item), then the rest.
+    const producersOf = (item: string) => {
+      const list = (this.producers.get(item) ?? []).filter(useful);
+      return [...list.filter((n) => n === item), ...list.filter((n) => n !== item)];
+    };
     const addTech = (name: string) => { if (this.p.technologies[name] && !techs.includes(name)) techs.push(name); };
 
     for (const e of entries) {
-      if (e.kind === "recipe") addRecipe(e.name);
+      if (e.kind === "recipe") addRecipe(e.name, true);
       if (e.kind === "technology") addTech(e.name);
     }
     for (const e of entries.filter((x) => x.kind === "item" || x.kind === "fluid")) {
-      const made = this.producers.get(e.name) ?? [];
-      made.slice(0, 6).forEach(addRecipe);
+      const made = producersOf(e.name);
+      made.slice(0, 4).forEach((n) => addRecipe(n));
       // One level down: how the main recipe's ingredients are made.
       const main = made.find((n) => n === e.name) ?? made[0];
       // What research unlocks it, so "what do I need to research?" questions have the answer.
       if (main) (this.unlockedBy.get(main) ?? []).slice(0, 2).forEach(addTech);
-      for (const ing of main ? this.p.recipes[main]!.ingredients : []) (this.producers.get(ing.name) ?? []).slice(0, 2).forEach(addRecipe);
-      (this.users.get(e.name) ?? []).slice(0, 4).forEach(addRecipe);
+      for (const ing of main ? this.p.recipes[main]!.ingredients : []) producersOf(ing.name).slice(0, 1).forEach((n) => addRecipe(n));
+      (this.users.get(e.name) ?? []).filter(useful).slice(0, 2).forEach((n) => addRecipe(n));
     }
-    for (const t of techs) this.p.technologies[t]!.unlocks.slice(0, 5).forEach(addRecipe);
+    for (const t of techs) this.p.technologies[t]!.unlocks.slice(0, 5).forEach((n) => addRecipe(n));
 
     const lines = [
       ...techs.map((t) => techLine(t, this.p.technologies[t]!)),

@@ -46,7 +46,7 @@ test("stable prefix is padded with reference lines until it crosses the next cac
   const lines = Array.from({ length: 200 }, (_, i) => `category-${i}: machine-a, machine-b`);
   const aligned = await alignToCacheBlock(system, lines, measure);
   expect(aligned.target).toBe(4096);
-  expect(aligned.tokens).toBeGreaterThanOrEqual(4096);
+  expect(aligned.tokens).toBeGreaterThanOrEqual(4096 + 24); // clears the boundary despite the probe's user-turn tokens
   expect(aligned.tokens).toBeLessThan(4096 + 64); // just past the boundary, not a whole extra block
   expect(aligned.system.startsWith(system)).toBe(true);
 });
