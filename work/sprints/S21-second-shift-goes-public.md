@@ -37,8 +37,15 @@
   - Acceptance: in map view a paste card names the map view, not "your position"; a small blueprint's sketch is big enough to read
   - Found while recording: the card said "Paste the blueprint at your position (55, 40)?" while the player was in map view 12 tiles from their character, and a 10-tile blueprint drew at 14 px a tile (~150 px wide). The card now says "at the map view" in map view; small sketches draw at up to 24 px a tile. Agent unit test
 
-- [ ] FC-121 Feature captures
+- [ ] FC-130 The model sometimes writes its whole answer twice
+  - Notes: selection review of a 22-entity build (2026-09-14, recording): the answer (507 characters) came out twice back to back, 271 tokens out, and the page and saved history both show it twice. The model repeated itself; the server passed it through
+  - Acceptance: a guard drops an exact repeat of the answer (streamed text stops once the repeat is certain, history keeps one copy), with a unit test; eval runs log how often it happens
+
+- [x] FC-121 Feature captures
   - Acceptance: screenshots of the console, answers with charts, the blueprint card, the approval flow, a screenshot card and a selection review, plus at least one animation, taken from the dev save and saved in the repo for the README and website
+  - `docs/media/`: stills (1440 px PNG) and MP4 clips of a chart answer, a production plan, a blueprint request pasted with an approval card, a screenshot card and a selection review; an in-game timelapse of robots building the pasted blueprint; GIFs for the README (chart 0.3 MB, paste 0.6 MB, timelapse 2.9 MB). All answers are real and unedited; takes with model misses were redone and the misses logged (FC-126, FC-127, FC-130)
+  - `scripts/capture/`: `scene.ts` drives the console in a headless Chromium (own temporary profile, 1440 × 900 at 2×) and records timestamped screencast frames; `timelapse.ts` has the game render daylight frames of one spot through test tooling; `stage.ts` puts the player over open ground in the main robot network and clears the build between takes; `assemble.ts` turns frames into MP4. Screen recording was tried first and dropped: it captured other windows (Discord) and records black while the Mac is locked
+  - Four display problems found while recording were fixed: FC-125, FC-128, FC-129
 - [ ] FC-122 README and license
   - Acceptance: a new player can go from clone to a first answer following only the README (requirements, setup, launch, first questions, what the companion can and can't do, troubleshooting, development); MIT license; no personal paths
 - [ ] FC-123 Website, built and tested locally
