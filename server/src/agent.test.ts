@@ -3,7 +3,7 @@ import type { ActionName } from "@companion/interfaces";
 import { DigestSchema, PrototypesSchema } from "@companion/interfaces";
 import { encodeBlueprintString } from "./blueprint";
 import { RecipeRetriever } from "./retrieval";
-import { Agent, compactHistory, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsBlueprint, wantsChart, type GameActions } from "./agent";
+import { Agent, compactHistory, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsBlueprint, wantsChart, type GameActions, type SessionData, type SessionStore } from "./agent";
 import { rowPrototypes } from "./fixtures/row-prototypes";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
@@ -104,6 +104,17 @@ test("world questions are told apart from recipe questions", () => {
 test("trend questions ask for charts; recipe and research questions don't", () => {
   for (const q of ["How is my science doing? Show me a chart.", "Is my iron plate production holding steady?", "has bioflux dropped?"]) expect(wantsChart(q)).toBe(true);
   for (const q of ["What do I need before I can research agricultural science?", "What's the recipe for carbon fiber?"]) expect(wantsChart(q)).toBe(false);
+});
+
+test("a science question with no item named charts the busiest science pack", () => {
+  const digest = DigestSchema.parse({
+    tick: 1, player: { name: "p", surface: "nauvis", position: { x: 0, y: 0 } }, research: { progress: 0, queue: {} }, alerts: {},
+    surfaces: [{ name: "nauvis", produced: {}, consumed: {}, science: [
+      { name: "automation-science-pack", per_minute: 2, per_minute_10h: 15.6 },
+      { name: "chemical-science-pack", per_minute: 0, per_minute_10h: 16.5 },
+    ], age_ticks: 0 }],
+  });
+  expect(fallbackChart("How is my science doing? Show me a chart.", [], digest)).toContain("item=chemical-science-pack surface=nauvis");
 });
 
 test("fallback chart picks the asked-about item on the named surface", () => {
@@ -296,5 +307,27 @@ test("a recipe question about something not in the save gets that as data", asyn
   const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => new RecipeRetriever(prototypes), prototypes: () => prototypes, emit: () => {} });
   await agent.ask("How do I craft a quantum widget?");
   expect(model.seen[0]!.at(-1)!.content).toContain('[save data: no item, fluid, recipe or building in this save is named "quantum widget"');
+});
+
+test("the conversation is saved after each answer, restored by a new agent, and cleared by a reset", async () => {
+  let saved: SessionData | null = null;
+  const store: SessionStore = { load: () => saved, save: (d) => { saved = structuredClone(d); }, clear: () => { saved = null; } };
+  const events: ServerMessage[] = [];
+  const first = new Agent({ model: fakeModel([{ text: "Carbon fiber needs carbon and yumako mash." }]), game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: (m) => events.push(m), session: store });
+  await first.ask("What's the recipe for carbon fiber?");
+  expect(saved!.transcript).toEqual([{ kind: "user", text: "What's the recipe for carbon fiber?" }, { kind: "agent", text: "Carbon fiber needs carbon and yumako mash." }]);
+  expect(saved!.history.map((m) => m.role)).toEqual(["user", "assistant"]);
+
+  // A restarted server: the new agent starts with the saved conversation, and the model sees it.
+  const model = fakeModel([{ text: "You asked about carbon fiber." }]);
+  const second = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {}, session: store });
+  expect(second.transcript()).toHaveLength(2);
+  await second.ask("What did I just ask you about?");
+  expect(model.seen[0]!.some((m) => m.content.includes("Carbon fiber needs carbon"))).toBe(true);
+  expect(saved!.transcript).toHaveLength(4);
+
+  second.reset();
+  expect(saved).toBeNull();
+  expect(second.transcript()).toEqual([]);
 });
 

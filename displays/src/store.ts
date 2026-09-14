@@ -87,6 +87,14 @@ export function onMessage(m: ServerMessage): void {
     case "plan":
       if (streaming) streaming.plan.value = m.plan;
       break;
+    case "transcript":
+      // Replayed on connect: rebuild the thread unless this page already has it.
+      if (thread.value.length === 0) {
+        thread.value = m.items.map((item) => item.kind === "user"
+          ? { kind: "user" as const, key: keys++, text: item.text }
+          : { kind: "agent" as const, key: keys++, text: signal(item.text), meta: signal(null), plan: signal(null), blueprint: signal(null) });
+      }
+      break;
     case "blueprint":
       if (streaming) streaming.blueprint.value = m.blueprint;
       break;

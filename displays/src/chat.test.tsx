@@ -86,3 +86,22 @@ test("a big pasted blueprint's sketch shrinks its tiles to stay panel-sized", as
   // 760 / 400 tiles → 2 px per tile (the minimum), plus 6 px padding each side.
   expect(root.querySelector("svg")!.getAttribute("width")).toBe(String(400 * 2 + 12));
 });
+
+test("a page that connects later shows the conversation so far", async () => {
+  const { render } = await import("preact");
+  const { Thread } = await import("./chat");
+  const { onMessage } = await import("./store");
+  onMessage({ type: "reset" });
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  render(<Thread />, root);
+  onMessage({ type: "transcript", items: [{ kind: "user", text: "What's the recipe for carbon fiber?" }, { kind: "agent", text: "Carbon and yumako mash." }] });
+  await new Promise((r) => setTimeout(r, 10));
+  expect(root.querySelector(".msg.user")?.textContent).toBe("What's the recipe for carbon fiber?");
+  expect(root.textContent).toContain("Carbon and yumako mash.");
+  // A second replay (another page connecting) doesn't duplicate the thread.
+  onMessage({ type: "transcript", items: [{ kind: "user", text: "What's the recipe for carbon fiber?" }, { kind: "agent", text: "Carbon and yumako mash." }] });
+  await new Promise((r) => setTimeout(r, 10));
+  expect(root.querySelectorAll(".msg.user").length).toBe(1);
+});
+

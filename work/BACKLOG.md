@@ -19,7 +19,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 - [ ] FC-060 In-game UI (mod GUI chat panel / hotkey popup)
 - [ ] FC-061 Background Factorio test instance for measuring blueprints
 - [ ] FC-062 Voice in/out
-- [ ] FC-063 Session memory across play sessions
 
 ## Tech debt and risks
 

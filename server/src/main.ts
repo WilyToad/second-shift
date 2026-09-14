@@ -1,7 +1,7 @@
 // Factorio Companion server: game link + model + web chat on localhost.
 import chatPage from "../../displays/src/chat.html";
 import { DigestSchema } from "@companion/interfaces";
-import { Agent, SELECTED_PREFIX, TOOLS } from "./agent";
+import { Agent, fileSession, SELECTED_PREFIX, TOOLS } from "./agent";
 import { GameLink, type Snapshot } from "./game";
 import type { ClientMessage, ServerMessage } from "./messages";
 import { OmlxClient, readOmlxApiKey } from "./model";
@@ -38,6 +38,7 @@ const agent = new Agent({
   fallbackSnapshot: (): Snapshot | undefined => (replayDigest ? { digest: replayDigest, receivedAt: Date.now() } : undefined),
   emit: (m) => broadcast(m),
   turnLog: process.env.COMPANION_TURN_LOG ?? new URL("../../data/eval/turns.jsonl", import.meta.url).pathname,
+  session: fileSession(process.env.COMPANION_SESSION ?? new URL("../../data/session.json", import.meta.url).pathname),
 });
 
 const server = Bun.serve({
@@ -52,6 +53,9 @@ const server = Bun.serve({
     open(ws) {
       ws.subscribe("chat");
       ws.send(JSON.stringify(statusMessage()));
+      // The conversation so far, so a reloaded page (or a restarted server) shows where things stand (FC-063).
+      const transcript = agent.transcript();
+      if (transcript.length) ws.send(JSON.stringify({ type: "transcript", items: transcript } satisfies ServerMessage));
       const latest = game.latest();
       if (latest) {
         ws.send(JSON.stringify({ type: "series", series: buildSeries(game.history()) } satisfies ServerMessage));
@@ -88,7 +92,8 @@ function statusMessage(): ServerMessage {
 // Load the model and cache the system prompt (tool definitions included) so the first question is fast.
 async function warmUp(): Promise<void> {
   try {
-    const r = await model.stream(buildMessages(system, [], userTurn("Reply with OK.")), { maxTokens: 1, tools: TOOLS });
+    // Warm with the restored conversation too, so the first follow-up after a restart hits the cache.
+    const r = await model.stream(buildMessages(system, agent.history, userTurn("Reply with OK.")), { maxTokens: 1, tools: TOOLS });
     modelState = { state: "ready" };
     console.log(`Model ready (load ${r.usage?.model_load_duration?.toFixed(1) ?? "0"} s, ${r.totalMs.toFixed(0)} ms total).`);
   } catch (e) {

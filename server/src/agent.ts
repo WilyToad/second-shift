@@ -1,5 +1,6 @@
 // The agent loop: retrieval + snapshot → model → tools → answer, with approvals for map changes.
 // Looks run immediately; map changes wait for the player to confirm a card in the web page.
+import { readFileSync, rmSync } from "node:fs";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ActionArgs, ActionData, ActionName, Digest, EntityRef, FindEntitiesResult, Prototypes } from "@companion/interfaces";
@@ -38,6 +39,31 @@ export type TurnRecord = {
 };
 
 const MAX_TOOL_ROUNDS = 3;
+export type TranscriptItem = { kind: "user" | "agent"; text: string };
+export type SessionData = { savedAt: string; history: ChatMessage[]; transcript: TranscriptItem[] };
+export type SessionStore = { load(): SessionData | null; save(data: SessionData): void; clear(): void };
+const MAX_TRANSCRIPT = 60;
+
+/** The conversation as one JSON file, rewritten after each answer (FC-063). Unreadable files start a fresh conversation. */
+export function fileSession(path: string): SessionStore {
+  return {
+    load() {
+      try {
+        const data = JSON.parse(readFileSync(path, "utf8")) as SessionData;
+        return Array.isArray(data.history) && Array.isArray(data.transcript) ? data : null;
+      } catch {
+        return null;
+      }
+    },
+    save(data) {
+      void Bun.write(path, JSON.stringify(data));
+    },
+    clear() {
+      rmSync(path, { force: true });
+    },
+  };
+}
+
 /** Estimated history size that triggers compaction (FC-076). ~2.8 characters per token measured. */
 const HISTORY_BUDGET_TOKENS = 8000;
 const KEEP_RECENT_TURNS = 2;
@@ -244,7 +270,11 @@ export function wantsChart(question: string): boolean {
 export function fallbackChart(question: string, items: string[], digest: Digest | undefined): string | null {
   if (!digest) return null;
   const q = question.toLowerCase().replace(/[-_]/g, " ");
-  for (const item of items) {
+  // "How is my science doing?" names no item: chart the pack with the most long-run production.
+  const science = /\bscience\b/.test(q)
+    ? digest.surfaces.flatMap((s) => s.science).sort((a, b) => b.per_minute_10h - a.per_minute_10h).map((r) => r.name)
+    : [];
+  for (const item of [...items, ...science]) {
     const surfaces = digest.surfaces
       .map((s) => ({ s, rate: [...s.produced, ...s.science].find((r) => r.name === item)?.per_minute }))
       .filter((x) => x.rate !== undefined);
@@ -260,6 +290,7 @@ const plural = (n: number, word: string) => `${n} ${n === 1 ? word : word.endsWi
 
 export class Agent {
   readonly history: ChatMessage[] = [];
+  private readonly shown: TranscriptItem[] = [];
   private lastResult: LastResult | null = null;
   private lastBlueprint: { raw: string; at: number } | null = null;
   private planner: { source: Prototypes; planner: Planner } | null = null;
@@ -279,8 +310,25 @@ export class Agent {
       now?: () => number;
       /** Appends a JSON line per answered question (FC-080). */
       turnLog?: string;
+      /** Where the conversation is kept between server runs (FC-063). */
+      session?: SessionStore;
     },
-  ) {}
+  ) {
+    const saved = deps.session?.load();
+    if (saved) {
+      this.history.push(...saved.history);
+      this.shown.push(...saved.transcript);
+    }
+  }
+
+  /** What the page showed in this conversation, for pages that connect later. */
+  transcript(): TranscriptItem[] {
+    return [...this.shown];
+  }
+
+  private saveSession(): void {
+    this.deps.session?.save({ savedAt: new Date(this.now()).toISOString(), history: this.history, transcript: this.shown.slice(-MAX_TRANSCRIPT) });
+  }
 
   private now(): number {
     return this.deps.now?.() ?? Date.now();
@@ -288,6 +336,8 @@ export class Agent {
 
   reset(): void {
     this.history.length = 0;
+    this.shown.length = 0;
+    this.deps.session?.clear();
     this.lastResult = null;
     this.pending.clear();
     this.notes = [];
@@ -346,6 +396,7 @@ export class Agent {
       },
     };
     this.deps.emit({ type: "user", text: pasted.display });
+    this.shown.push({ kind: "user", text: pasted.display });
     if (plan) this.deps.emit({ type: "plan", plan });
     // Pasted blueprints get the same sketch card, with the player's original string to copy back (FC-044).
     const protosForSketch = this.deps.prototypes();
@@ -399,10 +450,12 @@ export class Agent {
           // Store the question without its bulky retrieved lines and snapshot: the next turn re-reads the
           // previous turn anyway (it sits past the last cache block), so a short version is much cheaper (S08).
           this.history.push(...working.map((m, i) => (i === 0 && m.role === "user" ? { ...m, content: compactUserContent(m.content) } : m)));
+          this.shown.push({ kind: "agent", text });
           record.visibleTtftMs = ttftMs;
           record.totalMs = performance.now() - started;
           this.logTurn(record);
           await this.compactIfNeeded();
+          this.saveSession();
           this.deps.emit({
             type: "done", ttftMs, totalMs: performance.now() - started,
             promptTokens: result.usage?.prompt_tokens, cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens, completionTokens: result.usage?.completion_tokens,
