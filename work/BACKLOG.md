@@ -4,18 +4,12 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 2 — Acting on request
 
-- [ ] FC-020 `events` action: ring buffer of urgent events with "since N" polling
-  - Acceptance: server polls every ~250 ms; no event lost across polls; cost measured with the profiler
-- [ ] FC-021 Alert feed in the web page
 - [ ] FC-030 Blueprint string encoder/decoder in TypeScript
 - [ ] FC-031 Blueprint checker: entities exist, no overlaps, recipe fits machine
 - [ ] FC-032 Review a blueprint pasted into chat
 
 ## Phase 3 — Pleasant console and more actions
 
-- [ ] FC-040 Full web console per the mockup
-- [ ] FC-041 Choose a UI framework for the console
-- [ ] FC-042 Visual component renderer and `rate_chart`
 - [ ] FC-043 `recipe_graph` component
 - [ ] FC-044 `layout_sketch` component with copyable blueprint string
 - [ ] FC-045 Planning actions: `place_blueprint`, `mark_upgrade`, entity settings, `queue_research`, map tags, `camera_to`

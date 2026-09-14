@@ -1,10 +1,10 @@
 # S03 — Acts on request
 
-- **Status:** active
+- **Status:** done
 - **Goal:** The companion can act for the player within the helmet rule: it finds what the player asks about, previews an action in the game world, and does it only after the player approves.
 - **Acceptance:** On the dev save: "How many rails are near me on the right?" returns a count and the area searched. "Mark them for deconstruction" highlights exactly those rails in-game and shows an approval card. Confirming marks them, the action is on the player's undo stack, and Ctrl+Z (pressed by the player) restores them. A request the player couldn't do (outside radar coverage, or an instant delete) is refused with a reason. Profiler shows each action within the mod budget.
 - **Started:** 2026-09-13
-- **Finished:** —
+- **Finished:** 2026-09-14 (two player checks pending)
 
 ## Items
 
@@ -46,3 +46,32 @@
 Proposed and activated 2026-09-13. Kept out on purpose: the alert feed (FC-020, FC-021) and blueprints (FC-030–FC-032). They don't serve this goal and can be their own sprint.
 
 ## Review
+
+The companion acts for the player within the helmet rule: it finds what's asked about, highlights it
+in-game, asks for approval, and marks exactly those entities. Closed overnight on the player's
+delegation, **with two acceptance checks still waiting for the player** (FC-027 Ctrl+Z, FC-028 fog
+of war).
+
+**Acceptance status:**
+- ✓ "How many rails are near me on the right?" → searched 32 tiles east, 8 found and highlighted
+  (`scripts/e2e-rails.ts`, real model and game, 6/6).
+- ✓ "Mark them for deconstruction" → approval card, nothing marked until approval, then 8/8 marked.
+- ✓ The action lands on the player's undo stack as one item (8 `removed-entity` actions).
+  **Pending:** the player pressing Ctrl+Z.
+- ✓ Refusals: "delete them instantly" (no such tool; model offers the planner route), the character,
+  an entity in an unseen chunk (`scripts/test-helmet.ts`, 13/13).
+- ✓ Profiler: find 0.13 ms, highlight 0.10 ms, mark 0.14 ms for 8 entities.
+- **Pending:** confirm what the game allows in fog of war (conservative rule in place).
+
+**What we learned:**
+- A Lua `a and b or c` idiom silently turned "allowed" into "gone"; in-game tests caught it.
+- The model called tools on recipe questions (4/10) until the server classified world questions in
+  code. `tool_choice: "none"` isn't usable with oMLX (it strips the tools, which breaks the cache).
+- Tool definitions push the system prompt past a 4,096-token block; warm first visible token ~0.75 s
+  with the game closed. A running game costs ~12%.
+- Incoming RCON commands aren't split when hosting alone, but JSON parsing is ~14 ms/MB, so commands
+  are capped at 48 KB.
+- Launching through `steam_appid.txt` removed Steam's prompt and cut launch time to ~15–19 s.
+
+**Commits:** f216cfb (FC-077), 8c2863d (launch fix), 96bd4f2 (FC-024/025/026/029), 3646818 (FC-078/023), 929600a (FC-022), plus this closing commit.
+
