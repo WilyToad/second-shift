@@ -736,10 +736,11 @@ export class Agent {
     const recipe = this.resolveRecipe(what);
     if (!recipe) return `Error: no recipe matching "${what}" in this save. Nothing was changed.`;
     const entities = last.refs;
-    return this.card(`Set ${entities.length} ${last.label} to make ${recipe}?`, `The ${last.label} found ${last.where}, highlighted in-game. Ingredients inside them go to your inventory; anything that doesn't fit spills next to the machine.`, async () => {
+    return this.card(`Set ${entities.length} ${last.label} to make ${recipe}?`, `The ${last.label} found ${last.where}, highlighted in-game. Leftover ingredients go to your inventory for machines within your reach; the rest spill next to their machine, marked for your robots to collect.`, async () => {
       const r = await this.deps.game.call("set_recipe", { entities, recipe });
       const refused = Object.entries(r.rejected).map(([reason, count]) => `${count} ${reason.replace(/_/g, " ")}`).join(", ");
-      const items = r.returned || r.spilled ? `; ${r.returned} items back to your inventory${r.spilled ? `, ${r.spilled} spilled` : ""}` : "";
+      const parts = [r.to_inventory ? `${r.to_inventory} leftover ingredients to your inventory` : "", r.spilled ? `${r.spilled} spilled next to the machines for your robots to collect` : ""].filter(Boolean);
+      const items = parts.length ? `; ${parts.join(", ")}` : "";
       return `Set ${plural(r.done, "machine")} to ${recipe}${items}${refused ? `; refused: ${refused}` : ""}.`;
     });
   }

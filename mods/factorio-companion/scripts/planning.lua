@@ -150,8 +150,10 @@ return function(handlers)
   end
 
   -- Map change (approval in the app): set the recipe of assembling machines, as the player could in the
-  -- machine's window (in reach or through remote view where they can see). What the machine held goes to
-  -- the player's inventory, and anything that doesn't fit spills at the machine, so no items appear or vanish.
+  -- machine's window (in reach or through remote view where they can see). By hand, leftovers go to the player's
+  -- inventory when in reach, and to the machine's trash slots from remote view (player-verified 2026-09-14; the
+  -- docs for crafter_trash say the same). Scripts can't fill trash slots, so out of reach the leftovers spill next
+  -- to the machine, marked for the player's robots to collect: the closest match (decided with the player).
   handlers.set_recipe = function(args)
     local player = require_player()
     local targets = args.entities or {}
@@ -160,7 +162,7 @@ return function(handlers)
     if not recipe then reject("unknown_recipe", "No recipe named " .. tostring(args.recipe) .. ".") end
     if recipe.hidden then reject("hidden_recipe", recipe.name .. " can't be chosen in a machine.") end
     if not recipe.enabled then reject("not_unlocked", recipe.name .. " isn't unlocked yet.") end
-    local done, rejected, returned, spilled = 0, {}, 0, 0
+    local done, rejected, to_inventory, spilled = 0, {}, 0, 0
     for _, ref in ipairs(targets) do
       local e = resolve(player, ref)
       local reason = nil
@@ -177,10 +179,12 @@ return function(handlers)
       if reason then
         rejected[reason] = (rejected[reason] or 0) + 1
       else
+        local character = player.character
+        local in_reach = character ~= nil and character.valid and character.surface == e.surface and character.can_reach_entity(e)
         for _, item in pairs(e.set_recipe(recipe)) do
           local stack = { name = item.name, count = item.count, quality = item.quality }
-          local moved = player.insert(stack)
-          returned = returned + moved
+          local moved = in_reach and character.insert(stack) or 0
+          to_inventory = to_inventory + moved
           if moved < item.count then
             stack.count = item.count - moved
             e.surface.spill_item_stack({ position = e.position, stack = stack, enable_looted = true, force = player.force, allow_belts = false })
@@ -190,7 +194,7 @@ return function(handlers)
         done = done + 1
       end
     end
-    return { done = done, rejected = rejected, returned = returned, spilled = spilled }
+    return { done = done, rejected = rejected, to_inventory = to_inventory, spilled = spilled }
   end
 
   -- Map change (approval in the app): paste a blueprint as ghosts, like the player would.

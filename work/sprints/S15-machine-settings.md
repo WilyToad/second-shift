@@ -17,7 +17,7 @@
 
 ## Notes
 
-Planned and activated 2026-09-14 overnight under the player's delegation. Train stop limits and filters (the rest of FC-093's title) stay in the backlog as FC-109. For the player to check: when you change a recipe by hand in remote view, do the machine's ingredients go to your inventory? The action assumes they do (and spills what doesn't fit), like changing it while standing next to the machine.
+Planned and activated 2026-09-14 overnight under the player's delegation. Train stop limits and filters (the rest of FC-093's title) stay in the backlog as FC-109. For the player to check: when you change a recipe by hand in remote view, do the machine's ingredients go to your inventory? The action assumes they do (and spills what doesn't fit), like changing it while standing next to the machine. **Checked 2026-09-14 (S20, FC-116):** they don't; from map view they go to the machine's trash slots. The action now sends leftovers to the inventory only when in reach, and otherwise spills them for robots.
 
 ## Review
 

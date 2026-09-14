@@ -656,8 +656,12 @@ judge by time to first token.
     **2026-09-14, decided with the player (FC-092):** "here / this / on screen" means where the player is looking;
     "near me / to my right / where I'm standing" means the character; otherwise searches use the character and
     placements use the view, and answers say which was used when they differ.
-    Still open: which entity settings can be changed remotely (for example, whether a recipe change returns
-    ingredients to the inventory).
+    **2026-09-14, player-verified (FC-093):** changing a recipe by hand from map view moves the machine's
+    ingredients into its trash slots (`crafter_trash`, documented as "items that are ejected when changing the recipe
+    via remote view"), not the player's inventory. Scripts can't fill those slots (size 0, inserts refused), so the
+    companion (decided with the player): leftovers go to the character's inventory when the machine is in reach,
+    otherwise spill next to the machine marked for the player's robots.
+    Still open: other entity settings remotely (train stop limits, filters).
 11. **Character control vs player input.** Does the player's own movement override
     `walking_state` and `mining_state`? Should any player input cancel an agent action?
 12. ~~**Prototype data source.**~~ **Decided 2026-09-13: runtime view over RCON.** The mod's

@@ -278,7 +278,7 @@ test("changing a recipe goes through a card and names the recipe from the player
       calls.push({ action, args });
       if (action === "find_entities") return { surface: "nauvis", center: { x: 0, y: 0 }, direction: "around", radius: 32, area: { left_top: { x: -32, y: -32 }, right_bottom: { x: 32, y: 32 } }, count: 2, by_name: { "assembling-machine-2": 2 }, not_visible: 0, entities: machines, truncated: false };
       if (action === "highlight") return { drawn: 2, seconds: 30 };
-      if (action === "set_recipe") return { done: 2, rejected: {}, returned: 20, spilled: 0 };
+      if (action === "set_recipe") return { done: 2, rejected: {}, to_inventory: 20, spilled: 5 };
       throw new Error(`unexpected ${action}`);
     },
   };
@@ -292,7 +292,7 @@ test("changing a recipe goes through a card and names the recipe from the player
   expect(calls.some((c) => c.action === "set_recipe")).toBe(false);
   await agent.approve(card.id);
   expect(calls.find((c) => c.action === "set_recipe")?.args).toEqual({ entities: machines, recipe: "iron-gear-wheel" });
-  expect(events.at(-1)).toMatchObject({ type: "approval_result", status: "done", message: "Set 2 machines to iron-gear-wheel; 20 items back to your inventory." });
+  expect(events.at(-1)).toMatchObject({ type: "approval_result", status: "done", message: "Set 2 machines to iron-gear-wheel; 20 leftover ingredients to your inventory, 5 spilled next to the machines for your robots to collect." });
 });
 
 

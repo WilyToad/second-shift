@@ -117,7 +117,7 @@ export const actions = {
   },
   set_recipe: {
     args: TargetsSchema.extend({ recipe: z.string() }),
-    data: ApplyResultSchema.omit({ undo_items: true }).extend({ returned: z.number(), spilled: z.number() }),
+    data: ApplyResultSchema.omit({ undo_items: true }).extend({ to_inventory: z.number(), spilled: z.number() }),
     kind: "map_change",
   },
   place_blueprint: {
