@@ -18,11 +18,13 @@ const cases: Case[] = [
   { question: "What do I need for 60 maraxsis glass panes per minute?", item: "maraxsis-glass-panes", rate: 60, recipe: "maraxsis-glass-panes", machine: "foundry", input: "sand" },
 ];
 
-// Independent reference: one step, straight from recipe time, products and crafting speed.
+// Independent reference: one step, straight from recipe time, products, crafting speed and productivity
+// (machine base + researched recipe bonus, capped; none if the recipe doesn't allow it).
 function reference(c: Case) {
   const r = p.recipes[c.recipe]!;
   const speed = p.machines[c.machine]!.crafting_speed!;
-  const out = r.products.filter((x) => x.name === c.item).reduce((n, x) => n + (x.amount ?? 0) * (x.probability ?? 1), 0);
+  const prod = r.allows_productivity ? Math.min((p.machines[c.machine]!.base_productivity ?? 0) + (r.productivity_bonus ?? 0), r.maximum_productivity) : 0;
+  const out = r.products.filter((x) => x.name === c.item).reduce((n, x) => n + (x.amount ?? 0) * (1 + prod) * (x.probability ?? 1), 0);
   const craftsPerMin = c.rate / out;
   const machines = craftsPerMin / ((60 * speed) / r.energy);
   const ing = r.ingredients.find((i) => i.name === c.input)!;

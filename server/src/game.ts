@@ -24,6 +24,7 @@ export class GameLink {
   private eventListeners = new Set<(e: GameEvent[], dropped: number) => void>();
   private eventSeq: number | null = null;
   private recentEvents: GameEvent[] = [];
+  private refreshRequested = false;
   private loaded: LoadedPrototypes | null = null;
 
   constructor(private readonly opts: { pollMs: number; eventPollMs?: number; historySize: number; cacheDir: string; settings?: () => Promise<RconSettings | null> }) {}
@@ -71,12 +72,13 @@ export class GameLink {
     for (const fn of this.prototypeListeners) fn(p);
   }
 
-  /** Refetches prototype data only when the game's mod list differs from what's loaded. */
-  private async syncPrototypes(): Promise<void> {
+  /** Refetches prototype data when the mod list or dump format changed, or when `force` is set
+   * (a research completed, so recipe unlocks and productivity bonuses changed). */
+  private async syncPrototypes(force = false): Promise<void> {
     const info = await this.call("info");
     // The mod list plus the dump format: either changing means the cached prototypes are stale.
     const modsKey = String(Bun.hash(JSON.stringify([info.dump_version, ...Object.entries(info.mods).sort()])));
-    if (this.loaded?.modsKey === modsKey) return;
+    if (!force && this.loaded?.modsKey === modsKey) return;
     const started = performance.now();
     const data = await this.call("dump_prototypes");
     mkdirSync(this.opts.cacheDir, { recursive: true });
@@ -112,6 +114,7 @@ export class GameLink {
             this.eventSeq = r.seq;
             this.recentEvents = [...this.recentEvents, ...r.events].slice(-50);
             for (const fn of this.eventListeners) fn(r.events, dropped);
+            if (r.events.some((e) => e.kind === "research_finished")) this.refreshRequested = true;
           }
         } catch {
           // The digest loop owns reconnects; just try again next tick.
@@ -172,6 +175,10 @@ export class GameLink {
         }
       }
       try {
+        if (this.refreshRequested) {
+          this.refreshRequested = false;
+          await this.syncPrototypes(true);
+        }
         const digest = await this.call("digest");
         this.historyStore.push({ digest, receivedAt: Date.now() });
         if (this.historyStore.length > this.opts.historySize) this.historyStore.shift();

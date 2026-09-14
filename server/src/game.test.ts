@@ -10,7 +10,7 @@ const digest = { tick: 1, research: { progress: 0, queue: {} }, surfaces: {}, al
 
 /** Fake game: answers info (with a switchable mod list), dump_prototypes and digest; counts dumps. */
 function fakeGame() {
-  const state = { mods: { base: "2.0.77" } as Record<string, string>, dumps: 0 };
+  const state = { mods: { base: "2.0.77" } as Record<string, string>, dumps: 0, events: [] as object[] };
   let buf: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   const server = Bun.listen({
     hostname: "127.0.0.1", port: 0,
@@ -25,7 +25,7 @@ function fakeGame() {
           if (req.action === "info") data = { protocol: 1, dump_version: 2, mod_version: "0.1.0", game_version: "2.0.77", tick: 1, mods: state.mods, players: 1 };
           if (req.action === "dump_prototypes") { state.dumps++; data = prototypes; }
           if (req.action === "digest") data = digest;
-          if (req.action === "events") data = { seq: 0, oldest: 1, events: {} };
+          if (req.action === "events") { const events = state.events.filter((e: any) => e.seq > (req.args?.since ?? 0)); data = { seq: state.events.length, oldest: 1, events: events.length ? events : {} }; }
           sock.write(encodePacket(p.id, 0, JSON.stringify({ id: req.id, ok: true, data })));
         }
       },
@@ -57,5 +57,16 @@ test("prototypes are fetched on connect only when the mod list changes", async (
 
   state.mods = { base: "2.0.77", maraxsis: "1.31.9" }; // mod list changed
   link.disconnect();
+  await until(() => state.dumps === 2);
+});
+
+test("a finished research refetches prototypes (unlocks and productivity changed)", async () => {
+  const { server, state } = fakeGame();
+  const link = new GameLink({ pollMs: 50, eventPollMs: 50, historySize: 10, cacheDir: mkdtempSync(join(tmpdir(), "fc-cache-")), settings: async () => ({ host: "127.0.0.1", port: server.port, password: "x" }) });
+  cleanup.push(() => link.stop(), () => server.stop(true));
+  link.start();
+  await until(() => state.dumps === 1 && link.latest() !== undefined);
+  await Bun.sleep(300); // the first event poll only records the sequence number
+  state.events.push({ seq: 1, tick: 5, kind: "research_finished", severity: "info", research: "logistics" });
   await until(() => state.dumps === 2);
 });
