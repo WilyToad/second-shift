@@ -390,3 +390,14 @@ test("a paste 'near me' while viewing another surface is refused with a way forw
   expect(reply).toContain("character is on nauvis but they're viewing vulcanus");
 });
 
+
+test("in map view, a paste card names the map view as the spot", async () => {
+  const { agent, events } = setup([{ tool: "place_blueprint" }, { text: "Confirm in the card." }]);
+  (agent as any).lastBlueprint = { raw: "0eNq", at: Date.now() };
+  const game = (agent as any).deps.game as GameActions;
+  game.latest = () => ({ receivedAt: 0, digest: DigestSchema.parse({ tick: 1, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {},
+    player: { name: "p", surface: "nauvis", position: { x: 55, y: 40 }, remote_view: true, character_surface: "nauvis", character_position: { x: 55, y: 52 } } }) });
+  await agent.ask("Paste it here");
+  const card = events.filter((e) => e.type === "approval").at(-1) as any;
+  expect(card.title).toBe("Paste the blueprint at the map view (55, 40)?");
+});

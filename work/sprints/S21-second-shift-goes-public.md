@@ -22,8 +22,20 @@
   - Found while recording the first capture ("Gleba produces jelly at **1,493/min**"). `Emphasis` in `chat.tsx`; an unclosed `**` stays as typed; display test
 
 - [ ] FC-126 Blueprint requests sometimes come with an unasked-for paste card
-  - Notes: seen while recording: "Give me a blueprint for 300 electronic circuits a minute" answered with the card, "Say the word and I'll paste it", and a paste approval card in the same turn (S14 guidance says no tool call until asked). A 600/min request was refused correctly (1,800 cable/min is over one lane) but said "That approval card wasn't needed" when none was shown
+  - Notes: seen while recording: "Give me a blueprint for 300 electronic circuits a minute" answered with the card, "Say the word and I'll paste it", and a paste approval card in the same turn (S14 guidance says no tool call until asked). With "and paste it here" in the question, the answer still said "Want it pasted as ghosts at your position? Just say so" next to the card. A 600/min request was refused correctly (1,800 cable/min is over one lane) but said "That approval card wasn't needed" when none was shown
   - Acceptance: an eval over blueprint requests shows no paste card unless the player asked to paste
+
+- [ ] FC-127 A chart request took an unasked-for screenshot
+  - Notes: fresh conversation, player in map view on Nauvis: "How much jelly is Gleba making? Chart it." answered with numbers and a chart, then called `screenshot` (at last_result), then said "the screenshot shows your nauvis spot, not Gleba" and repeated the chart. The saved transcript kept only the second part of the answer. The same question earlier the same day (player on Gleba, not in map view) was clean
+  - Acceptance: an eval of chart questions in and out of map view shows no screenshot call unless asked; the transcript keeps every text part of a turn
+
+- [x] FC-128 Recipe graph cuts off the final product
+  - Acceptance: the final product of a plan graph is in view when the card appears, at 1440 px
+  - Found while recording: "60 advanced circuits a minute" drew six columns (1,250 px) in an 820 px message, so the advanced-circuit node was cut off behind a scrollbar. Columns are narrower (150 px, 28 px gaps), the graph shrinks to fit down to 80 % of full size, and when it still overflows it opens scrolled to the final product. Display test
+
+- [x] FC-129 Paste card and sketch polish
+  - Acceptance: in map view a paste card names the map view, not "your position"; a small blueprint's sketch is big enough to read
+  - Found while recording: the card said "Paste the blueprint at your position (55, 40)?" while the player was in map view 12 tiles from their character, and a 10-tile blueprint drew at 14 px a tile (~150 px wide). The card now says "at the map view" in map view; small sketches draw at up to 24 px a tile. Agent unit test
 
 - [ ] FC-121 Feature captures
   - Acceptance: screenshots of the console, answers with charts, the blueprint card, the approval flow, a screenshot card and a selection review, plus at least one animation, taken from the dev save and saved in the repo for the README and website

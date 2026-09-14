@@ -806,7 +806,9 @@ export class Agent {
     if (!position) return "Error: the player's position isn't known yet.";
     // A paste lands on the surface the player is looking at, like pasting by hand.
     if (from === "character" && position.surface !== digest?.player?.surface) return `Error: the player's character is on ${position.surface} but they're viewing ${digest?.player?.surface}; a paste can only go where they're looking. Ask them to go back to their character or say "paste it here".`;
-    return this.card(`Paste the blueprint at ${from === "character" ? "your character" : "your position"} (${position.x}, ${position.y})?`, `Placed as ghosts, like pasting it yourself; construction robots build it and Ctrl+Z undoes it.${position.note}`, async () => {
+    // Name the spot the way the player sees it: in map view, "here" is the map view, not where they stand (FC-129).
+    const where = from === "character" ? "your character" : digest?.player?.remote_view ? "the map view" : "your position";
+    return this.card(`Paste the blueprint at ${where} (${position.x}, ${position.y})?`, `Placed as ghosts, like pasting it yourself; construction robots build it and Ctrl+Z undoes it.${position.note}`, async () => {
       const r = await this.deps.game.call("place_blueprint", { blueprint: bp.raw, x: position.x, y: position.y });
       return `Placed ${r.placed} of ${r.expected} ghosts at (${r.x}, ${r.y})${r.placed < r.expected ? " (some spots were blocked)" : ""}.`;
     });

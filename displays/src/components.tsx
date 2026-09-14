@@ -84,6 +84,8 @@ export function RateChart({ spec }: { spec: RateChartSpec }) {
 const pretty = (name: string) => name.replace(/-/g, " ");
 
 /** The computed plan as a left-to-right chain: raw inputs, intermediates, then the target (S09). */
+const fit = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+
 export function RecipeGraph({ plan }: { plan: Plan }) {
   // Column = longest distance from the raw inputs, so each step sits right of everything it consumes.
   const steps = new Map(plan.steps.map((s) => [s.item, s]));
@@ -99,7 +101,9 @@ export function RecipeGraph({ plan }: { plan: Plan }) {
   nodes.forEach((n) => depth(n));
   const columns = Math.max(...nodes.map((n) => column.get(n)!)) + 1;
   const byColumn = Array.from({ length: columns }, (_, c) => nodes.filter((n) => column.get(n) === c));
-  const NW = 170, NH = 44, GX = 40, GY = 12, PAD = 10;
+  const NW = 150, NH = 44, GX = 28, GY = 12, PAD = 10;
+  // Characters that fit inside a node: 12 px UI font for names, 11 px mono (≈ 6.6 px a character) for the machine line.
+  const NAME_CHARS = 22, SUB_CHARS = 20;
   const width = PAD * 2 + columns * NW + (columns - 1) * GX;
   const height = PAD * 2 + Math.max(...byColumn.map((c) => c.length)) * (NH + GY) - GY;
   const pos = new Map<string, { x: number; y: number }>();
@@ -108,8 +112,9 @@ export function RecipeGraph({ plan }: { plan: Plan }) {
   return (
     <figure class="vis">
       <figcaption class="vis-head">{plan.perMinute}/min {pretty(plan.item)}<span class="tag">recipe_graph · computed plan</span></figcaption>
-      <div class="graph-scroll">
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Production chain for ${plan.perMinute} ${pretty(plan.item)} per minute`}>
+      <div class="graph-scroll" ref={(el) => { if (el && !el.dataset.opened) { el.dataset.opened = "1"; requestAnimationFrame(() => { el.scrollLeft = el.scrollWidth; }); } }}>
+        {/* Shrinks to fit the card down to 80 % of full size, then scrolls, opened at the final product (FC-128). */}
+        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", maxWidth: `${width}px`, minWidth: `${Math.round(width * 0.8)}px`, height: "auto" }} role="img" aria-label={`Production chain for ${plan.perMinute} ${pretty(plan.item)} per minute`}>
           {edges.map(([from, to]) => {
             const a = pos.get(from)!, b = pos.get(to)!;
             const x1 = a.x + NW, y1 = a.y + NH / 2, x2 = b.x, y2 = b.y + NH / 2;
@@ -120,8 +125,8 @@ export function RecipeGraph({ plan }: { plan: Plan }) {
             return (
               <g key={n} class={`graph-node${step ? "" : " raw"}${step && !step.unlocked ? " locked" : ""}`}>
                 <rect x={p.x} y={p.y} width={NW} height={NH} rx="3" />
-                <text class="graph-name" x={p.x + 8} y={p.y + 17}>{pretty(n).slice(0, 24)}</text>
-                <text class="graph-sub" x={p.x + 8} y={p.y + 34}>{step ? `${step.machines}× ${pretty(step.machine)}`.slice(0, 26) : `${plan.raw[n]}/min input`}</text>
+                <text class="graph-name" x={p.x + 8} y={p.y + 17}>{fit(pretty(n), NAME_CHARS)}</text>
+                <text class="graph-sub" x={p.x + 8} y={p.y + 34}>{fit(step ? `${step.machines}× ${pretty(step.machine).replace(/^assembling machine/, "assembler")}` : `${plan.raw[n]}/min input`, SUB_CHARS)}</text>
               </g>
             );
           })}
@@ -135,8 +140,8 @@ export function RecipeGraph({ plan }: { plan: Plan }) {
 /** A blueprint built in code: a top-down tile sketch and a button that copies the string (S14). */
 export function BlueprintView({ card }: { card: BlueprintCard }) {
   const copied = useSignal<"idle" | "copied" | "select">("idle");
-  // Tile size shrinks for big blueprints so the sketch stays about a panel wide.
-  const T = Math.max(2, Math.min(14, Math.floor(760 / card.width))), PAD = 6;
+  // Tile size shrinks for big blueprints so the sketch stays about a panel wide; small ones draw big enough to read (FC-129).
+  const T = Math.max(2, Math.min(24, Math.floor(760 / card.width))), PAD = 6;
   const width = card.width * T + PAD * 2, height = card.height * T + PAD * 2;
   const copy = async () => {
     try {
@@ -149,8 +154,9 @@ export function BlueprintView({ card }: { card: BlueprintCard }) {
   return (
     <figure class="vis blueprint">
       <figcaption class="vis-head">{pretty(card.label)}<span class="tag">layout_sketch · built in code</span></figcaption>
-      <div class="graph-scroll">
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Layout of ${card.label}: ${card.summary}`}>
+      <div class="graph-scroll" ref={(el) => { if (el && !el.dataset.opened) { el.dataset.opened = "1"; requestAnimationFrame(() => { el.scrollLeft = el.scrollWidth; }); } }}>
+        {/* Shrinks to fit the card down to 80 % of full size, then scrolls, opened at the final product (FC-128). */}
+        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", maxWidth: `${width}px`, minWidth: `${Math.round(width * 0.8)}px`, height: "auto" }} role="img" aria-label={`Layout of ${card.label}: ${card.summary}`}>
           {card.sketch.map((e, i) => {
             const x = PAD + e.x * T, y = PAD + e.y * T, w = e.w * T, h = e.h * T;
             // Belts and inserters get a direction tick: 0 north, 4 east, 8 south, 12 west.

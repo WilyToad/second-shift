@@ -44,6 +44,21 @@ test("recipe graph draws steps, raw inputs and edges from a computed plan", asyn
   expect(root.querySelectorAll(".graph-node").length).toBe(4);
   expect(root.querySelectorAll(".graph-node.raw").length).toBe(2);
   expect(root.querySelectorAll(".graph-edge").length).toBe(3);
-  expect(root.textContent).toContain("1.33× assembling machine 2");
+  expect(root.textContent).toContain("1.33× assembler 2");
   expect(root.textContent).toContain("180/min input");
+});
+
+test("a wide recipe graph scales to fit its card before it scrolls", async () => {
+  const { render } = await import("preact");
+  const { RecipeGraph } = await import("./components");
+  const root = document.createElement("div");
+  const step = (item: string, inputs: string[]) => ({ item, recipe: item, machine: "assembling-machine-3", machines: 1, perMinute: 60, inputs, unlocked: true });
+  render(<RecipeGraph plan={{ item: "e", perMinute: 60, raw: { a: 60 }, steps: [step("b", ["a"]), step("c", ["b"]), step("d", ["c"]), step("e", ["d"])], notes: [] } as any} />, root);
+  const svg = root.querySelector("svg")!;
+  const width = Number(svg.getAttribute("width"));
+  expect(svg.style.width).toBe("100%");
+  expect(svg.style.minWidth).toBe(`${Math.round(width * 0.8)}px`);
+  // Machine lines are trimmed to fit inside a node.
+  expect([...root.querySelectorAll(".graph-sub")].every((t) => (t.textContent ?? "").length <= 20)).toBe(true);
+  expect(root.textContent).toContain("1× assembler 3");
 });

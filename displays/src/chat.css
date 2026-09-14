@@ -92,7 +92,7 @@ button.cancel { background: transparent; color: var(--muted); border: 1px solid 
 .chart-end { fill: var(--agent); stroke: var(--inset); stroke-width: 2; }
 .end-label { fill: var(--text); font: 12px var(--mono); }
 .graph-scroll { overflow-x: auto; padding: 6px; }
-.graph-scroll svg { width: auto; max-width: none; }
+.graph-scroll svg { display: block; }
 .graph-edge { fill: none; stroke: var(--faint); stroke-width: 1.4; }
 .graph-node rect { fill: var(--panel); stroke: var(--seam); }
 .graph-node.raw rect { fill: var(--inset); stroke-dasharray: 3 3; }
