@@ -10,8 +10,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 4 — Voice and extras
 
-- [ ] FC-062 Voice in/out
-  - Notes (player, 2026-09-15): do this first, using the browser's own voice features since the console runs in Chrome or Safari: `SpeechRecognition` (webkit-prefixed) for push-to-talk questions and `speechSynthesis` to read answers aloud. Check before building: whether each browser recognizes speech on the device or sends audio to a cloud service (the README and site promise nothing leaves the machine, so a cloud path must be off, opt-in or clearly labelled), which voices are local, and how charts, code and cards are skipped when reading aloud
 - [ ] FC-060 In-game UI (mod GUI chat panel / hotkey popup)
 - [ ] FC-061 Background Factorio test instance for measuring blueprints
 
