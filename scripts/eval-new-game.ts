@@ -75,6 +75,7 @@ check("the new map starts with no conversation from another map", switched >= 0 
 
 const turns = new URL("../data/eval/turns.jsonl", import.meta.url).pathname;
 const lastTurn = async () => JSON.parse((await Bun.file(turns).text()).trim().split("\n").at(-1)!);
+const turnsByQuestion: { q: string; text: string; turn: any }[] = [];
 const send = async (text: string) => {
   answer = "";
   const done = new Promise<ServerMessage>((r) => (onDone = r));
@@ -82,7 +83,9 @@ const send = async (text: string) => {
   await done;
   answers[answers[text] === undefined ? text : `${text} (${Object.keys(answers).length})`] = answer;
   console.log(`\n> ${text}\n${answer}\n`);
-  return { text: answer, turn: await lastTurn() };
+  const turn = await lastTurn();
+  turnsByQuestion.push({ q: text, text: answer, turn });
+  return { text: answer, turn };
 };
 // The first time an answer ends by offering something ("Want me to look around?"), reply "yeah": the reply must
 // be taken as that offer, so the turn looks or uses the player's data instead of saying it can't (FC-132).
@@ -106,9 +109,25 @@ const LEAKS = /\b(tool call|no tools?|the data provided|data (you|i was) (gave|g
 const MEMORY = /\b(craft|make|get|build|use|with) (a |an |your |the )?(stone |iron )?(pick ?axe|axe)\b|\bscrap\b/i;
 const RESEARCH = /\bresearch/i;
 
+// Truth for ore claims: every resource the player can see within 128 tiles (the widest search the companion can
+// make), taken at the start and the end. Visibility changes as the game runs: the starting area is charted at the
+// start and fades to "charted, not visible" later, so something seen early can be gone from a later look.
+const visibleOres = async () => {
+  const names = JSON.parse(await game.sc(`
+    local p = game.connected_players[1] local s = p.physical_surface local names = {} local seen = {}
+    for _, e in pairs(s.find_entities_filtered({ position = p.physical_position, radius = 128, type = "resource" })) do
+      local key = math.floor(e.position.x / 32) .. ":" .. math.floor(e.position.y / 32)
+      if seen[key] == nil then seen[key] = p.force.is_chunk_visible(s, { x = math.floor(e.position.x / 32), y = math.floor(e.position.y / 32) }) end
+      if seen[key] then names[e.name] = true end
+    end
+    local out = {} for n in pairs(names) do out[#out + 1] = n end rcon.print(helpers.table_to_json(out))`));
+  return Array.isArray(names) ? (names as string[]) : [];
+};
+const startOres = await visibleOres();
+
 // 3. The walkthrough.
 const status = await call("player_status");
-const around = await call("surroundings", { radius: 32 });
+const around = await call("surroundings", { radius: 32, resource_radius: 96 });
 const craftNames = (status.craftable as { name: string }[]).map((c) => c.name);
 const itemNames = (status.items as { name: string }[]).map((i) => i.name);
 const resourceNames = (around.resources as { name: string }[]).map((r) => r.name);
@@ -147,7 +166,7 @@ check("look around: names something that's really there", mentions(look.text, se
 check("look around: doesn't invent enemies", around.enemies > 0 || !/\b\d+ enem/i.test(look.text));
 
 const ore = await ask("I think I found some ore");
-check("found ore: names the resources that are really nearby, or says there are none", resourceNames.length ? mentions(ore.text, resourceNames).length > 0 : /\b(no|don'?t see any|can'?t see any|not seeing any)\b[^.]*\bore\b/i.test(ore.text), mentions(ore.text, resourceNames).join(", ") || "none nearby");
+check("found ore: names the resources that are really nearby, or says there are none", mentions(ore.text, resourceNames).length > 0 || /\b(no|don'?t see any|can'?t see any|not seeing any)\b[^.]*\bore\b/i.test(ore.text), mentions(ore.text, resourceNames).join(", ") || "none nearby");
 
 // Build a stone furnace from the inventory, the way the player would.
 const built = await game.sc(`
@@ -160,6 +179,7 @@ const built = await game.sc(`
   p.clear_cursor()
   rcon.print(#s.find_entities_filtered({ name = "stone-furnace", position = p.physical_position, radius = 20 }) > 0 and "built" or "not built")`);
 check("setup: built a stone furnace from the inventory", built === "built", built);
+const buildNames = ((await call("player_status")).recent_builds as { name: string }[]).map((b) => b.name);
 const justBuilt = await ask("I just built something");
 check("I just built something: names the stone furnace", mentions(justBuilt.text, ["stone furnace"]).length > 0);
 
@@ -173,6 +193,31 @@ const leaks = all.filter(([, a]) => LEAKS.test(a));
 check("no answer talks about tools, tool calls or 'the data provided'", leaks.length === 0, leaks.map(([q]) => q).join(" | "));
 const memory = all.filter(([, a]) => MEMORY.test(a));
 check("no answer repeats vanilla-memory mistakes (craft a pickaxe or axe, scrap)", memory.length === 0, memory.map(([q]) => q).join(" | "));
+// FC-139: details the data contradicts.
+// A build the answer says the player made must be in the build record.
+const builtClaims = all.flatMap(([q, a]) => [...a.matchAll(/\byou(?:'ve| have)? (?:just )?(?:placed|built|put down|set up) (?!with |for |it |that |this |in |on |to |so |and |there |here )(?:a |an |your |the )?([a-z][a-z0-9 -]{2,40}?)(?= \d| tiles|,|\.|!| to | at | near | next | south| north| east| west| —|$)/gi)].map((m) => ({ q, said: m[1]! })));
+const wrongBuilds = builtClaims.filter((c) => !buildNames.some((n) => norm(c.said).includes(norm(n))));
+check("named builds match the build record", wrongBuilds.length === 0, wrongBuilds.map((c) => `"${c.said}" in: ${c.q}`).join(" | ") || `${builtClaims.length} claims, record: ${buildNames.join(", ")}`);
+// An ore the answer places near the player must be among the resources the player can see (out to 96 tiles).
+const ORES = ["iron ore", "copper ore", "coal", "stone", "uranium ore", "crude oil"];
+const truthOres = [...new Set([...startOres, ...resourceNames, ...(await visibleOres())])];
+const absent = ORES.filter((o) => !truthOres.some((r) => norm(r) === o));
+const LOCATES = /\b(\d+ tiles|nearby|near (the|you)|next to|beside|to the (north|south|east|west)|(north|south|east|west)(-(east|west))? of you|patch (is|at|by|near|to))\b/i;
+const HEDGES = /\b(no|not|none|isn'?t|find|scout|look for|search|explore|once you|when you|if you|until you)\b/i;
+// Clause by clause, so "No iron ore here — the big patch is 82 tiles south-west" isn't excused by its "No".
+// "stone" in "stone furnace" or stone from rocks isn't an ore claim.
+const clauses = (a: string) => a.split(/(?<=[.!?])\s+|\n+|\s+[—–]\s+|;\s+/).map((c) => norm(c).replace(/\bstone (furnace|wall|brick)s?\b/g, "")).map((c) => (/\brocks?\b/.test(c) ? c.replace(/\bstone\b/g, "") : c));
+const oreClaims = all.flatMap(([q, a]) => clauses(a).filter((c) => absent.some((o) => c.includes(o)) && LOCATES.test(c) && !HEDGES.test(c)).map((c) => `${q}: ${c.slice(0, 100)}`));
+check("ore claims match what's around", oreClaims.length === 0, oreClaims.join(" | ") || `absent: ${absent.join(", ")}`);
+// Ingredient amounts on a turn with the player's data need recipe lines in that turn.
+const INGREDIENTS = /\(\s*\d+\s+[a-z][a-z -]+(\s*\+\s*\d+\s+[a-z][a-z -]+)+\s*\)|\bneeds? \d+ [a-z-]+ (plates?|gears?|wheels?|wood|stone)\b/i;
+const ungrounded = turnsByQuestion.filter((t) => INGREDIENTS.test(t.text) && (t.turn.chars.player ?? 0) > 0 && !(t.turn.chars.retrieved > 0));
+check("ingredient claims come with recipe lines", ungrounded.length === 0, ungrounded.map((t) => t.q).join(" | "));
+const leaksHidden = all.filter(([, a]) => /\b(in )?(chunks|areas?|places?) (you|the player) can'?t (currently )?see\b|\bexist in (chunks|areas)\b/i.test(a));
+check("no answer reveals what's in chunks the player can't see (helmet rule)", leaksHidden.length === 0, leaksHidden.map(([q]) => q).join(" | "));
+const unaskedCards = got.filter((m) => m.type === "approval");
+check("no approval cards (nothing was asked for)", unaskedCards.length === 0, unaskedCards.map((m: any) => m.title).join(" | "));
+
 const nags = all.filter(([q, a]) => !RESEARCH.test(q) && /nothing is research|not research|no research/i.test(a));
 check("no answer nags about research on a map without labs", nags.length === 0, nags.map(([q]) => q).join(" | "));
 

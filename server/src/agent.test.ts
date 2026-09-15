@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ActionName } from "@companion/interfaces";
 import { DigestSchema, PrototypesSchema } from "@companion/interfaces";
 import { encodeBlueprintString } from "./blueprint";
 import { RecipeRetriever } from "./retrieval";
-import { Agent, fileSession, mapSession, anchorFor, anchorSpot, compactHistory, compactUserContent, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsBlueprint, wantsChart, type GameActions, type SessionData, type SessionStore } from "./agent";
+import { Agent, askedFor, fileSession, mapSession, anchorFor, anchorSpot, compactHistory, compactUserContent, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsBlueprint, wantsChart, type GameActions, type SessionData, type SessionStore } from "./agent";
 import { rowPrototypes } from "./fixtures/row-prototypes";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
@@ -179,7 +179,7 @@ test("a pasted blueprint reaches the model only as a checked summary", async () 
   expect(card.blueprint.sketch.map((e) => [e.name, e.x, e.y, e.w])).toEqual([["assembling-machine-3", 0, 0, 3], ["quantum-widget", 8.5, 8.5, 1]]);
 });
 
-test("planning tools: explicit research runs now, unprompted becomes a card, pastes and upgrades need approval", async () => {
+test("planning tools: explicit research runs now, unprompted is offered in words and runs on yes, pastes need approval", async () => {
   const prototypes = PrototypesSchema.parse({
     recipes: { "fast-transport-belt": { category: "crafting", energy: 0.5, enabled: false, maximum_productivity: 3, ingredients: [], products: [{ type: "item", name: "fast-transport-belt", amount: 1 }] } },
     items: { "fast-transport-belt": { type: "item", stack_size: 100, place_result: "fast-transport-belt" } }, fluids: {},
@@ -201,7 +201,8 @@ test("planning tools: explicit research runs now, unprompted becomes a card, pas
   const events: ServerMessage[] = [];
   const model = fakeModel([
     { tool: "queue_research", args: { technology: "fast belts" } }, { text: "Queued." },
-    { tool: "queue_research", args: { technology: "logistics" } }, { text: "Want me to queue it?" },
+    { tool: "queue_research", args: { technology: "logistics" } }, { text: "Logistics is next. Want me to queue it?" },
+    { tool: "queue_research", args: { technology: "logistics" } }, { text: "Queued." },
     { text: "Looks fine." },
     { tool: "place_blueprint" }, { text: "Confirm in the app." },
   ]);
@@ -212,9 +213,12 @@ test("planning tools: explicit research runs now, unprompted becomes a card, pas
   expect(acts()).toEqual([{ action: "queue_research", args: { technology: "logistics" } }]);
   expect(model.seen[0]!.at(-1)!.content).toContain("researchable now (1, cheapest first): logistics 10×automation");
 
-  await agent.ask("what should I work on next?"); // model suggests research unprompted
+  await agent.ask("what should I work on next?"); // model suggests research unprompted: dropped, no card (FC-126)
   expect(acts().length).toBe(1);
-  expect((events.filter((e) => e.type === "approval").at(-1) as any).title).toBe("Queue research: logistics?");
+  expect(events.some((e) => e.type === "approval")).toBe(false);
+  expect(model.seen[3]!.at(-1)!.content).toContain("the player didn't ask for that");
+  await agent.ask("yes please"); // a yes to "Want me to queue it?" asks for it
+  expect(acts().at(-1)).toEqual({ action: "queue_research", args: { technology: "logistics" } });
 
   const raw = encodeBlueprintString({ blueprint: { item: "blueprint", entities: [{ entity_number: 1, name: "fast-transport-belt", position: { x: 0.5, y: 0.5 } }] } });
   await agent.ask(`review this ${raw}`);
@@ -510,4 +514,54 @@ test("FC-127: an unasked-for screenshot is dropped and the round's answer stands
   expect(game.calls).toEqual([]);
   expect(events.some((e) => e.type === "done")).toBe(true);
   expect(agent.history.at(-1)).toEqual({ role: "assistant", content: "Yumako spoils in 60 minutes." });
+});
+
+test("FC-126: actions run or get a card only when the player's words ask for them", () => {
+  expect(askedFor("place_blueprint", "Give me a blueprint for 300 electronic circuits a minute")).toBe(false);
+  expect(askedFor("place_blueprint", "a blueprint for 300 electronic circuits a minute, paste it here")).toBe(true);
+  expect(askedFor("queue_research", "What do I need before I can research agricultural science?")).toBe(false);
+  expect(askedFor("queue_research", "queue the research for fast belts")).toBe(true);
+  expect(askedFor("queue_research", "research logistics")).toBe(true);
+  expect(askedFor("map_action", "help me... what do I do?")).toBe(false);
+  expect(askedFor("map_action", "I just built something")).toBe(false);
+  expect(askedFor("map_action", "tag this spot as iron")).toBe(true);
+  expect(askedFor("mark_deconstruction", "mark them for deconstruction")).toBe(true);
+  expect(askedFor("mark_deconstruction", "how many rails are near me?")).toBe(false);
+  expect(askedFor("set_recipe", "switch those assemblers to gears")).toBe(true);
+  expect(askedFor("find_entities", "anything")).toBe(true);
+});
+
+test("FC-130: a doubled answer reaches the page and the history once, and the turn is marked", async () => {
+  const answer = "22 entities: 2 assembling-machine-2, 6 inserters and 14 belts. Both inputs keep up at 90/min; nothing looks wrong.";
+  const events: ServerMessage[] = [];
+  const log = join(mkdtempSync(join(tmpdir(), "turns-")), "turns.jsonl");
+  const model: ChatModel = {
+    async stream(_messages, opts) {
+      const doubled = `${answer}\n\n${answer}`;
+      for (let i = 0; i < doubled.length; i += 5) {
+        if (opts?.signal?.aborted) throw new DOMException("aborted", "AbortError");
+        opts?.onToken?.(doubled.slice(i, i + 5));
+      }
+      return { text: doubled, toolCalls: [], totalMs: 1 };
+    },
+  };
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: (m) => events.push(m), turnLog: log });
+  await agent.ask("review this build");
+  const shown = events.filter((e) => e.type === "token").map((e) => (e as { text: string }).text).join("");
+  expect(shown.trim()).toBe(answer);
+  expect(agent.history.at(-1)).toEqual({ role: "assistant", content: answer });
+  expect(agent.transcript().at(-1)).toEqual({ kind: "agent", text: answer });
+  expect(JSON.parse(readFileSync(log, "utf8").trim()).repeated).toBe(true);
+});
+
+test("helmet: a search result never tells the model what's in chunks the player can't see", async () => {
+  const game = fakeGame([]);
+  const call = game.game.call.bind(game.game);
+  game.game.call = async (action: any, args?: any) => (action === "find_entities" ? { ...(await call(action, args)), not_visible: 1580 } : call(action, args));
+  const { agent, model } = setup([{ tool: "find_entities", args: { what: "rails" } }, { text: "None nearby." }], game);
+  await agent.ask("any rails near me?");
+  const toolMsg = model.seen[1]!.at(-1)!.content;
+  expect(toolMsg).toContain("Found 0 rails");
+  expect(toolMsg).not.toContain("1580");
+  expect(toolMsg).not.toContain("can't see");
 });

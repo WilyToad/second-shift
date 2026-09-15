@@ -112,8 +112,13 @@ Mockup: https://claude.ai/code/artifact/433cce2c-e0d4-421d-a875-49a8a582033b
 - **Layout** (see mockup): Tier 1 alert feed on the left, chat in the center, live state on the
   right (per-surface status, science rates, research, and a view of prompt size and cache use).
   The composer has a "Quick answer / Think it through" switch that maps to `enable_thinking`.
-- **Camera jumps** happen when the player asks for one. A jump the agent suggests on its own
-  waits for a click. It never moves the camera unprompted.
+- **Camera jumps** happen when the player asks for one. It never moves the camera unprompted.
+- **Suggestions are offered in words (decided 2026-09-15, FC-126).** An action the player didn't ask for (in the
+  question, or in an offer they said yes to) isn't run and gets no card: the call is dropped in code (`ASKS_FOR` in
+  `server/src/agent.ts`) and the model offers it as a question instead. A yes makes it asked; map changes then still
+  go through a card. Before, unasked suggestions became cards, and players got "I've dropped a tag, confirm it in the
+  app" after "what do I do?". Measured in the S23 evals: 66 unasked calls dropped over 273 turns; the request eval
+  (`scripts/eval-requests.ts`) shows cards only when asked, 26/26 over 2 runs.
 - **Anything sent back into the game needs RCON or UDP.** Factorio Lua can't read files (§8 Q5).
   Actions, camera jumps, in-world highlights and in-game UI all use that channel.
 
@@ -375,6 +380,10 @@ second 5-run pass 0.054). Nothing new runs per tick; the player's own builds now
 with an empty inventory and 1.7 ms with plates (asking `get_craftable_count` for all 233 hand recipes measured
 6.8 ms, so it's only asked for recipes the inventory can reach); `surroundings` 1.5 ms at radius 32 (the server's
 default) and 7.6 ms at the 64 cap on a dense Gleba base.
+
+**Re-run after S23 (2026-09-15, wider resource look in `surroundings`, 5 runs):** without 0.619, with 0.689, so
+**0.070 ms/tick**, within the noise of 0.055 (nothing new per tick). On demand on the dev save: `surroundings` with no
+resources within 32 tiles looks for resources out to 96 in 2.1 ms.
 
 **Measure every mod change** with `factorio --benchmark <save copy> --benchmark-ticks N`,
 with and without the companion mod, and watch the in-game time-usage debug view (F4 →

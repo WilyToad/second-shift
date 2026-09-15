@@ -9,16 +9,16 @@ import { summarizePasted } from "./blueprint-review";
 import { blueprintsIn, decodeBlueprintString, encodeBlueprintString, type Blueprint } from "./blueprint";
 import { describeRow, productionRow, type RowBuild } from "./blueprint-template";
 import type { BlueprintCard } from "./messages";
-import { ChartBlockFilter, stripChartBlocks } from "./stream-filter";
+import { ChartBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
 import { pruneShots, waitForShot } from "./screenshots";
 import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
 import type { Snapshot } from "./game";
 import type { ServerMessage } from "./messages";
-import type { ChatMessage, ChatModel, ToolCall, ToolSpec } from "./model";
+import type { ChatMessage, ChatModel, StreamResult, ToolCall, ToolSpec } from "./model";
 import { buildMessages, formatSnapshot, userTurn } from "./prompt";
 import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
-import { acceptedOffer, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, craftableRecipes, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -38,6 +38,10 @@ export type TurnRecord = {
   chars: { system: number; history: number; question: number; retrieved: number; player?: number; snapshot: number };
   rounds: { promptTokens?: number; cachedTokens?: number; serverTtftS?: number; completionTokens?: number; ms: number; toolCalls: number; tools?: string[] }[];
   visibleTtftMs?: number;
+  /** The answer started over and was cut to one copy (FC-130). */
+  repeated?: boolean;
+  /** Tool calls dropped because the player didn't ask for them (FC-126). */
+  dropped?: number;
   totalMs: number;
 };
 
@@ -245,6 +249,28 @@ export function needsWorldTools(question: string, hasLastResult: boolean): boole
 /** The player asked to see a picture (FC-127). */
 export const PICTURE = /\b(screenshot|screen shot|picture|photo|image|snapshot|what does .+ look like|show me what)\b/i;
 
+/**
+ * What the player's words (the question, or an offer they said yes to) must ask for before an action tool runs or
+ * shows a card (FC-126). Unasked, the call is dropped and the model offers it in words instead: cards nobody asked
+ * for ("I've dropped a tag, confirm it in the app") were noise. Looks (find_*) aren't listed: they always run.
+ */
+export const ASKS_FOR: Record<string, RegExp> = {
+  screenshot: PICTURE,
+  place_blueprint: /\b(paste|place (it|this|that|them)|put (it|this|that) (down|here|there)|build (it|this|that) (here|there|for me)|stamp)\b/i,
+  mark_deconstruction: /\b(mark|deconstruct\w*|remove|delete|clear|tear (it |them |those )?down|get rid|demolish|take (it |them |those )?down)\b/i,
+  cancel_deconstruction: /\b(cancel|unmark|undo|keep (it|them|those))\b/i,
+  mark_upgrade: /\b(upgrad\w*|replace)\b/i,
+  set_recipe: /\b(set|switch|change|swap)\b.*\b(recipe|to make|to craft|to produce|to)\b|\bmake (it|them|those|these) (make|craft|produce)\b/i,
+  // "What do I need before I can research X?" is a question, not a request to queue it.
+  queue_research: /\b(queue|start research\w*|begin research\w*|research (it|that|this|them)\b|go research)|^\s*(please |ok,? |okay,? |yes,? )?research\b/i,
+  map_action: /\b(tag|pin|label|mark (it )?on (the )?map|camera|jump|take me|go to|show me where|look at)\b/i,
+};
+
+/** Is this tool call something the player asked for? Tools not listed in ASKS_FOR always are. */
+export function askedFor(tool: string, intent: string): boolean {
+  return ASKS_FOR[tool]?.test(intent) ?? true;
+}
+
 /** A production target in the question ("60 bioflux per minute", "2/s") as items per minute, plus the words naming what. */
 export function parseTarget(question: string): { perMinute: number; phrase: string } | null {
   // Up to four words may sit between the number and the unit: "60 electronic circuits per minute".
@@ -351,6 +377,8 @@ export class Agent {
   private lastBlueprint: { raw: string; at: number } | null = null;
   private planner: { source: Prototypes; planner: Planner } | null = null;
   private currentQuestion = "";
+  /** The question plus any offer it said yes to: what the player asked for this turn (FC-126). */
+  private currentIntent = "";
   private pending = new Map<string, Pending>();
   private notes: string[] = [];
 
@@ -439,6 +467,7 @@ export class Agent {
     // "yeah" after "Want me to look around?" is classified as the offer it accepts (S22).
     const offer = acceptedOffer(question, this.history.findLast((m) => m.role === "assistant" && m.content)?.content);
     const intent = offer ? `${offer} ${question}` : question;
+    this.currentIntent = intent;
     const world = needsWorldTools(intent, this.lastResult !== null);
     const snapshot = snap ? formatSnapshot(snap.digest, this.now() - snap.receivedAt, { question: intent, items: found?.items ?? [], planned: plannedTarget }) : null;
     // Outcomes of approvals since the last turn go in front of the question, keeping history append-only.
@@ -455,7 +484,7 @@ export class Agent {
     const start = !pasted.summaries.length && wantsStartAdvice(intent);
     const [status, around] = pasted.summaries.length ? [null, null] : await Promise.all([
       wantsPlayerStatus(intent) ? this.lookup("player_status") : null,
-      wantsSurroundings(intent) ? this.lookup("surroundings") : null,
+      wantsSurroundings(intent) ? this.lookup("surroundings", { resource_radius: 96 }) : null,
     ]);
     const playerLines = [...(status ? formatPlayerStatus(status, { builds: start || /\b(buil\w*|plac\w*|made)\b/i.test(intent) }) : []), ...(around ? formatSurroundings(around) : [])];
     // Tools are ruled out only when the retrieved data answers the question; a question nothing matched
@@ -467,7 +496,7 @@ export class Agent {
       around && !searchAgain ? "the surroundings lines are a fresh look, so don't search again unless the player asks for a wider search" : "",
       chart ? "" : "no chart block",
       searchAgain ? "call find_entities again for this question, even if an earlier result looks similar" : "",
-      start ? "base next steps only on the inventory, hand-craftable, surroundings and research lines; name no item, building or technology that isn't in them"
+      start ? "base next steps only on the inventory, hand-craftable, recipe, surroundings and research lines; name no item, building or technology that isn't in them"
         : playerLines.length ? "name no item, building or technology that isn't in the lines above" : "",
     ].filter(Boolean);
     // Blueprint requests are built in code; the model only explains the result (S14).
@@ -477,7 +506,10 @@ export class Agent {
     const top = plan?.steps[0];
     const guided = requested
       ? `${noted}\n\n(${requested.build
-        ? "A blueprint was built in code from the save's data and the player sees it with a copy button. In 60 words or fewer, using only the numbers in the generated blueprint line: what it makes, what to feed it on the input belt, that a pole must connect it to power, and that you can paste it as ghosts if they ask; no other calculations; no tool call (don't paste it until they ask); never write a blueprint string; no chart."
+        // A request that already says "paste it here" is asked: the old "don't paste until they ask" made the model offer instead (FC-126).
+        ? ASKS_FOR.place_blueprint!.test(intent)
+          ? "A blueprint was built in code from the save's data and the player sees it with a copy button. They asked to paste it: call place_blueprint now, then in 60 words or fewer, using only the numbers in the generated blueprint line, say what it makes, what to feed it on the input belt, that a pole must connect it to power, and that they confirm the paste in the card; no other calculations; never write a blueprint string; no chart."
+          : "A blueprint was built in code from the save's data and the player sees it with a copy button. In 60 words or fewer, using only the numbers in the generated blueprint line: what it makes, what to feed it on the input belt, that a pole must connect it to power, and that you can paste it as ghosts if they ask; no other calculations; no tool call (don't paste it until they ask); never write a blueprint string; no chart."
         : "The blueprint couldn't be built; in 40 words or fewer give the reason from the data and what request would work; no chart."})`
       : pasted.summaries.length
       ? `${noted}\n\n(Review from the checked summary in 90 words or fewer: lead with the total entity count and the main counts, then list every problem the checks found, or say they found none; for rates or bottlenecks use the throughput line's numbers; ${SELECTED.test(question) ? "it's already built in their game, so don't offer to paste it" : "it isn't built, so offer no actions on its entities"}; no tool call or chart.)`
@@ -490,16 +522,19 @@ export class Agent {
     // Research questions get the live list of what can be queued right now (decided in code, not guessed).
     const researchLines = start || /\b(research\w*|tech\w*|unlock\w*|queue)\b/i.test(question) ? await this.researchOptions() : [];
     const planLines = plan ? [formatPlan(plan)] : requested ? [requested.line] : [];
+    // What the player can hand-craft comes with its recipes: answers stated ingredients from memory (FC-139).
+    const craftLines = this.deps.retriever()?.recipeLines(craftableRecipes(status)) ?? [];
     const unknown = pasted.summaries.length ? null : this.deps.retriever()?.unknownName(question);
     const unknownLines = unknown ? [`[save data: no item, fluid, recipe or building in this save is named "${unknown}"; if it's a nickname, ask which item they mean]`] : [];
-    const working: ChatMessage[] = [userTurn(guided, { recipes: [...unknownLines, ...planLines, ...researchLines, ...(found?.lines ?? [])], player: playerLines, snapshot })];
+    const recipeBlock = [...unknownLines, ...planLines, ...researchLines, ...(found?.lines ?? []), ...craftLines.filter((l) => !found?.lines.includes(l))];
+    const working: ChatMessage[] = [userTurn(guided, { recipes: recipeBlock, player: playerLines, snapshot })];
     const record: TurnRecord = {
       at: new Date(this.now()).toISOString(), question, world, chart, rounds: [], totalMs: 0,
       chars: {
         system: this.deps.system().length,
         history: this.history.reduce((n, m) => n + m.content.length, 0),
         question: guided.length,
-        retrieved: (found?.lines ?? []).join("\n").length,
+        retrieved: recipeBlock.join("\n").length,
         player: playerLines.join("\n").length,
         snapshot: snapshot?.length ?? 0,
       },
@@ -540,23 +575,44 @@ export class Agent {
           ttftMs ??= performance.now() - started;
           this.deps.emit({ type: "token", text });
         };
-        const result = await this.deps.model.stream(buildMessages(this.deps.system(), [...this.history, ...working.slice(0, -1)], working.at(-1)!), {
-          thinking,
-          tools,
-          onToken: (text) => show(filter ? filter.push(text) : text),
-        });
-        if (filter) show(filter.end());
+        // An answer that starts over is cut to one copy and the stream stopped (FC-130).
+        const repeat = new RepeatFilter();
+        const stop = new AbortController();
+        const roundStarted = performance.now();
+        let result: StreamResult;
+        try {
+          result = await this.deps.model.stream(buildMessages(this.deps.system(), [...this.history, ...working.slice(0, -1)], working.at(-1)!), {
+            thinking,
+            tools,
+            signal: stop.signal,
+            onToken: (text) => {
+              show(repeat.push(filter ? filter.push(text) : text));
+              if (repeat.repeated && !stop.signal.aborted) stop.abort();
+            },
+          });
+        } catch (e) {
+          if (!repeat.repeated) throw e;
+          result = { text: repeat.text(), toolCalls: [], totalMs: performance.now() - roundStarted };
+        }
+        if (filter && !repeat.repeated) show(repeat.push(filter.end()));
+        show(repeat.end());
+        if (repeat.repeated) {
+          record.repeated = true;
+          result = { ...result, text: repeat.text(), toolCalls: [] };
+        }
         record.rounds.push({
           promptTokens: result.usage?.prompt_tokens, cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens,
           serverTtftS: result.usage?.time_to_first_token, completionTokens: result.usage?.completion_tokens,
           ms: result.totalMs, toolCalls: result.toolCalls.length,
           ...(result.toolCalls.length ? { tools: result.toolCalls.map((c) => c.function.name) } : {}),
         });
-        // Screenshots nobody asked for are dropped (FC-127): the round's answer stands without them.
-        const calls = result.toolCalls.filter((c) => c.function.name !== "screenshot" || PICTURE.test(intent));
+        // Actions and pictures nobody asked for are dropped (FC-126, FC-127): the round's answer stands without them.
+        const calls = result.toolCalls.filter((c) => askedFor(c.function.name, intent));
+        const dropped = result.toolCalls.length - calls.length;
+        if (dropped) record.dropped = (record.dropped ?? 0) + dropped;
         if (calls.length === 0 && result.toolCalls.length && !result.text.trim()) {
           working.push({ role: "assistant", content: "", tool_calls: result.toolCalls });
-          for (const call of result.toolCalls) working.push({ role: "tool", tool_call_id: call.id, content: "Error: the player didn't ask for a picture. Answer in words." });
+          for (const call of result.toolCalls) working.push({ role: "tool", tool_call_id: call.id, content: "Not done: the player didn't ask for that, and no card was shown. Answer their question. If it would help, offer it in one short question; never say it was done or that a card is waiting." });
           continue;
         }
         if (calls.length === 0) {
@@ -634,9 +690,9 @@ export class Agent {
   }
 
   /** A look the player could make themselves; null when the game can't answer (not connected, older mod). */
-  private async lookup<A extends "player_status" | "surroundings">(action: A): Promise<ActionData<A> | null> {
+  private async lookup<A extends "player_status" | "surroundings">(action: A, args?: ActionArgs<A>): Promise<ActionData<A> | null> {
     try {
-      return await this.deps.game.call(action);
+      return await this.deps.game.call(action, args);
     } catch {
       return null;
     }
@@ -728,9 +784,12 @@ export class Agent {
     this.deps.emit({ type: "tool", summary: `${summary}${r.count ? ` Highlighted in-game for ${HIGHLIGHT_SECONDS} s.` : ""}` });
     return [
       summary,
-      r.not_visible ? `${r.not_visible} more are in chunks the player can't see right now and weren't counted.` : "",
+      // Nothing about what's in chunks the player can't see: its count is a helmet-rule leak, and answers repeated it
+      // ("1,580 ore tiles exist in chunks you can't see", S23 eval). Their own machines (findStuck) are different.
       r.truncated ? `Only the first ${r.entities.length} are remembered.` : "",
       r.count ? `They are highlighted in-game for ${HIGHLIGHT_SECONDS} s and remembered as the last result.` : "",
+      // After "0 found" an answer still placed "the big patch 82 tiles south-west" (FC-139).
+      r.count ? "" : "None are there, so don't say where one is; only lines that list it can place it.",
     ].filter(Boolean).join(" ");
   }
 
@@ -840,7 +899,7 @@ export class Agent {
 
   /** Small requests run right away only when the player's own words asked for them; otherwise they need a card. */
   private asked(pattern: RegExp): boolean {
-    return pattern.test(this.currentQuestion);
+    return pattern.test(this.currentIntent);
   }
 
   private async queueResearch(what: string): Promise<string> {
@@ -858,7 +917,7 @@ export class Agent {
       }
       return `Not queued: ${failures.join(" ")}`;
     };
-    if (!this.asked(/\b(queue|research|start)\b/i)) return this.card(`Queue research: ${candidates[0]}?`, "Adds it to the research queue.", run);
+    if (!this.asked(ASKS_FOR.queue_research!)) return this.card(`Queue research: ${candidates[0]}?`, "Adds it to the research queue.", run);
     const message = await run();
     this.deps.emit({ type: "tool", summary: message });
     return message;

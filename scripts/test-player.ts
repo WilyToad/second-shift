@@ -78,6 +78,10 @@ check("a script-created entity isn't a player build", !after.data.recent_builds.
 const around = await call("surroundings", { radius: 32 });
 const chest = (around.data.mine as any[]).find((e) => e.name === "wooden-chest");
 check("surroundings lists the new chest as built", around.ok && chest?.count >= 1, `${around.profile}; mine ${around.data.mine.length} names, resources ${around.data.resources.length}, trees ${around.data.trees}`);
+// No resources within 32 tiles: resources are looked for out to 96, and the cost stays low (FC-139).
+const far = await call("surroundings", { radius: 32, resource_radius: 96 });
+const farMs = Number(/([\d.]+)ms/.exec(far.profile ?? "")?.[1] ?? NaN);
+check("wider resource look costs under 3 ms", far.ok && farMs < 3, `${far.profile}; looked out to ${far.data.resource_radius}, ${far.data.resources.length} resource kinds`);
 const wide = await call("surroundings", { radius: 64 });
 check("surroundings radius is capped at 64", wide.ok && wide.data.radius === 64, wide.profile ?? "");
 

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ChartBlockFilter, stripChartBlocks } from "./stream-filter";
+import { ChartBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
 
 const streamed = (tokens: string[]) => {
   const f = new ChartBlockFilter();
@@ -20,4 +20,28 @@ test("other code and inline backticks pass through, and an unfinished chart is d
   expect(streamed(["Here: ```rate_chart\nitem=x"])).toBe("Here: ");
   expect(streamed(["ends with a tick `"])).toBe("ends with a tick `");
   expect(stripChartBlocks("A.\n\n```rate_chart\nitem=x surface=y\n```\n\n")).toBe("A.");
+});
+
+test("FC-130: an answer written twice is cut to one copy, however it's split into tokens", () => {
+  const answer = "22 entities: 2 assembling-machine-2, 6 inserters and 14 belts. Both inputs keep up at 90/min; nothing looks wrong.";
+  const stream = `${answer}\n\n${answer}`;
+  for (const size of [1, 3, 7, 40]) {
+    const f = new RepeatFilter();
+    let shown = "";
+    for (let i = 0; i < stream.length; i += size) shown += f.push(stream.slice(i, i + size));
+    shown += f.end();
+    expect(shown.trim()).toBe(answer);
+    expect(f.repeated).toBe(true);
+    expect(f.text()).toBe(answer);
+  }
+});
+
+test("FC-130: restating the first words briefly isn't a repeat, and nothing is lost", () => {
+  const text = "Iron plate is made in a stone furnace from iron ore at 3.2 s per plate. Iron plate is made faster in a steel furnace: 1.6 s per plate, same ore.";
+  const f = new RepeatFilter();
+  let shown = "";
+  for (const ch of text) shown += f.push(ch);
+  shown += f.end();
+  expect(shown).toBe(text);
+  expect(f.repeated).toBe(false);
 });

@@ -121,6 +121,11 @@ export class RecipeRetriever {
     return out;
   }
 
+  /** Recipe lines for recipes named exactly (what the player can hand-craft now). */
+  recipeLines(names: string[]): string[] {
+    return names.filter((n) => this.p.recipes[n]).map((n) => recipeLine(n, this.p.recipes[n]!, this.crafters));
+  }
+
   /** Relevant lines for a question, capped. Returns the names it matched for transparency. */
   retrieve(question: string, maxLines = 24): { matched: string[]; items: string[]; lines: string[] } {
     const entries = this.match(question);

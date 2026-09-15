@@ -42,6 +42,8 @@ export const SurroundingsSchema = z.object({
   x: z.number(),
   y: z.number(),
   radius: z.number(),
+  // Resources are looked for this far out when none are within `radius` (FC-139).
+  resource_radius: z.number().optional(),
   mine: luaArray(Nearest),
   resources: luaArray(Nearest.extend({ amount: z.number() })),
   other: luaArray(Nearest),
@@ -154,7 +156,7 @@ export const actions = {
   },
   player_status: { args: z.object({}), data: PlayerStatusSchema, kind: "look" },
   map_id: { args: z.object({}), data: z.object({ map_id: z.string().optional() }), kind: "look" },
-  surroundings: { args: z.object({ radius: z.number().positive().max(64).optional() }), data: SurroundingsSchema, kind: "look" },
+  surroundings: { args: z.object({ radius: z.number().positive().max(64).optional(), resource_radius: z.number().positive().max(96).optional() }), data: SurroundingsSchema, kind: "look" },
   queue_research: { args: z.object({ technology: z.string() }), data: z.object({ queued: z.string(), queue: luaArray(z.string()) }), kind: "small_request" },
   add_map_tag: { args: z.object({ x: z.number().optional(), y: z.number().optional(), surface: z.string().optional(), text: z.string().max(200) }), data: z.object({ x: z.number(), y: z.number(), text: z.string() }), kind: "small_request" },
   camera_to: { args: z.object({ x: z.number(), y: z.number(), surface: z.string().optional() }), data: z.object({ surface: z.string(), x: z.number(), y: z.number() }), kind: "small_request" },

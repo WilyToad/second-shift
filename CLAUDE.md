@@ -26,7 +26,8 @@ No Vite. UI: Preact + signals in `displays/src` (PLAN §4).
 - **Approval:** looking and small requests (queue research, map tag, a camera jump the player
   asked for) run immediately. Map changes need a preview (in-world highlight + approval card) and a
   confirm. Character control (walk, mine by hand, craft, move items) needs a confirm and a stop
-  hotkey. Anything the agent suggests on its own always needs a confirm. Pass `player` so map
+  hotkey. Anything the agent suggests on its own is offered in words and acts only after the player says yes
+  (`ASKS_FOR` drops unasked calls, FC-126); map changes then still get a card. Pass `player` so map
   changes go on the player's undo history.
 - Achievements don't matter, so console commands (`/c`, `/editor`) are fine for development.
 - **Two tiers, split by latency.** Anything time-critical (attacks, brownouts, low ammo, full
@@ -148,6 +149,9 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun scripts/eval-new-game.ts [--switch-back]` (server running, game closed) creates a fresh map (~2 s), hosts it
   and runs the first-hour questions against the game's own data; `--switch-back` then hosts the dev save and checks
   its conversation returns. Run it after changes to player-data retrieval or turn guidance.
+- `bun scripts/eval-requests.ts [--runs N]` (server running, dev save hosted) checks that cards and actions happen only
+  when asked (blueprint requests with and without "paste", research questions, marking). Run it after changes to
+  tool guards or turn guidance.
 - `bun scripts/test-helmet.ts` (dev save hosted) runs the in-game helmet-rule tests. Run it after any change
   to mod actions or `scripts/helmet.lua`.
 - Captures for offline work go in `data/captures/` (gitignored).

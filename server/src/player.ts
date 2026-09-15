@@ -17,7 +17,7 @@ export function acceptedOffer(question: string, lastAnswer: string | undefined):
   return offers ? offers.map((o) => o.trim()).join(" ") : null;
 }
 
-const START = /\b(what (should|do|can) i do|help me|i need help|get(ting)? started|where (do|should) i (start|begin)|what now|what next|what'?s next|next steps?|first steps?|just (started|landed|crashed|spawned)|new (game|map)|how do i (start|begin))\b|^\s*help\b/i;
+const START = /\b(what (should|do|can) i do|what (should|do|can) i (build|make|craft|place|set up) (next|now|first)|what to build (next|first)|help me|i need help|get(ting)? started|where (do|should) i (start|begin)|what now|what next|what'?s next|next steps?|first steps?|just (started|landed|crashed|spawned)|new (game|map)|how do i (start|begin))\b|^\s*help\b/i;
 // "How do I craft X?" is a recipe question; only what the player can craft or has counts here.
 const CARRY = /\b(inventory|carrying|holding|in my hands?|what do i have|have on me|what (can|could|should) i (hand ?)?(craft|make)|can i (hand ?)?craft|craftable|craft (right )?now|pick(ed)? up|debris|wreck\w*|materials)\b/i;
 const BUILT = /\b(i (just |have |'ve )?(built|placed|put down|set up)|what (did|have) i (just )?(build|built|place|placed|make|made)|what you('ve| have)? ?(just )?(built|placed|made)|my (last|latest|new|recent) builds?|i just (made|build) (something|a|an|some))\b/i;
@@ -48,6 +48,11 @@ export function bearing(from: { x: number; y: number }, to: { x: number; y: numb
 
 const thousands = (n: number) => (n >= 10_000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)));
 
+/** Recipes for what the player can hand-craft now, so ingredient claims come from the save (FC-139). */
+export function craftableRecipes(s: PlayerStatus | null, max = 10): string[] {
+  return s?.character ? s.craftable.slice(0, max).map((c) => c.name) : [];
+}
+
 export function formatPlayerStatus(s: PlayerStatus, opts: { builds?: boolean } = {}): string[] {
   if (!s.character) return ["player: no character right now (map or editor view without a body), so no inventory or hand crafting"];
   const lines = [
@@ -74,10 +79,11 @@ export function formatSurroundings(s: Surroundings): string[] {
   const named = (list: Surroundings["mine"]) => list.map((e) => `${e.name} ${e.count} (nearest ${bearing(here, e)})`).join(", ");
   const lines = [`what the player can see within ${s.radius} tiles of their character on ${s.surface}:`];
   lines.push(`- the player's own (built or owned): ${s.mine.length ? named(s.mine) : "nothing"}`);
-  lines.push(`- resources: ${s.resources.length ? s.resources.map((r) => `${r.name} ${r.count} tiles, ${thousands(r.amount)} total (nearest ${bearing(here, r)})`).join(", ") : "none"}`);
+  const reach = s.resource_radius && s.resource_radius > s.radius ? ` (none within ${s.radius} tiles, so looked out to ${s.resource_radius})` : "";
+  lines.push(`- resources${reach}: ${s.resources.length ? s.resources.map((r) => `${r.name} ${r.count} tiles, ${thousands(r.amount)} total (nearest ${bearing(here, r)})`).join(", ") : "none"}`);
   if (s.other.length) lines.push(`- other: ${named(s.other)}`);
   // Answers said wreckage gives "scrap" (a Fulgora item) until the contents were listed as the only loot (S22 eval).
-  if (s.salvage.length) lines.push(`- wreckage and other containers here hold only: ${s.salvage.map((i) => `${i.name} ${i.count}`).join(", ")} (in ${s.salvage_containers}; mining one by hand takes those items and nothing else)`);
+  if (s.salvage.length) lines.push(`- wreckage and other containers here hold only: ${s.salvage.map((i) => `${i.name} ${i.count}`).join(", ")} (in ${s.salvage_containers}; mining one by hand takes those items and nothing else: call them by these names, not scrap)`);
   lines.push(`- trees ${s.trees}, rocks ${s.rocks}, water tiles ${s.water_tiles}, enemies ${s.enemies}`);
   return lines;
 }

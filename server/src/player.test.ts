@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PlayerStatusSchema, SurroundingsSchema } from "@companion/interfaces";
-import { acceptedOffer, bearing, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, bearing, craftableRecipes, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 test("a short yes takes up the question the last answer offered", () => {
   const last = "Start by mining iron.\n\nWant me to look around to see what you built?";
@@ -14,7 +14,7 @@ test("a short yes takes up the question the last answer offered", () => {
 });
 
 test("first-hour questions fetch what the player has and sees", () => {
-  for (const q of ["help me... what do I do?", "what should I do next?", "how do I get started?"]) {
+  for (const q of ["help me... what do I do?", "what should I do next?", "how do I get started?", "what should I build next?"]) {
     expect(wantsStartAdvice(q)).toBe(true);
     expect(wantsPlayerStatus(q)).toBe(true);
     expect(wantsSurroundings(q)).toBe(true);
@@ -72,5 +72,18 @@ test("surroundings lines name resources with amounts and where the nearest is", 
   expect(text).toContain("iron-ore 300 tiles, 245k total (nearest 20 tiles north)");
   expect(text).toContain("crash-site-spaceship-wreck-big-1 1 (nearest 10 tiles west)");
   expect(text).toContain("trees 120, rocks 3, water tiles 0, enemies 0");
-  expect(text).toContain("wreckage and other containers here hold only: iron-plate 8 (in 1; mining one by hand takes those items and nothing else)");
+  expect(text).toContain("wreckage and other containers here hold only: iron-plate 8 (in 1; mining one by hand takes those items and nothing else: call them by these names, not scrap)");
+});
+
+test("FC-139: resources looked for further out say so; craftable recipes come with their lines", () => {
+  const around = SurroundingsSchema.parse({
+    surface: "nauvis", x: 0, y: 0, radius: 32, resource_radius: 96,
+    mine: {}, other: {}, resources: [{ name: "iron-ore", count: 120, amount: 60000, x: 70, y: 0 }],
+    trees: 0, rocks: 0, enemies: 0, water_tiles: 0,
+  });
+  expect(formatSurroundings(around).join("\n")).toContain("- resources (none within 32 tiles, so looked out to 96): iron-ore 120 tiles, 60k total (nearest 70 tiles east)");
+  const status = PlayerStatusSchema.parse({ character: true, surface: "nauvis", x: 0, y: 0, items: [], total_items: 0, craftable: [{ name: "iron-gear-wheel", count: 2 }], more_craftable: false, crafting_queue: [], recent_builds: [] });
+  expect(craftableRecipes(status)).toEqual(["iron-gear-wheel"]);
+  expect(craftableRecipes({ ...status, character: false })).toEqual([]);
+  expect(craftableRecipes(null)).toEqual([]);
 });

@@ -74,7 +74,7 @@ raw Lua or console commands.
 | Looking | Find, count, review a blueprint, screenshot | Runs straight away |
 | Small requests you ask for | Queue research, add a map tag, move the camera | Runs straight away |
 | Map changes | Paste ghosts, mark for deconstruction or upgrade, change a recipe | A card with the details; nothing changes until you confirm. Pastes and marks go on your Ctrl+Z history |
-| Anything it suggests on its own | "Want me to mark these?" | Always a card |
+| Anything it suggests on its own | "Want me to mark these?" | It asks first, in words; nothing happens unless you say yes (then map changes still get a card) |
 
 So it can't place real buildings, delete things, teleport, spawn items, finish research or see through fog of war.
 

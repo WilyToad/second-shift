@@ -27,3 +27,7 @@ const single = turns.filter((t) => t.rounds.length === 1);
 console.log(`\nmedian visible ttft ${fmt(median(turns.map((t) => t.visibleTtftMs ?? NaN)))} · single-round ${fmt(median(single.map((t) => t.visibleTtftMs ?? NaN)))} · with tools ${fmt(median(turns.filter((t) => t.rounds.length > 1).map((t) => t.visibleTtftMs ?? NaN)))}`);
 console.log(`median uncached tokens ${median(turns.map(uncached))} · median snapshot ${tok(median(turns.map((t) => t.chars.snapshot)))} tok · retrieved ${tok(median(turns.map((t) => t.chars.retrieved)))} tok · system ${tok(median(turns.map((t) => t.chars.system)))} tok`);
 console.log(`median gap visible − server ttft (single-round): ${fmt(median(single.map((t) => (t.visibleTtftMs ?? 0) - (first(t).serverTtftS ?? 0) * 1000)))}`);
+// Model misses cut in code (FC-126, FC-130): how often they happen.
+const repeats = turns.filter((t) => t.repeated).length;
+const droppedTurns = turns.filter((t) => t.dropped).length;
+console.log(`answers cut for repeating: ${repeats} of ${turns.length} · turns with unasked actions dropped: ${droppedTurns} (${turns.reduce((n, t) => n + (t.dropped ?? 0), 0)} calls)`);

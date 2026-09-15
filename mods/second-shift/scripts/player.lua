@@ -9,6 +9,7 @@ local MAX_ITEMS = 40
 local MAX_CRAFTABLE = 40
 local MAX_RADIUS = 64
 local MAX_NAMES = 25
+local MAX_RESOURCE_RADIUS = 96
 -- Effects that aren't things in the world: the crash site's fires are on the enemy force and read as 34 enemies (S22 eval).
 local TRANSIENT = { explosion = true, fire = true, ["smoke-with-trigger"] = true, sticker = true, projectile = true, beam = true, stream = true, ["particle-source"] = true, corpse = true }
 local ENEMY_TYPES = { unit = true, ["unit-spawner"] = true, turret = true, ["spider-unit"] = true, ["segmented-unit"] = true }
@@ -214,6 +215,25 @@ function M.register(handlers)
         groups.other[e.name] = entry
       end
     end
+    -- No ore close by (a new map's crash site): look for resources further out, still only where the player can see.
+    -- Answers otherwise sent players to "the iron patch near the wreck" that wasn't there (FC-139).
+    local resource_radius = radius
+    local wide = math.min(tonumber(args.resource_radius) or radius, MAX_RESOURCE_RADIUS)
+    if next(groups.resources) == nil and wide > radius then
+      resource_radius = wide
+      local wide_area = { { center.x - wide, center.y - wide }, { center.x + wide, center.y + wide } }
+      for _, e in ipairs(surface.find_entities_filtered({ area = wide_area, type = "resource" })) do
+        local key = math.floor(e.position.x / 32) .. ":" .. math.floor(e.position.y / 32)
+        if visible_chunk[key] == nil then visible_chunk[key] = helmet.visible(player.force, surface, e.position) end
+        if visible_chunk[key] then
+          local entry = groups.resources[e.name] or { name = e.name, count = 0, amount = 0 }
+          entry.count = entry.count + 1
+          entry.amount = entry.amount + e.amount
+          nearer(entry, e)
+          groups.resources[e.name] = entry
+        end
+      end
+    end
     local function listed(dict)
       local out = {}
       for _, entry in pairs(dict) do entry.d = nil; out[#out + 1] = entry end
@@ -235,6 +255,7 @@ function M.register(handlers)
       surface = surface.name,
       x = math.floor(center.x), y = math.floor(center.y),
       radius = radius,
+      resource_radius = resource_radius,
       mine = listed(groups.mine),
       resources = listed(groups.resources),
       other = listed(groups.other),
