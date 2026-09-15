@@ -17,6 +17,20 @@ export function acceptedOffer(question: string, lastAnswer: string | undefined):
   return offers ? offers.map((o) => o.trim()).join(" ") : null;
 }
 
+// "I meant the rocket silo", "no, the red chest", "try that again": short follow-ups that fix or repeat the last question.
+const CORRECTION = /^\s*(no[,.]?\s+|nope[,.]?\s+|sorry[,.]?\s+|oh[,.]?\s+)*(i meant|i mean|i said|actually,?\s+(i meant|i mean|the|it'?s|its|no)\b|not (that|this|those|the)\b|the other|(try|do) (it|that|this) again|again\b|the \w+ (one|instead)|instead)/i;
+const CORRECTION_MAX_WORDS = 10;
+
+/**
+ * "Where's the rocket salad? Point it out" then "I meant the rocket silo": the correction keeps the request (FC-154).
+ * Returns the previous question when this one is a short correction or retry of it, so both classify the turn.
+ */
+export function correctedRequest(question: string, lastQuestion: string | undefined): string | null {
+  if (!lastQuestion || question.trim().split(/\s+/).length > CORRECTION_MAX_WORDS) return null;
+  const q = question.trim();
+  return CORRECTION.test(q) || /^\s*no[,.]?\s+the\b/i.test(q) ? lastQuestion.trim() : null;
+}
+
 const START = /\b(what (should|do|can) i do|what (should|do|can) i (build|make|craft|place|set up) (next|now|first)|what to build (next|first)|help me|i need help|get(ting)? started|where (do|should) i (start|begin)|what now|what next|what'?s next|next steps?|first steps?|just (started|landed|crashed|spawned)|new (game|map)|how do i (start|begin))\b|^\s*help\b/i;
 // "How do I craft X?" is a recipe question; only what the player can craft or has counts here.
 const CARRY = /\b(inventory|carrying|holding|in my hands?|what do i have|have on me|what (can|could|should) i (hand ?)?(craft|make)|can i (hand ?)?craft|craftable|craft (right )?now|pick(ed)? up|debris|wreck\w*|materials)\b/i;
@@ -42,7 +56,9 @@ const COMPASS = ["east", "south-east", "south", "south-west", "west", "north-wes
 
 /** "12 tiles north-east" from one map position to another (map y grows southward). */
 export function bearing(from: { x: number; y: number }, to: { x: number; y: number }): string {
-  const dx = to.x - from.x, dy = to.y - from.y;
+  // Whole tiles on both ends: every line measures the same way, so a thing on a compass boundary doesn't flip
+  // between "west" and "north-west" from one lookup to the next (FC-157).
+  const dx = Math.floor(to.x) - Math.floor(from.x), dy = Math.floor(to.y) - Math.floor(from.y);
   const d = Math.round(Math.hypot(dx, dy));
   if (d <= 1) return "right here";
   const octant = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
@@ -89,11 +105,13 @@ export function formatPlayerStatus(s: PlayerStatus, opts: { builds?: boolean } =
 
 export function formatSurroundings(s: Surroundings): string[] {
   const here = { x: s.x, y: s.y };
-  const named = (list: Surroundings["mine"]) => list.map((e) => `${e.name} ${e.count} (nearest ${bearing(here, e)})`).join(", ");
+  // The nearest one's position too: without it an answer made up "roughly (-5, 0)" for a silo (FC-157).
+  const at = (p: { x: number; y: number }) => `${bearing(here, p)} at (${Math.floor(p.x)}, ${Math.floor(p.y)})`;
+  const named = (list: Surroundings["mine"]) => list.map((e) => `${e.name} ${e.count} (nearest ${at(e)})`).join(", ");
   const lines = [`what the player can see within ${s.radius} tiles of their character on ${s.surface}:`];
   lines.push(`- the player's own (built or owned): ${s.mine.length ? named(s.mine) : "nothing"}`);
   const reach = s.resource_radius && s.resource_radius > s.radius ? ` (none within ${s.radius} tiles, so looked out to ${s.resource_radius})` : "";
-  lines.push(`- resources${reach}: ${s.resources.length ? s.resources.map((r) => `${r.name} ${r.count} tiles, ${thousands(r.amount)} total (nearest ${bearing(here, r)})`).join(", ") : "none"}`);
+  lines.push(`- resources${reach}: ${s.resources.length ? s.resources.map((r) => `${r.name} ${r.count} tiles, ${thousands(r.amount)} total (nearest ${at(r)})`).join(", ") : "none"}`);
   if (s.other.length) lines.push(`- other: ${named(s.other)}`);
   // Answers said wreckage gives "scrap" (a Fulgora item) until the contents were listed as the only loot (S22 eval).
   if (s.salvage.length) lines.push(`- wreckage and other containers here hold only: ${s.salvage.map((i) => `${i.name} ${i.count}`).join(", ")} (in ${s.salvage_containers}; still inside the wreckage, not in the player's inventory; mining one by hand takes those items and nothing else)`);

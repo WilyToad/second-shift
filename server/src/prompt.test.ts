@@ -126,7 +126,7 @@ test("planned rate questions skip machine and production blocks", () => {
   expect(text).not.toContain("jelly");
 });
 
-test("S22: research only when it matters; idle labs always show", () => {
+test("FC-156: research only for research, science, rate, machine and what-next questions, idle labs or not", () => {
   const craft = formatSnapshot(digest, 0, { question: "what can I craft right now?", items: [] });
   expect(craft).toContain("player: p on gleba at (1, 2)");
   expect(craft).not.toContain("research:");
@@ -134,7 +134,13 @@ test("S22: research only when it matters; idle labs always show", () => {
     tick: 1, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {},
     machines: { progress: { machines: 4, scanned: true, refresh_ticks: 1 }, stuck: [{ surface: "nauvis", recipes: [{ recipe: "(research)", total: 4, stuck: 4, statuses: { no_research_in_progress: 4 } }] }] },
   });
-  expect(formatSnapshot(idle, 0, { question: "what can I craft right now?", items: [] })).toContain("research: nothing researching (4 labs idle)");
+  // The first voice session's questions (2026-09-15): none is about research.
+  for (const question of ["Testing hello", "No what's around me", "Where is the rocket silo can you point it out to me", "What do I have in my inventory", "What do I use these for", "How many radars are near me"]) {
+    expect(formatSnapshot(idle, 0, { question, items: [] })).not.toContain("research:");
+  }
+  for (const question of ["what's being researched?", "why is my science slow?", "what should I do next?", "are my labs working?", "what's my iron production?"]) {
+    expect(formatSnapshot(idle, 0, { question, items: [] })).toContain("research: nothing researching (4 labs idle)");
+  }
 });
 
 test("FC-131: the system prompt lists the save's own mods, not the author's", () => {

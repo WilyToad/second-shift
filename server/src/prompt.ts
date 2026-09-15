@@ -58,6 +58,7 @@ export function diagnose(digest: Digest): string[] {
 
 const MACHINE_QUESTION = /\b(slow|stuck|bottleneck\w*|why|problem\w*|broken|idle|starv\w*|backed up|back(ing)? up|not working|blocked|jam\w*|full)\b/i;
 const RESEARCH_QUESTION = /\b(research\w*|tech\w*|unlock\w*|queue\w*|labs?)\b/i;
+const NEXT_QUESTION = /\b(what (should|do|can) i (do|work on|build|focus on)|what('s| is)? next|next steps?|what now)\b/i;
 const RATE_QUESTION = /\b(rate|rates|per minute|\/min|output|throughput|production|produc\w*|making|consum\w*|science|bottleneck|slow|stalled)\b/i;
 
 /**
@@ -78,11 +79,11 @@ export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { ques
       ? `player: ${p.name} in map view looking at (${p.position.x}, ${p.position.y}) on ${p.surface}; character at (${p.character_position.x}, ${p.character_position.y}) on ${p.character_surface ?? p.surface}`
       : `player: ${p.name} on ${p.surface} at (${p.position.x}, ${p.position.y})`);
   }
-  // Research state only for research, rate and machine questions, or when labs sit idle: on a new map
-  // "nothing researching" isn't a problem yet, and answers kept nagging about it (S22).
+  // Research state only for research, rate, machine and what-next questions: on a new map "nothing researching" isn't a
+  // problem yet (S22), and a save whose labs sit idle got "labs are still idle" on 7 of 10 answers, "hello" included (FC-156).
   const r = digest.research;
   const idleLabs = (digest.machines?.stuck ?? []).flatMap((s) => s.recipes).filter((x) => x.recipe === "(research)").reduce((n, x) => n + (x.statuses.no_research_in_progress ?? 0), 0);
-  if (!relevance || idleLabs > 0 || RESEARCH_QUESTION.test(relevance.question) || MACHINE_QUESTION.test(relevance.question) || RATE_QUESTION.test(relevance.question)) {
+  if (!relevance || [RESEARCH_QUESTION, MACHINE_QUESTION, RATE_QUESTION, NEXT_QUESTION].some((re) => re.test(relevance.question))) {
     lines.push(`research: ${r.current ? `${r.current} ${Math.round(r.progress * 100)}%` : `nothing researching${idleLabs ? ` (${idleLabs} labs idle)` : ""}`}${r.queue.length > 1 ? `; queued: ${r.queue.slice(1).join(", ")}` : ""}`);
   }
   let omitted = false;

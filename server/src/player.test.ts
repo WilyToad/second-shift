@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PlayerStatusSchema, SurroundingsSchema } from "@companion/interfaces";
-import { acceptedOffer, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, correctedRequest, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 test("a short yes takes up the question the last answer offered", () => {
   const last = "Start by mining iron.\n\nWant me to look around to see what you built?";
@@ -69,8 +69,8 @@ test("surroundings lines name resources with amounts and where the nearest is", 
   const text = formatSurroundings(around).join("\n");
   expect(text).toContain("within 32 tiles of their character on nauvis");
   expect(text).toContain("- the player's own (built or owned): nothing");
-  expect(text).toContain("iron-ore 300 tiles, 245k total (nearest 20 tiles north)");
-  expect(text).toContain("crash-site-spaceship-wreck-big-1 1 (nearest 10 tiles west)");
+  expect(text).toContain("iron-ore 300 tiles, 245k total (nearest 20 tiles north at (0, -20))");
+  expect(text).toContain("crash-site-spaceship-wreck-big-1 1 (nearest 10 tiles west at (-10, 0))");
   expect(text).toContain("trees 120, rocks 3, water tiles 0, enemies 0");
   expect(text).toContain("wreckage and other containers here hold only: iron-plate 8 (in 1; still inside the wreckage, not in the player's inventory; mining one by hand takes those items and nothing else)");
 });
@@ -81,7 +81,7 @@ test("FC-139: resources looked for further out say so; craftable recipes come wi
     mine: {}, other: {}, resources: [{ name: "iron-ore", count: 120, amount: 60000, x: 70, y: 0 }],
     trees: 0, rocks: 0, enemies: 0, water_tiles: 0,
   });
-  expect(formatSurroundings(around).join("\n")).toContain("- resources (none within 32 tiles, so looked out to 96): iron-ore 120 tiles, 60k total (nearest 70 tiles east)");
+  expect(formatSurroundings(around).join("\n")).toContain("- resources (none within 32 tiles, so looked out to 96): iron-ore 120 tiles, 60k total (nearest 70 tiles east at (70, 0))");
   const status = PlayerStatusSchema.parse({ character: true, surface: "nauvis", x: 0, y: 0, items: [], total_items: 0, craftable: [{ name: "iron-gear-wheel", count: 2 }], more_craftable: false, crafting_queue: [], recent_builds: [] });
   expect(craftableRecipes(status)).toEqual(["iron-gear-wheel"]);
   expect(craftableRecipes({ ...status, character: false })).toEqual([]);
@@ -124,4 +124,25 @@ test("FC-140: counts and builds an answer gets wrong are corrected from the play
   // On a turn that isn't about the inventory, "you have 47 labs" is the factory.
   expect(claimCorrections("You have 47 labs idle on Gleba.", status, new Set([...known, "lab"]), { inventoryTurn: false })).toEqual([]);
   expect(claimCorrections("Your inventory has wood 9.", status, known, { inventoryTurn: false })).toEqual(["Correction: your inventory has wood 1."]);
+});
+
+test("FC-154: a short correction or retry keeps the last question's request", () => {
+  const last = "Where is the rocket salad can you point it out to me";
+  for (const q of ["I meant the rocket silo", "no, the rocket silo", "No I meant the silo", "actually the silo", "not that, the silo", "try that again", "the other one"]) {
+    expect(correctedRequest(q, last)).toBe(last);
+  }
+  for (const q of ["How many radars are near me", "Actually, how many radars are near me?", "What do I use these for", "yes please"]) {
+    expect(correctedRequest(q, last)).toBeNull();
+  }
+  expect(correctedRequest("I meant the rocket silo", undefined)).toBeNull();
+  expect(correctedRequest("no, the one I meant is the big rocket silo over there past the lake to the north", last)).toBeNull(); // a new question
+});
+
+test("FC-157: the same thing gets the same direction whether positions come floored or not", () => {
+  // The silo case: a character at (8.6, -2.4) and a silo centre on the west/north-west boundary.
+  const character = { x: 8.6, y: -2.4 }, silo = { x: -4.5, y: -7.5 };
+  const floored = bearing({ x: Math.floor(character.x), y: Math.floor(character.y) }, { x: Math.floor(silo.x), y: Math.floor(silo.y) });
+  expect(bearing(character, silo)).toBe(floored);
+  const lines = formatSurroundings(SurroundingsSchema.parse({ surface: "nauvis", x: 8, y: -3, radius: 32, mine: [{ name: "rocket-silo", count: 1, x: -5, y: -8 }], resources: [], other: [], trees: 0, rocks: 0, water_tiles: 0, enemies: 0, salvage: [], salvage_containers: 0 }));
+  expect(lines[1]).toBe(`- the player's own (built or owned): rocket-silo 1 (nearest ${floored} at (-5, -8))`);
 });

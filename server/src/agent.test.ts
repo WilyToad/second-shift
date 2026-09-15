@@ -6,6 +6,7 @@ import type { ActionName } from "@companion/interfaces";
 import { DigestSchema, PrototypesSchema } from "@companion/interfaces";
 import { encodeBlueprintString } from "./blueprint";
 import { RecipeRetriever } from "./retrieval";
+import { acceptedOffer, correctedRequest } from "./player";
 import { Agent, askedFor, fileSession, mapSession, anchorFor, anchorSpot, compactHistory, compactUserContent, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsBlueprint, wantsChart, type GameActions, type SessionData, type SessionStore } from "./agent";
 import { rowPrototypes } from "./fixtures/row-prototypes";
 import type { ServerMessage } from "./messages";
@@ -216,7 +217,7 @@ test("planning tools: explicit research runs now, unprompted is offered in words
   await agent.ask("what should I work on next?"); // model suggests research unprompted: dropped, no card (FC-126)
   expect(acts().length).toBe(1);
   expect(events.some((e) => e.type === "approval")).toBe(false);
-  expect(model.seen[3]!.at(-1)!.content).toContain("the player didn't ask for that");
+  expect(model.seen[3]!.at(-1)!.content).toContain("the player hasn't asked for this yet");
   await agent.ask("yes please"); // a yes to "Want me to queue it?" asks for it
   expect(acts().at(-1)).toEqual({ action: "queue_research", args: { technology: "logistics" } });
 
@@ -457,7 +458,7 @@ test("S22: start-of-game advice is grounded on inventory, surroundings and trigg
   expect(new Set(calls.map((c) => c.action))).toEqual(new Set(["player_status", "surroundings", "research_options"]));
   const turn = model.seen[0]!.at(-1)!.content;
   expect(turn).toContain("inventory (1 kinds): iron-plate 8");
-  expect(turn).toContain("iron-ore 200 tiles, 90k total (nearest 15 tiles north)");
+  expect(turn).toContain("iron-ore 200 tiles, 90k total (nearest 15 tiles north at (0, -15))");
   expect(turn).toContain("unlocked by doing, no labs needed: electronics (craft 10 copper-cable)");
   expect(turn).toContain("name no item, building or technology that isn't in them");
   // Compacted history keeps only the question.
@@ -606,7 +607,7 @@ test("FC-143: 'show me the way to copper' points to the nearest one it found, an
   await agent.ask("show me the way to the nearest copper ore");
   expect(calls.find((c) => c.action === "find_entities")!.args).toMatchObject({ names: ["copper-ore"], radius: 128, from: "character" });
   expect(calls.find((c) => c.action === "point_to")!.args).toEqual({ x: 40.5, y: 0.5, label: "copper-ore", seconds: 30 });
-  expect(model.seen[1]!.at(-1)!.content).toContain("Pointing to the nearest copper-ore: 41 tiles east at (40, 0)");
+  expect(model.seen[1]!.at(-1)!.content).toContain("Pointing to the nearest copper-ore: 40 tiles east at (40, 0)");
   calls.length = 0;
   await agent.ask("is there copper around?"); // a question, not a request to be pointed: dropped (FC-126)
   expect(calls.some((c) => c.action === "point_to")).toBe(false);
@@ -625,4 +626,27 @@ test("FC-109: train stop limits go through a card on the last search, and only w
   expect(calls.some((c) => c.action === "set_train_stop")).toBe(false);
   expect(askedFor("set_train_stop", "how many train stops are near me?")).toBe(false);
   expect(askedFor("set_train_stop", "rename them to Iron Drop")).toBe(true);
+});
+
+test("FC-155: offers in the model's own wording count as asked once the player says yes", () => {
+  const yes = (offer: string, tool: string) => askedFor(tool, `${acceptedOffer("Yes please", offer)} Yes please`);
+  expect(yes("I can't place the arrow right now. Want me to try marking it on your map?", "map_action")).toBe(true);
+  expect(yes("Want me to drop a map tag on the copper patch?", "map_action")).toBe(true);
+  expect(yes("Want me to drop a marker there?", "map_action")).toBe(true);
+  expect(yes("Want me to point you toward the iron ore?", "show_the_way")).toBe(true);
+  expect(yes("Want me to point out the nearest ore patch?", "show_the_way")).toBe(true);
+  expect(yes("Want me to point you at the wreckage?", "show_the_way")).toBe(true);
+  expect(yes("Want me to ghost it at your spot?", "place_blueprint")).toBe(true);
+  expect(yes("Want me to research agricultural science?", "queue_research")).toBe(true);
+  expect(yes("Want me to queue it?", "queue_research")).toBe(true);
+  expect(yes("Want me to mark the wrecks for deconstruction?", "mark_deconstruction")).toBe(true);
+  // Still not asked without an offer or a request.
+  expect(askedFor("map_action", "where is the rocket silo?")).toBe(false);
+  expect(askedFor("show_the_way", "how many radars are near me?")).toBe(false);
+  expect(askedFor("queue_research", "What do I need before I can research agricultural science?")).toBe(false);
+});
+
+test("FC-154: a correction carries the request into the turn", () => {
+  const intent = `${correctedRequest("I meant the rocket silo", "Where is the rocket salad can you point it out to me")} I meant the rocket silo`;
+  expect(askedFor("show_the_way", intent)).toBe(true);
 });

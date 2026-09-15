@@ -18,7 +18,7 @@ import type { ChatMessage, ChatModel, StreamResult, ToolCall, ToolSpec } from ".
 import { buildMessages, formatSnapshot, userTurn } from "./prompt";
 import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
-import { acceptedOffer, bearing, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, correctedRequest, bearing, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -275,16 +275,16 @@ export const PICTURE = /\b(screenshot|screen shot|picture|photo|image|snapshot|w
  */
 export const ASKS_FOR: Record<string, RegExp> = {
   screenshot: PICTURE,
-  place_blueprint: /\b(paste|place (it|this|that|them)|put (it|this|that) (down|here|there)|build (it|this|that) (here|there|for me)|stamp)\b/i,
+  place_blueprint: /\b(paste|place (it|this|that|them)|put (it|this|that) (down|here|there)|build (it|this|that) (here|there|for me)|stamp|ghost (it|this|that|them))\b/i,
   mark_deconstruction: /\b(mark|deconstruct\w*|remove|delete|clear|tear (it |them |those )?down|get rid|demolish|take (it |them |those )?down)\b/i,
   cancel_deconstruction: /\b(cancel|unmark|undo|keep (it|them|those))\b/i,
   mark_upgrade: /\b(upgrad\w*|replace)\b/i,
   set_recipe: /\b(set|switch|change|swap)\b.*\b(recipe|to make|to craft|to produce|to)\b|\bmake (it|them|those|these) (make|craft|produce)\b/i,
   // "What do I need before I can research X?" is a question, not a request to queue it.
-  queue_research: /\b(queue|start research\w*|begin research\w*|research (it|that|this|them)\b|go research)|^\s*(please |ok,? |okay,? |yes,? )?research\b/i,
-  map_action: /\b(tag|pin|label|mark (it )?on (the )?map|camera|jump|take me|go to|show me where|look at)\b/i,
+  queue_research: /\b(queue|start research\w*|begin research\w*|research (it|that|this|them)\b|go research|(want me to|shall i|should i|can you|could you|will you|would you) research)|^\s*(please |ok,? |okay,? |yes,? )?research\b/i,
+  map_action: /\b(tag|pin|label|mark\w* (it |them |that |this |the [\w -]{1,24})?on (the |your |my )?map|map (tag|marker|pin)|(drop|put|place|add) a (marker|flag|pin)|marker|camera|jump|take me|go to|show me where|look at)\b/i,
   set_train_stop: /\b(limit|priority|prioriti[sz]e|rename|name (it|them|those|these|the stops?)|call (it|them))\b/i,
-  show_the_way: /\b(show me the way|point (me|the way|it out)|which way|what direction|guide me|lead me|ping|arrow|how do i get to|direct me|way to)\b/i,
+  show_the_way: /\b(show (me|you) the way|point(ing)? (me|you|the way|it out|them out|out|toward\w*|to|at)|which way|what direction|guide (me|you)|lead (me|you)|ping|arrow|how do i get to|direct (me|you)|way to)\b/i,
 };
 
 /** Is this tool call something the player asked for? Tools not listed in ASKS_FOR always are. */
@@ -487,7 +487,9 @@ export class Agent {
     const plannedTarget = parseTarget(question) !== null;
     // "yeah" after "Want me to look around?" is classified as the offer it accepts (S22).
     const offer = acceptedOffer(question, this.history.findLast((m) => m.role === "assistant" && m.content)?.content);
-    const intent = offer ? `${offer} ${question}` : question;
+    // "I meant the rocket silo" keeps the last question's request (FC-154).
+    const corrected = offer ? null : correctedRequest(question, this.history.findLast((m) => m.role === "user")?.content);
+    const intent = offer ? `${offer} ${question}` : corrected ? `${corrected} ${question}` : question;
     this.currentIntent = intent;
     const world = needsWorldTools(intent, this.lastResult !== null);
     const snapshot = snap ? formatSnapshot(snap.digest, this.now() - snap.receivedAt, { question: intent, items: found?.items ?? [], planned: plannedTarget }) : null;
@@ -638,7 +640,7 @@ export class Agent {
         if (dropped) record.dropped = (record.dropped ?? 0) + dropped;
         if (calls.length === 0 && result.toolCalls.length && !result.text.trim()) {
           working.push({ role: "assistant", content: "", tool_calls: result.toolCalls });
-          for (const call of result.toolCalls) working.push({ role: "tool", tool_call_id: call.id, content: "Not done: the player didn't ask for that, and no card was shown. Answer their question. If it would help, offer it in one short question; never say it was done or that a card is waiting." });
+          for (const call of result.toolCalls) working.push({ role: "tool", tool_call_id: call.id, content: "Not run: the player hasn't asked for this yet. Answer their question. If it would help, offer it in one short question. Don't say it was done, and don't mention cards, confirmations or that anything was held back." });
           continue;
         }
         if (calls.length === 0) {
@@ -834,7 +836,11 @@ export class Agent {
     this.lastResult = { refs: r.entities, label: what, count: r.count, at: this.now(), where };
     if (r.count > 0) await this.deps.game.call("highlight", { entities: r.entities, seconds: HIGHLIGHT_SECONDS });
     const kinds = Object.entries(r.by_name).map(([n, c]) => `${n} ${c}`).join(", ");
-    const summary = `Found ${r.count} ${what} ${where}${kinds ? ` (${kinds})` : ""}.`;
+    const c = r.center;
+    const nearest = r.entities.length ? r.entities.reduce((best, e) => (Math.hypot(e.x - c.x, e.y - c.y) < Math.hypot(best.x - c.x, best.y - c.y) ? e : best)) : null;
+    // Measured like the surroundings line, so both give the same direction and position (FC-157).
+    const nearestNote = nearest ? ` Nearest: ${nearest.name} ${bearing(c, nearest)} at (${Math.floor(nearest.x)}, ${Math.floor(nearest.y)}).` : "";
+    const summary = `Found ${r.count} ${what} ${where}${kinds ? ` (${kinds})` : ""}.${nearestNote}`;
     this.deps.emit({ type: "tool", summary: `${summary}${r.count ? ` Highlighted in-game for ${HIGHLIGHT_SECONDS} s.` : ""}` });
     return [
       summary,
