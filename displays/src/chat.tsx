@@ -168,12 +168,17 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
       {recognition && (voiceError.value || listening) && (
         <div class={`voice-note${voiceError.value ? " error" : ""}`} role="status">{voiceError.value ?? whereLabel(recognizedWhere.value)}</div>
       )}
-      {recognition && !voiceError.value && (deviceStatus.value === "downloadable" || deviceStatus.value === "downloading") && (
+      {recognition && !voiceError.value && deviceStatus.value === "downloadable" && (
         <div class="voice-note">
           Voice goes to your browser's speech service.{" "}
-          <button type="button" class="link" id="on-device" disabled={deviceStatus.value === "downloading"} onClick={() => void installOnDevice(recognition)}>
-            {deviceStatus.value === "downloading" ? "Downloading on-device recognition…" : "Recognize on this device instead"}
-          </button>
+          <button type="button" class="link" id="on-device" onClick={() => void installOnDevice(recognition)}>Recognize on this device instead</button>
+        </div>
+      )}
+      {recognition && !voiceError.value && deviceStatus.value === "downloading" && (
+        <div class="voice-note" id="on-device-downloading">
+          Chrome is downloading on-device speech recognition. It shows no progress here; to check, open chrome://components
+          and look for "Speech On-Device API (SODA)". Talk still works meanwhile through the speech service, and this
+          switches to on-device when the download finishes.
         </div>
       )}
     </form>

@@ -168,7 +168,7 @@ test("FC-062: where on-device recognition can be downloaded, the console offers 
   const installs: unknown[] = [];
   const { ctor, made } = fakeRecognition();
   ctor.available = async () => status;
-  ctor.install = async (options: unknown) => { installs.push(options); status = "available"; return true; };
+  ctor.install = async (options: unknown) => { installs.push(options); await new Promise((r) => setTimeout(r, 40)); status = "available"; return true; };
   await voice.probeRecognition(ctor, "en-US");
   const root = document.createElement("div");
   document.body.appendChild(root);
@@ -177,6 +177,8 @@ test("FC-062: where on-device recognition can be downloaded, the console offers 
   expect(root.textContent).toContain("Voice goes to your browser's speech service.");
   (root.querySelector("#on-device") as HTMLButtonElement).click();
   await new Promise((r) => setTimeout(r, 10));
+  expect(root.querySelector("#on-device-downloading")?.textContent ?? "").toContain("chrome://components");
+  await new Promise((r) => setTimeout(r, 60));
   expect(installs).toEqual([{ langs: ["en-US"], processLocally: true }]);
   expect(voice.recognizedWhere.value).toBe("on-device");
   expect(root.querySelector("#on-device")).toBeNull();

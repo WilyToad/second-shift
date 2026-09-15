@@ -97,6 +97,30 @@ export async function probeRecognition(ctor = recognitionCtor(), lang = globalTh
   }
   onDevice = deviceStatus.value === "available";
   recognizedWhere.value = onDevice ? "on-device" : "speech-service";
+  if (deviceStatus.value === "downloading") watchDownload(ctor, lang);
+}
+
+let watching: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * The API gives no download progress, and `install()` can stay pending for minutes, so while Chrome says
+ * "downloading" the page asks again every few seconds and switches to on-device the moment it's ready.
+ */
+function watchDownload(ctor: RecognitionCtor, lang: string, everyMs = 5000): void {
+  if (watching || !ctor.available) return;
+  watching = setInterval(async () => {
+    try {
+      deviceStatus.value = await ctor.available!({ langs: [lang], processLocally: true });
+    } catch {
+      return;
+    }
+    if (deviceStatus.value !== "downloading") {
+      clearInterval(watching!);
+      watching = null;
+      onDevice = deviceStatus.value === "available";
+      recognizedWhere.value = onDevice ? "on-device" : "speech-service";
+    }
+  }, everyMs);
 }
 
 /**
@@ -106,6 +130,7 @@ export async function probeRecognition(ctor = recognitionCtor(), lang = globalTh
 export async function installOnDevice(ctor = recognitionCtor(), lang = globalThis.navigator?.language || "en-US"): Promise<boolean> {
   if (!ctor?.install) return false;
   deviceStatus.value = "downloading";
+  watchDownload(ctor, lang);
   let ok = false;
   try {
     ok = await ctor.install({ langs: [lang], processLocally: true });
