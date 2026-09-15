@@ -3,7 +3,9 @@ import { useEffect, useRef } from "preact/hooks";
 import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
 import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
-import { chooseVoice, deviceStatus, elevenVoices, finishListening, voiceChoice, heard, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, startListening, stopListening, stopSpeaking, voiceError } from "./voice";
+import { chooseVoice, deviceStatus, elevenVoices, voiceChoice, heard, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
+
+const SILENCE_CHOICES = [1, 1.5, 2, 3, 4, 5];
 
 /** Bold and inline code the model writes in Markdown (`**1,493/min**`, `` `iron-plate` ``) render as such, not as raw marks (FC-125). */
 export function Emphasis({ text }: { text: string }) {
@@ -121,10 +123,13 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
     onAsk(value, thinking.value);
     text.value = "";
   };
-  const listening = listenState.value === "listening";
+  const on = talking.value;
+  const listening = on && listenState.value === "listening";
+  const waiting = on && listenState.value === "waiting";
+  // Talk starts a session that keeps listening until Talk is clicked again (FC-149).
   const toggleMic = (fromGame = false) => {
-    if (listenState.peek() === "listening") finishListening();
-    else startListening((spoken) => { stopSpeaking(); onAsk(spoken, thinking.value); }, recognition, undefined, { fromGame });
+    if (talking.peek()) stopTalking();
+    else startTalking((spoken: string) => onAsk(spoken, thinking.value), recognition, undefined, { fromGame });
   };
   // Push to talk from the game (FC-147): each press toggles, like clicking Talk.
   const seenTalk = useRef(talkRequests.peek());
@@ -133,11 +138,11 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
     seenTalk.current = talkRequests.value;
     toggleMic(true);
   }, [talkRequests.value]);
-  // Option+V (Alt+V) talks from anywhere on the page; Escape cancels listening or speech.
+  // Option+V (Alt+V) toggles talking from anywhere on the page; Escape ends it without sending and stops speech.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (recognition && e.altKey && e.code === "KeyV") { e.preventDefault(); toggleMic(); }
-      if (e.key === "Escape") { stopListening(); stopSpeaking(); }
+      if (e.key === "Escape") { stopTalking({ send: false }); stopSpeaking(); }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -146,7 +151,7 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
     <form id="composer" onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <label for="ask" class="visually-hidden">Ask the companion</label>
       <textarea
-        id="ask" rows={2} value={listening && heard.value ? heard.value : text.value} placeholder={listening ? "Listening…" : "Ask about your factory, e.g. “how many rails are near me on the right?”"}
+        id="ask" rows={2} value={listening && heard.value ? heard.value : text.value} placeholder={listening ? "Listening…" : waiting ? "Waiting for the answer, then listening again…" : "Ask about your factory, e.g. “how many rails are near me on the right?”"}
         onInput={(e) => (text.value = e.currentTarget.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
       />
@@ -169,14 +174,22 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
         <span>
           <button type="button" class="cancel" onClick={() => send({ type: "reset" })}>New conversation</button>{" "}
           {recognition && (
-            <button type="button" id="mic" class={`mic${listening ? " listening" : ""}`} aria-pressed={listening} title="Talk (Option+V). Click again to send, Escape to cancel." onClick={() => toggleMic()}>
-              <MicIcon /> {listening ? "Listening" : "Talk"}
+            <label title="How long a pause sends what you said">
+              <span class="visually-hidden">Send after a pause of</span>
+              <select id="silence" value={String(silenceSeconds.value)} onChange={(e) => setSilenceSeconds(Number(e.currentTarget.value))}>
+                {SILENCE_CHOICES.map((sec) => <option key={sec} value={String(sec)}>send after {sec} s</option>)}
+              </select>
+            </label>
+          )}{" "}
+          {recognition && (
+            <button type="button" id="mic" class={`mic${listening ? " listening" : ""}${waiting ? " waiting" : ""}`} aria-pressed={on} title="Talk (Option+V): keeps listening and sends after each pause. Click again to stop; Escape stops without sending." onClick={() => toggleMic()}>
+              <MicIcon /> {listening ? "Listening" : waiting ? "Waiting" : "Talk"}
             </button>
           )}{" "}
           <button type="submit">Send</button>
         </span>
       </div>
-      {recognition && (voiceError.value || listening) && (
+      {recognition && (voiceError.value || on) && (
         <div class={`voice-note${voiceError.value ? " error" : ""}`} role="status">{voiceError.value ?? whereLabel(recognizedWhere.value)}</div>
       )}
       {recognition && !voiceError.value && deviceStatus.value === "downloadable" && (

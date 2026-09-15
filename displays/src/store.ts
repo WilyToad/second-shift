@@ -76,6 +76,7 @@ export function onMessage(m: ServerMessage): void {
     }
     case "error":
       append({ kind: "error", key: keys++, text: m.message });
+      answerSpeech.onDone(); // a failed answer is still over: a talk session listens again
       streaming = null;
       break;
     case "talk":

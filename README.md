@@ -55,8 +55,10 @@ it: what's there, whether the belts and inserters keep up, and anything that loo
 
 ### Talk to it
 
-Click **Talk** in the console, or press **Alt+V** in the console or in the game, and ask out loud. Press it again to
-send, or just stop talking; Escape cancels. Tick **Read answers aloud** to hear each answer as it arrives.
+Click **Talk** in the console, or press **Alt+V** in the console or in the game, and ask out loud. It keeps listening:
+each pause (2 seconds by default; pick 1–5 s next to the button) sends what you said, the mic waits while the answer
+arrives and is read aloud, then listens again. Click **Talk** again to stop (anything not yet sent goes out first);
+**Escape** stops without sending. Tick **Read answers aloud** to hear each answer as it arrives.
 
 Voice uses the browser's [Web Speech API](https://webaudio.github.io/web-speech-api/), so it needs Chrome (it doesn't
 work in Brave). By default Chrome sends your voice to its online speech service to turn it into text. Click

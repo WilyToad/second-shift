@@ -28,7 +28,7 @@ export type RecognitionCtor = {
   install?: (options: { langs: string[]; processLocally: boolean }) => Promise<boolean>;
 };
 
-export type ListenState = "idle" | "listening" | "error";
+export type ListenState = "idle" | "listening" | "waiting" | "error";
 /** Where the voice is turned into text: known only once the browser has answered `available()`. */
 export type Where = "on-device" | "speech-service" | "unknown";
 
@@ -142,51 +142,106 @@ export async function installOnDevice(ctor = recognitionCtor(), lang = globalThi
   return (deviceStatus.value as Availability | null) === "available";
 }
 
+/** How long a pause ends a question, in seconds (player setting, FC-149). */
+export const silenceSeconds = signal(loadNumber("second-shift.silenceSeconds", 2));
+/** A talk session is on: from clicking Talk (or the game's key) until it's clicked again. */
+export const talking = signal(false);
+
+function loadNumber(key: string, fallback: number): number {
+  try {
+    const v = Number(globalThis.localStorage?.getItem(key));
+    return Number.isFinite(v) && v > 0 ? v : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function setSilenceSeconds(seconds: number): void {
+  silenceSeconds.value = seconds;
+  try {
+    globalThis.localStorage?.setItem("second-shift.silenceSeconds", String(seconds));
+  } catch {
+    // per-browser convenience
+  }
+}
+
+type Session = { ctor: RecognitionCtor; lang: string; onUtterance: (text: string) => void; fromGame: boolean };
+let session: Session | null = null;
+/** A question was sent (or typed) and its answer is still arriving or being read aloud: the mic waits. */
+let awaitingAnswer = false;
+let answerDone = true;
+let silence: ReturnType<typeof setTimeout> | null = null;
+
 /**
- * Listens for one question. Words appear in `heard` as they're recognized; `onFinal` gets the finished question.
- * Prefers recognition on the device when the browser says it's available.
+ * Starts a talk session (FC-149): listens continuously, sends each question after `silenceSeconds` of quiet, then
+ * pauses while the answer arrives and is read aloud (so the mic doesn't hear the companion) and listens again. Words
+ * appear in `heard` as they're recognized. Runs on the device when the browser offers that.
  */
-export function startListening(onFinal: (text: string) => void, ctor = recognitionCtor(), lang = globalThis.navigator?.language || "en-US", opts: { fromGame?: boolean } = {}): void {
+export function startTalking(onUtterance: (text: string) => void, ctor = recognitionCtor(), lang = globalThis.navigator?.language || "en-US", opts: { fromGame?: boolean } = {}): void {
   if (!ctor) return;
-  fromGame = Boolean(opts.fromGame);
   stopSpeaking(); // talking over an answer stops it
-  stopListening();
-  const rec = new ctor();
-  rec.lang = lang;
-  rec.continuous = false;
+  endRecognition();
+  fromGame = Boolean(opts.fromGame);
+  session = { ctor, lang, onUtterance, fromGame };
+  talking.value = true;
+  awaitingAnswer = false;
+  answerDone = true;
+  voiceError.value = null;
+  listen();
+}
+
+function listen(): void {
+  const s = session;
+  if (!s || awaitingAnswer) return;
+  const rec = new s.ctor();
+  rec.lang = s.lang;
+  rec.continuous = true;
   rec.interimResults = true;
   rec.maxAlternatives = 1;
   if (onDevice) rec.processLocally = true;
-  if (onDevice === null) recognizedWhere.value = ctor.available ? "unknown" : "speech-service";
-  let finalText = "";
-  const session = { rec, aborted: false };
-  const current = () => active === session;
-  rec.onstart = () => { if (current()) { listenState.value = "listening"; voiceError.value = null; heard.value = ""; } };
+  if (onDevice === null) recognizedWhere.value = s.ctor.available ? "unknown" : "speech-service";
+  const run = { rec, aborted: false };
+  const current = () => active === run;
+  // Results from this recognition that were already sent as a question.
+  let sentUpTo = 0;
+  let latest: ArrayLike<Result> = [];
+  const textFrom = (results: ArrayLike<Result>) => {
+    let text = "";
+    for (let i = sentUpTo; i < results.length; i++) text += results[i]![0].transcript;
+    return text.trim();
+  };
+  rec.onstart = () => { if (current()) listenState.value = "listening"; };
   rec.onresult = (e) => {
-    let interim = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const r = e.results[i]!;
-      if (r.isFinal) finalText += r[0].transcript;
-      else interim += r[0].transcript;
-    }
-    if (current()) heard.value = (finalText + interim).trim();
+    if (!current()) return;
+    latest = e.results;
+    heard.value = textFrom(e.results);
+    if (silence) clearTimeout(silence);
+    silence = setTimeout(() => {
+      silence = null;
+      const text = textFrom(latest);
+      if (!text || !current()) return;
+      sentUpTo = latest.length;
+      send(text);
+    }, silenceSeconds.value * 1000);
   };
   rec.onerror = (e) => {
-    // Started from the game without a click in this tab, Chrome may refuse: say what fixes it (FC-147).
-    const message = fromGame && e.error === "not-allowed" ? "Chrome wouldn't start listening from the game's hotkey. Click Talk once in this tab (and allow the microphone), then the hotkey works." : describeError(e.error);
-    if (message && current()) { voiceError.value = message; listenState.value = "error"; }
+    if (!current()) return;
+    // Quiet or our own abort just means "keep going"; anything else ends the session with a reason.
+    if (e.error === "no-speech" || e.error === "aborted") return;
+    const message = s.fromGame && e.error === "not-allowed"
+      ? "Chrome wouldn't start listening from the game's hotkey. Click Talk once in this tab (and allow the microphone), then the hotkey works."
+      : describeError(e.error);
+    if (message) voiceError.value = message;
+    listenState.value = "error";
+    stopTalking({ send: false, keepError: true });
   };
   rec.onend = () => {
-    // A session replaced or cancelled by the player never sends what it heard.
-    if (session.aborted || !current()) return;
+    // Chrome ends continuous recognition on its own after a while: start again while the session is on.
+    if (run.aborted || !current()) return;
     active = null;
-    if (listenState.value === "listening") listenState.value = "idle";
-    const text = finalText.trim();
-    heard.value = "";
-    if (text) onFinal(text);
+    if (session && !awaitingAnswer) listen();
   };
-  active = session;
-  voiceError.value = null;
+  active = run;
   heard.value = "";
   listenState.value = "listening";
   try {
@@ -195,21 +250,54 @@ export function startListening(onFinal: (text: string) => void, ctor = recogniti
     active = null;
     voiceError.value = `Voice input couldn't start: ${(e as Error).message}`;
     listenState.value = "error";
+    stopTalking({ send: false, keepError: true });
   }
 }
 
-/** Cancels listening without sending anything. */
-export function stopListening(): void {
-  const session = active;
-  active = null;
+/** Sends a spoken question and pauses the mic until the answer is done. */
+function send(text: string): void {
+  const s = session;
+  if (!s) return;
   heard.value = "";
-  if (session) { session.aborted = true; session.rec.abort(); }
-  if (listenState.value === "listening") listenState.value = "idle";
+  pauseForAnswer();
+  s.onUtterance(text);
 }
 
-/** Stops listening and sends what was heard so far. */
-export function finishListening(): void {
-  active?.rec.stop();
+function pauseForAnswer(): void {
+  awaitingAnswer = true;
+  answerDone = false;
+  endRecognition();
+  if (session) listenState.value = "waiting";
+}
+
+function endRecognition(): void {
+  if (silence) { clearTimeout(silence); silence = null; }
+  const run = active;
+  active = null;
+  if (run) { run.aborted = true; run.rec.abort(); }
+}
+
+/** Listens again once the answer has finished arriving and nothing is being read aloud. */
+function maybeResume(): void {
+  if (!session || !awaitingAnswer || !answerDone || isSpeaking()) return;
+  awaitingAnswer = false;
+  listen();
+}
+
+/**
+ * Ends the talk session. With `send`, words heard since the last question go out first (clicking Talk again right
+ * after speaking shouldn't lose them); Escape cancels without sending.
+ */
+export function stopTalking({ send: sendPending = true, keepError = false }: { send?: boolean; keepError?: boolean } = {}): void {
+  const s = session;
+  const pending = heard.value.trim();
+  session = null;
+  talking.value = false;
+  awaitingAnswer = false;
+  endRecognition();
+  heard.value = "";
+  if (!keepError) listenState.value = "idle";
+  if (sendPending && pending && s) s.onUtterance(pending);
 }
 
 /** Answer text as it should sound: no chart blocks, markdown marks or item-name hyphens. */
@@ -255,7 +343,7 @@ export class SentenceQueue {
 }
 
 type Synth = { speak(u: unknown): void; cancel(): void; getVoices(): { name: string; lang: string; localService: boolean; default: boolean }[] };
-type UtteranceCtor = new (text: string) => { voice: unknown; lang: string; rate: number };
+type UtteranceCtor = new (text: string) => { voice: unknown; lang: string; rate: number; onend: (() => void) | null; onerror: (() => void) | null };
 
 function synth(): Synth | null {
   return (globalThis as unknown as { speechSynthesis?: Synth }).speechSynthesis ?? null;
@@ -317,7 +405,7 @@ type AudioLike = { play(): Promise<void>; pause(): void; onended: (() => void) |
 export class ElevenPlayer {
   private items: { text: string; audio: Promise<string | null> }[] = [];
   private playing: AudioLike | null = null;
-  private busy = false;
+  private busyFlag = false;
   private stop = new AbortController();
   private previous = "";
 
@@ -328,8 +416,18 @@ export class ElevenPlayer {
       fallback: (text: string) => void;
       voice: () => string;
       onError: (message: string) => void;
+      onIdle?: () => void;
     },
   ) {}
+
+  /** Audio queued or playing. */
+  busy(): boolean {
+    return this.playingNow || this.items.length > 0;
+  }
+
+  private get playingNow(): boolean {
+    return this.busyFlag;
+  }
 
   enqueue(text: string): void {
     const previous = this.previous;
@@ -347,16 +445,16 @@ export class ElevenPlayer {
   }
 
   private async next(): Promise<void> {
-    if (this.busy) return;
+    if (this.busyFlag) return;
     const item = this.items.shift();
-    if (!item) return;
-    this.busy = true;
+    if (!item) { this.deps.onIdle?.(); return; }
+    this.busyFlag = true;
     const signal = this.stop.signal;
     const url = await item.audio;
     if (signal.aborted) return;
     if (!url) {
       this.deps.fallback(item.text);
-      this.busy = false;
+      this.busyFlag = false;
       return this.next();
     }
     const audio = (this.deps.makeAudio ?? ((src) => new Audio(src) as unknown as AudioLike))(url);
@@ -365,7 +463,7 @@ export class ElevenPlayer {
       URL.revokeObjectURL(url);
       if (this.playing !== audio) return;
       this.playing = null;
-      this.busy = false;
+      this.busyFlag = false;
       void this.next();
     };
     audio.onended = done;
@@ -380,7 +478,7 @@ export class ElevenPlayer {
     this.previous = "";
     this.playing?.pause();
     this.playing = null;
-    this.busy = false;
+    this.busyFlag = false;
   }
 }
 
@@ -388,6 +486,7 @@ const eleven = new ElevenPlayer({
   fallback: (text) => speakWithBrowser(text),
   voice: () => voiceChoice.value.replace(/^eleven:/, ""),
   onError: (message) => { voiceError.value = `ElevenLabs couldn't speak (${message}); using this Mac's voice instead.`; },
+  onIdle: () => maybeResume(),
 });
 
 export function speak(sentence: string): void {
@@ -395,11 +494,21 @@ export function speak(sentence: string): void {
   else speakWithBrowser(sentence);
 }
 
+let browserSpeaking = 0;
+
+function isSpeaking(): boolean {
+  return browserSpeaking > 0 || eleven.busy();
+}
+
 function speakWithBrowser(sentence: string): void {
   const s = synth();
   const Utterance = (globalThis as unknown as { SpeechSynthesisUtterance?: UtteranceCtor }).SpeechSynthesisUtterance;
   if (!s || !Utterance || !sentence) return;
   const u = new Utterance(sentence);
+  browserSpeaking++;
+  const finished = () => { browserSpeaking = Math.max(0, browserSpeaking - 1); maybeResume(); };
+  u.onend = finished;
+  u.onerror = finished;
   const lang = globalThis.navigator?.language || "en-US";
   const voice = pickVoice(s.getVoices(), lang);
   if (voice) u.voice = voice;
@@ -410,13 +519,17 @@ function speakWithBrowser(sentence: string): void {
 
 export function stopSpeaking(): void {
   queue = null;
+  browserSpeaking = 0;
   synth()?.cancel();
   eleven.cancel();
+  maybeResume();
 }
 
 /** Feeds the answer stream to speech while "Read answers aloud" is on. */
 export const answerSpeech = {
   onQuestion(): void {
+    // Any question (spoken or typed) pauses a talk session's mic until its answer is done (FC-149).
+    if (session) pauseForAnswer();
     stopSpeaking();
     if (readAloud.value) queue = new SentenceQueue();
   },
@@ -425,8 +538,9 @@ export const answerSpeech = {
     for (const sentence of queue.push(text)) speak(sentence);
   },
   onDone(): void {
-    if (!queue) return;
-    for (const sentence of queue.end()) speak(sentence);
+    if (queue) for (const sentence of queue.end()) speak(sentence);
     queue = null;
+    answerDone = true;
+    maybeResume();
   },
 };

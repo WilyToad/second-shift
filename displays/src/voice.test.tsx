@@ -46,15 +46,17 @@ function fakeSynthesis() {
 
 beforeEach(async () => {
   const voice = await import("./voice");
-  voice.stopListening();
+  voice.stopTalking({ send: false });
+  voice.setSilenceSeconds(0.02);
   voice.voiceError.value = null;
   voice.listenState.value = "idle";
   voice.readAloud.value = false;
 });
 
-test("FC-062: speaking a question shows the words as they come and sends the question when speech ends", async () => {
+test("FC-149: Talk keeps listening: each pause sends a question, the mic waits for the answer, then listens again until Talk is clicked", async () => {
   const { render } = await import("preact");
   const { Composer } = await import("./chat");
+  const { onMessage } = await import("./store");
   const { ctor, made } = fakeRecognition("unavailable");
   const voice = await import("./voice");
   await voice.probeRecognition(ctor, "en-US");
@@ -66,49 +68,105 @@ test("FC-062: speaking a question shows the words as they come and sends the que
 
   (root.querySelector("#mic") as HTMLButtonElement).click();
   await new Promise((r) => setTimeout(r, 5));
-  const rec = made.at(-1);
-  expect(rec.started).toBe(true);
-  expect(rec.interimResults).toBe(true);
-  expect(rec.continuous).toBe(false);
-  expect(rec.processLocally).toBeUndefined(); // not available on this "device"
+  const first = made.at(-1);
+  expect(first.started).toBe(true);
+  expect(first.continuous).toBe(true);
+  expect(first.interimResults).toBe(true);
+  expect(first.processLocally).toBeUndefined(); // not available on this "device"
   expect(root.querySelector("#mic")?.getAttribute("aria-pressed")).toBe("true");
   expect(root.textContent).toContain("Voice is sent to your browser's speech service");
 
-  rec.say([{ text: "how many rails", final: false }]);
+  first.say([{ text: "how many rails", final: false }]);
   await new Promise((r) => setTimeout(r, 5));
   expect((root.querySelector("#ask") as HTMLTextAreaElement).value).toBe("how many rails");
-
-  rec.say([{ text: "how many rails are near me", final: true }]);
-  rec.onend();
-  await new Promise((r) => setTimeout(r, 5));
+  first.say([{ text: "how many rails are near me", final: true }]);
+  await new Promise((r) => setTimeout(r, 60)); // the pause
   expect(asked).toEqual(["how many rails are near me"]);
-  expect(voice.listenState.value).toBe("idle");
+  expect(first.aborted).toBe(true); // the mic stops while the answer comes
+  expect(voice.listenState.value).toBe("waiting");
+
+  // The answer arrives and finishes (not read aloud): the mic listens again with a fresh recognition.
+  onMessage({ type: "user", text: "how many rails are near me" });
+  onMessage({ type: "token", text: "6 rails." });
+  expect(made.length).toBe(1); // still just the first one
+  onMessage({ type: "done", totalMs: 1 });
+  await new Promise((r) => setTimeout(r, 5));
+  expect(made.length).toBe(2);
+  expect(voice.listenState.value).toBe("listening");
+  const second = made.at(-1);
+  second.say([{ text: "mark them", final: true }]);
+  await new Promise((r) => setTimeout(r, 60));
+  expect(asked).toEqual(["how many rails are near me", "mark them"]);
+  onMessage({ type: "user", text: "mark them" });
+  onMessage({ type: "done", totalMs: 1 });
+  await new Promise((r) => setTimeout(r, 5));
+
+  // Chrome ending recognition on its own restarts it while the session is on.
+  const third = made.at(-1);
+  third.onend();
+  await new Promise((r) => setTimeout(r, 5));
+  expect(made.length).toBe(4);
+
+  // Clicking Talk again ends the session; words not yet sent go out first.
+  made.at(-1).say([{ text: "thanks", final: false }]);
+  (root.querySelector("#mic") as HTMLButtonElement).click();
+  await new Promise((r) => setTimeout(r, 5));
+  expect(asked.at(-1)).toBe("thanks");
+  expect(voice.talking.value).toBe(false);
+  expect(root.querySelector("#mic")?.getAttribute("aria-pressed")).toBe("false");
   render(null, root);
+});
+
+test("FC-149: while an answer is read aloud the mic stays off, so it never hears the companion", async () => {
+  const synth = fakeSynthesis();
+  const { ctor, made } = fakeRecognition("unavailable");
+  const voice = await import("./voice");
+  const { onMessage } = await import("./store");
+  voice.readAloud.value = true;
+  voice.startTalking(() => {}, ctor, "en-US");
+  made.at(-1).say([{ text: "what is coal for", final: true }]);
+  await new Promise((r) => setTimeout(r, 60));
+  onMessage({ type: "user", text: "what is coal for" });
+  onMessage({ type: "token", text: "Coal fuels furnaces. " });
+  onMessage({ type: "done", totalMs: 1 });
+  await new Promise((r) => setTimeout(r, 5));
+  expect(synth.spoken.length).toBeGreaterThan(0);
+  expect(made.length).toBe(1); // still speaking: no new recognition
+  // The fake synth never ends utterances by itself: stopping speech (or it finishing) resumes listening.
+  voice.stopSpeaking();
+  await new Promise((r) => setTimeout(r, 5));
+  expect(made.length).toBe(2);
+  voice.stopTalking({ send: false });
+  voice.readAloud.value = false;
 });
 
 test("FC-062: recognition runs on the device when the browser offers it, and the console says so", async () => {
   const { ctor, made } = fakeRecognition("available");
   const voice = await import("./voice");
   await voice.probeRecognition(ctor, "en-US");
-  voice.startListening(() => {}, ctor, "en-US");
+  voice.startTalking(() => {}, ctor, "en-US");
   expect(made.at(-1).processLocally).toBe(true);
   expect(voice.recognizedWhere.value).toBe("on-device");
   const { whereLabel } = await import("./chat");
   expect(whereLabel("on-device")).toBe("Voice is recognized on this device.");
-  voice.stopListening();
+  voice.stopTalking({ send: false });
 });
 
-test("FC-062: cancelling never sends; errors tell the player what to do", async () => {
+test("FC-062: Escape-style cancelling never sends; errors end the session and tell the player what to do", async () => {
   const { ctor, made } = fakeRecognition();
   const voice = await import("./voice");
   const asked: string[] = [];
-  voice.startListening((t) => asked.push(t), ctor, "en-US");
-  made.at(-1).say([{ text: "delete everything", final: true }]);
-  voice.stopListening();
+  voice.startTalking((t) => asked.push(t), ctor, "en-US");
+  made.at(-1).say([{ text: "delete everything", final: false }]);
+  voice.stopTalking({ send: false });
+  await new Promise((r) => setTimeout(r, 60));
   expect(asked).toEqual([]);
 
-  voice.startListening(() => {}, ctor, "en-US");
+  voice.startTalking(() => {}, ctor, "en-US");
+  made.at(-1).onerror({ error: "no-speech" }); // quiet: keep going
+  expect(voice.talking.value).toBe(true);
   made.at(-1).onerror({ error: "network" });
+  expect(voice.talking.value).toBe(false);
   expect(voice.listenState.value).toBe("error");
   expect(voice.voiceError.value).toContain("Brave can't reach the service");
   expect(voice.describeError("not-allowed")).toContain("microphone is blocked");
@@ -182,13 +240,13 @@ test("FC-062: where on-device recognition can be downloaded, the console offers 
   expect(installs).toEqual([{ langs: ["en-US"], processLocally: true }]);
   expect(voice.recognizedWhere.value).toBe("on-device");
   expect(root.querySelector("#on-device")).toBeNull();
-  voice.startListening(() => {}, ctor, "en-US");
+  voice.startTalking(() => {}, ctor, "en-US");
   expect(made.at(-1).processLocally).toBe(true);
-  voice.stopListening();
+  voice.stopTalking({ send: false });
   render(null, root);
 });
 
-test("FC-147: the game's push-to-talk key starts listening in the console, and a second press sends", async () => {
+test("FC-147: the game's push-to-talk key turns the talk session on and off", async () => {
   const { render } = await import("preact");
   const { Composer } = await import("./chat");
   const { onMessage } = await import("./store");
@@ -204,11 +262,13 @@ test("FC-147: the game's push-to-talk key starts listening in the console, and a
   onMessage({ type: "talk" });
   await new Promise((r) => setTimeout(r, 10));
   expect(made.length).toBe(before + 1);
-  expect(voice.listenState.value).toBe("listening");
+  expect(voice.talking.value).toBe(true);
   made.at(-1).say([{ text: "where is the nearest coal", final: true }]);
-  onMessage({ type: "talk" }); // second press: stop and send
-  await new Promise((r) => setTimeout(r, 10));
+  await new Promise((r) => setTimeout(r, 60));
   expect(asked).toEqual(["where is the nearest coal"]);
+  onMessage({ type: "talk" }); // second press: session off
+  await new Promise((r) => setTimeout(r, 10));
+  expect(voice.talking.value).toBe(false);
 
   // Chrome refusing to start from the hotkey says how to fix it.
   onMessage({ type: "talk" });
@@ -299,5 +359,26 @@ test("FC-148: the voice picker lists ElevenLabs voices only when the server has 
   expect(voice.voiceChoice.value).toBe("browser");
   expect(voice.pickVoice([{ name: "Samantha", lang: "en-US", localService: true, default: true }, { name: "Ava (Premium)", lang: "en-US", localService: true, default: false }], "en-US")?.name).toBe("Ava (Premium)");
   voice.readAloud.value = false;
+  render(null, root);
+});
+
+test("FC-149: the pause length is a setting, remembered per browser", async () => {
+  const { render } = await import("preact");
+  const { Composer } = await import("./chat");
+  const voice = await import("./voice");
+  const { ctor } = fakeRecognition("unavailable");
+  voice.setSilenceSeconds(2);
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  render(<Composer onAsk={() => {}} recognition={ctor} />, root);
+  await new Promise((r) => setTimeout(r, 5));
+  const select = root.querySelector("#silence") as HTMLSelectElement;
+  expect(select.value).toBe("2");
+  expect([...select.querySelectorAll("option")].map((o) => o.textContent)).toContain("send after 3 s");
+  select.value = "3";
+  select.dispatchEvent(new (window as any).Event("change", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 5));
+  expect(voice.silenceSeconds.value).toBe(3);
+  expect(globalThis.localStorage?.getItem("second-shift.silenceSeconds") ?? "3").toBe("3");
   render(null, root);
 });
