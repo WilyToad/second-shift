@@ -243,7 +243,8 @@ function M.register(handlers)
   -- Event filters take one type per entry (entries are OR'ed).
   local filter = {}
   for _, t in ipairs(TYPES) do filter[#filter + 1] = { filter = "type", type = t } end
-  script.on_event(defines.events.on_built_entity, on_built, filter)
+  -- The player's own builds are shared with the recent-builds record (player.lua), so no filter; add() checks the type.
+  util.on_event(defines.events.on_built_entity, on_built)
   script.on_event(defines.events.on_robot_built_entity, on_built, filter)
   script.on_event(defines.events.on_space_platform_built_entity, on_built, filter)
   script.on_event(defines.events.script_raised_built, on_built, filter)

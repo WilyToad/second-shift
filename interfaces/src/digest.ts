@@ -16,6 +16,8 @@ export const StuckRecipeSchema = z.object({
 export const DigestSchema = z.object({
   tick: z.number(),
   paused: z.boolean().optional(),
+  // FC-137: made once per map by the mod, so the app keeps one conversation per map.
+  map_id: z.string().optional(),
   machines: z.object({
     progress: z.object({ machines: z.number(), scanned: z.boolean(), refresh_ticks: z.number() }),
     stuck: luaArray(z.object({ surface: z.string(), recipes: luaArray(StuckRecipeSchema) })),

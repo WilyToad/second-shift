@@ -7,7 +7,8 @@ import { readRconSettings, type RconSettings } from "./factorio";
 import { applyResearchState } from "./research";
 
 export type Snapshot = { digest: Digest; receivedAt: number };
-export type LoadedPrototypes = { modsKey: string; data: Prototypes; source: "game" | "cache" };
+/** `mods`: the save's active mod names (FC-131); missing in caches written before it was kept. */
+export type LoadedPrototypes = { modsKey: string; mods?: string[]; data: Prototypes; source: "game" | "cache" };
 export type GameStatus = { connected: boolean; lastError?: string; latest?: Snapshot };
 
 export class ModError extends Error {
@@ -52,8 +53,8 @@ export class GameLink {
     const file = Bun.file(join(this.opts.cacheDir, "prototypes.json"));
     if (!(await file.exists())) return null;
     try {
-      const cached = (await file.json()) as { modsKey: string; data: unknown };
-      this.setPrototypes({ modsKey: cached.modsKey, data: PrototypesSchema.parse(cached.data), source: "cache" });
+      const cached = (await file.json()) as { modsKey: string; mods?: string[]; data: unknown };
+      this.setPrototypes({ modsKey: cached.modsKey, mods: cached.mods, data: PrototypesSchema.parse(cached.data), source: "cache" });
     } catch (e) {
       console.warn("Ignoring unreadable prototype cache:", (e as Error).message);
     }
@@ -80,16 +81,18 @@ export class GameLink {
     const info = await this.call("info");
     // The mod list plus the dump format: either changing means the cached prototypes are stale.
     const modsKey = String(Bun.hash(JSON.stringify([info.dump_version, ...Object.entries(info.mods).sort()])));
+    const mods = Object.keys(info.mods).sort();
     if (!force && this.loaded?.modsKey === modsKey) {
+      if (!this.loaded.mods) this.setPrototypes({ ...this.loaded, mods });
       await this.patchResearch();
       return;
     }
     const started = performance.now();
     const data = await this.call("dump_prototypes");
     mkdirSync(this.opts.cacheDir, { recursive: true });
-    await Bun.write(join(this.opts.cacheDir, "prototypes.json"), JSON.stringify({ modsKey, data }));
+    await Bun.write(join(this.opts.cacheDir, "prototypes.json"), JSON.stringify({ modsKey, mods, data }));
     console.log(`Loaded prototypes from the game (${Object.keys(data.recipes).length} recipes, ${(performance.now() - started).toFixed(0)} ms).`);
-    this.setPrototypes({ modsKey, data, source: "game" });
+    this.setPrototypes({ modsKey, mods, data, source: "game" });
   }
 
   /** Applies research state to the loaded prototypes: for the given technologies (~0.08 ms in the game)

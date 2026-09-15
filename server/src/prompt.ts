@@ -7,7 +7,7 @@ import type { Digest, Prototypes } from "@companion/interfaces";
 import { formatItemTraits } from "./grounding";
 import type { ChatMessage } from "./model";
 
-export const SYSTEM_RULES = `You are Second Shift, an assistant riding along in the player's helmet in a live, heavily modded Factorio 2.0 game (Space Age plus mods such as maraxsis, Cerys, factorissimo-2).
+export const SYSTEM_RULES = `You are Second Shift, an assistant riding along in the player's helmet in a live Factorio 2.0 game. The save's mods are listed below the rules.
 
 Rules:
 - Ground every claim in the data you're given: the save data below, the recipe and technology lines sent with each question, and the game state sent with each question. If the data doesn't contain what's needed, say what's missing instead of guessing.
@@ -57,6 +57,8 @@ export function diagnose(digest: Digest): string[] {
 }
 
 const MACHINE_QUESTION = /\b(slow|stuck|bottleneck\w*|why|problem\w*|broken|idle|starv\w*|backed up|back(ing)? up|not working|blocked|jam\w*|full)\b/i;
+const RESEARCH_QUESTION = /\b(research\w*|tech\w*|unlock\w*|queue\w*|labs?)\b/i;
+const POSITION_QUESTION = /\b(where|position|location|coordinates?|surface|planet|am i\b|here|near|nearby|around)\b/i;
 const RATE_QUESTION = /\b(rate|rates|per minute|\/min|output|throughput|production|produc\w*|making|consum\w*|science|bottleneck|slow|stalled)\b/i;
 
 /**
@@ -64,20 +66,26 @@ const RATE_QUESTION = /\b(rate|rates|per minute|\/min|output|throughput|producti
  * Production lines are included only when the question is about rates or names an item the
  * digest tracks (`items`: prototype names matched in the question). Pass no options for everything.
  */
-export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { question: string; items: string[]; planned?: boolean }): string {
+export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { question: string; items: string[]; planned?: boolean; world?: boolean }): string {
   // A computed plan already answers rate targets; only lines for the planned items stay (S10 latency).
   const wantsRates = !relevance || (!relevance.planned && RATE_QUESTION.test(relevance.question));
   const mentioned = new Set(relevance?.items ?? []);
   const lines = [`[game state at tick ${digest.tick}, ${Math.round(ageMs / 1000)} s old${digest.paused ? ", game is PAUSED: rates and machine status are frozen" : ""}]`];
-  if (digest.player) {
+  // Position only when it matters: answers otherwise opened with "You're on nauvis at (0, 0)" (S22).
+  if (digest.player && (!relevance || relevance.world || POSITION_QUESTION.test(relevance.question))) {
     const p = digest.player;
     // In remote view the position is the map view; say so, and where the character is (FC-092).
     lines.push(p.remote_view && p.character_position
       ? `player: ${p.name} in map view looking at (${p.position.x}, ${p.position.y}) on ${p.surface}; character at (${p.character_position.x}, ${p.character_position.y}) on ${p.character_surface ?? p.surface}`
       : `player: ${p.name} on ${p.surface} at (${p.position.x}, ${p.position.y})`);
   }
+  // Research state only for research, rate and machine questions, or when labs sit idle: on a new map
+  // "nothing researching" isn't a problem yet, and answers kept nagging about it (S22).
   const r = digest.research;
-  lines.push(`research: ${r.current ? `${r.current} ${Math.round(r.progress * 100)}%` : "nothing researching"}${r.queue.length > 1 ? `; queued: ${r.queue.slice(1).join(", ")}` : ""}`);
+  const idleLabs = (digest.machines?.stuck ?? []).flatMap((s) => s.recipes).filter((x) => x.recipe === "(research)").reduce((n, x) => n + (x.statuses.no_research_in_progress ?? 0), 0);
+  if (!relevance || idleLabs > 0 || RESEARCH_QUESTION.test(relevance.question) || MACHINE_QUESTION.test(relevance.question) || RATE_QUESTION.test(relevance.question)) {
+    lines.push(`research: ${r.current ? `${r.current} ${Math.round(r.progress * 100)}%` : `nothing researching${idleLabs ? ` (${idleLabs} labs idle)` : ""}`}${r.queue.length > 1 ? `; queued: ${r.queue.slice(1).join(", ")}` : ""}`);
+  }
   let omitted = false;
   for (const s of digest.surfaces) {
     const label = s.platform ? `${s.name} (platform ${s.platform})` : s.name;
@@ -116,11 +124,22 @@ export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { ques
   return lines.join("\n");
 }
 
+const MAX_MODS = 40;
+const NOT_CONTENT = new Set(["base", "core", "second-shift"]);
+
+/** The save's mod list, from the game (FC-131). Stable for a save, so it lives in the system prompt. */
+export function formatMods(mods: string[]): string {
+  const content = mods.filter((m) => !NOT_CONTENT.has(m)).sort((a, b) => a.localeCompare(b));
+  if (!content.length) return "[save data: mods]\nnone: an unmodded base game";
+  return `[save data: mods]\n${content.slice(0, MAX_MODS).join(", ")}${content.length > MAX_MODS ? ` (+${content.length - MAX_MODS} more)` : ""}`;
+}
+
 /** Stable system prompt: rules plus the small, rarely changing slice of save data (PLAN §6). */
-export function systemPrompt(prototypes: Prototypes | null): string {
-  if (!prototypes) return `${SYSTEM_RULES}\n\n[save data not loaded yet: recipes and machines are unknown]`;
+export function systemPrompt(prototypes: Prototypes | null, mods?: string[]): string {
+  const rules = mods ? `${SYSTEM_RULES}\n\n${formatMods(mods)}` : SYSTEM_RULES;
+  if (!prototypes) return `${rules}\n\n[save data not loaded yet: recipes and machines are unknown]`;
   // Machine details come with each question via retrieval (S08): the full list cost ~2k stable tokens.
-  return `${SYSTEM_RULES}\n\n[save data: items that spoil or burn]\n${formatItemTraits(prototypes)}`;
+  return `${rules}\n\n[save data: items that spoil or burn]\n${formatItemTraits(prototypes)}`;
 }
 
 export const CACHE_BLOCK_TOKENS = 2048;
@@ -162,10 +181,11 @@ export async function alignToCacheBlock(system: string, referenceLines: string[]
   return { system: candidate, tokens, target };
 }
 
-/** The volatile tail, in order: question, retrieved recipe lines, game state last. */
-export function userTurn(question: string, { recipes = [], snapshot = null }: { recipes?: string[]; snapshot?: string | null } = {}): ChatMessage {
+/** The volatile tail, in order: question, retrieved recipe lines, the player's own situation, game state last. */
+export function userTurn(question: string, { recipes = [], player = [], snapshot = null }: { recipes?: string[]; player?: string[]; snapshot?: string | null } = {}): ChatMessage {
   const parts = [question];
   if (recipes.length) parts.push(`[recipes and technologies from this save]\n${recipes.join("\n")}`);
+  if (player.length) parts.push(`[the player right now]\n${player.join("\n")}`);
   parts.push(snapshot ?? "[game state unavailable: the game isn't connected]");
   return { role: "user", content: parts.join("\n\n") };
 }

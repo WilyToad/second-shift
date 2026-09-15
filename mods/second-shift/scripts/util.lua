@@ -35,7 +35,20 @@ function util.on_nth_tick(n, fn)
   table.insert(nth_tick_handlers[n], fn)
 end
 
---- Raises an error the dispatcher turns into {"ok":false,"error":{"code":code,"message":message}}.
+--- script.on_event(e, f) replaces any earlier handler for the same event too, so modules that share an
+-- event register here. Shared handlers get no event filter: each one checks the entity itself.
+local event_handlers = {}
+function util.on_event(event, fn)
+  if not event_handlers[event] then
+    event_handlers[event] = {}
+    script.on_event(event, function(e)
+      for _, handler in ipairs(event_handlers[event]) do handler(e) end
+    end)
+  end
+  table.insert(event_handlers[event], fn)
+end
+
+-- Raises an error the dispatcher turns into {"ok":false,"error":{"code":code,"message":message}}.
 function util.reject(code, message)
   error({ code = code, message = message }, 0)
 end

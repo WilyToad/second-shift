@@ -15,6 +15,43 @@ export const InfoSchema = z.object({
   players: z.number(),
 });
 
+const NameCount = z.object({ name: z.string(), count: z.number() });
+
+/** What the player carries, can hand-craft now and built recently (S22). */
+export const PlayerStatusSchema = z.object({
+  character: z.boolean(),
+  surface: z.string(),
+  x: z.number(),
+  y: z.number(),
+  items: luaArray(NameCount),
+  total_items: z.number(),
+  hand: NameCount.optional(),
+  craftable: luaArray(NameCount),
+  // The list stopped at its cap with recipes left unchecked.
+  more_craftable: z.boolean(),
+  crafting_queue: luaArray(NameCount),
+  recent_builds: luaArray(z.object({ name: z.string(), ghost: z.boolean(), surface: z.string(), x: z.number(), y: z.number(), age_ticks: z.number(), still_there: z.boolean() })),
+});
+export type PlayerStatus = z.infer<typeof PlayerStatusSchema>;
+
+const Nearest = NameCount.extend({ x: z.number(), y: z.number() });
+
+/** What the player can see around their character (S22). */
+export const SurroundingsSchema = z.object({
+  surface: z.string(),
+  x: z.number(),
+  y: z.number(),
+  radius: z.number(),
+  mine: luaArray(Nearest),
+  resources: luaArray(Nearest.extend({ amount: z.number() })),
+  other: luaArray(Nearest),
+  trees: z.number(),
+  rocks: z.number(),
+  enemies: z.number(),
+  water_tiles: z.number(),
+});
+export type Surroundings = z.infer<typeof SurroundingsSchema>;
+
 /** An entity on the companion player's surface, identified the way a player would point at it. */
 export const EntityRefSchema = z.object({ name: z.string(), x: z.number(), y: z.number() });
 export type EntityRef = z.infer<typeof EntityRefSchema>;
@@ -103,9 +140,17 @@ export const actions = {
   events: { args: z.object({ since: z.number().default(0) }), data: EventsSchema, kind: "look" },
   research_options: {
     args: z.object({}),
-    data: z.object({ options: luaArray(z.object({ name: z.string(), count: z.number(), packs: luaArray(z.string()) })), available: z.number(), queue: luaArray(z.string()) }),
+    data: z.object({
+      options: luaArray(z.object({ name: z.string(), count: z.number(), packs: luaArray(z.string()) })),
+      available: z.number(),
+      queue: luaArray(z.string()),
+      // Technologies unlocked by doing something ("craft 10 iron-gear-wheel"), not by labs (S22).
+      triggers: luaArray(z.object({ name: z.string(), trigger: z.string() })).default([]),
+    }),
     kind: "look",
   },
+  player_status: { args: z.object({}), data: PlayerStatusSchema, kind: "look" },
+  surroundings: { args: z.object({ radius: z.number().positive().max(64).optional() }), data: SurroundingsSchema, kind: "look" },
   queue_research: { args: z.object({ technology: z.string() }), data: z.object({ queued: z.string(), queue: luaArray(z.string()) }), kind: "small_request" },
   add_map_tag: { args: z.object({ x: z.number().optional(), y: z.number().optional(), surface: z.string().optional(), text: z.string().max(200) }), data: z.object({ x: z.number(), y: z.number(), text: z.string() }), kind: "small_request" },
   camera_to: { args: z.object({ x: z.number(), y: z.number(), surface: z.string().optional() }), data: z.object({ surface: z.string(), x: z.number(), y: z.number() }), kind: "small_request" },

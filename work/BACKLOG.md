@@ -24,15 +24,9 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 - [ ] FC-126 Blueprint requests sometimes come with an unasked-for paste card
   - Notes: seen while recording: "Give me a blueprint for 300 electronic circuits a minute" answered with the card, "Say the word and I'll paste it", and a paste approval card in the same turn (S14 guidance says no tool call until asked). With "and paste it here" in the question, the answer still said "Want it pasted as ghosts at your position? Just say so" next to the card. A 600/min request was refused correctly (1,800 cable/min is over one lane) but said "That approval card wasn't needed" when none was shown
   - Acceptance: an eval over blueprint requests shows no paste card unless the player asked to paste
-- [ ] FC-127 A chart request took an unasked-for screenshot
-  - Notes: fresh conversation, player in map view on Nauvis: "How much jelly is Gleba making? Chart it." answered with numbers and a chart, then called `screenshot` (at last_result), then said "the screenshot shows your nauvis spot, not Gleba" and repeated the chart. The saved transcript kept only the second part of the answer. The same question earlier the same day (player on Gleba, not in map view) was clean
-  - Acceptance: an eval of chart questions in and out of map view shows no screenshot call unless asked; the transcript keeps every text part of a turn
 - [ ] FC-130 The model sometimes writes its whole answer twice
   - Notes: selection review of a 22-entity build (2026-09-14, recording): the answer (507 characters) came out twice back to back, 271 tokens out, and the page and saved history both show it twice. The model repeated itself; the server passed it through
   - Acceptance: a guard drops an exact repeat of the answer (streamed text stops once the repeat is certain, history keeps one copy), with a unit test; eval runs log how often it happens
-
-- [ ] FC-131 The system prompt names one player's mods
-  - Notes: `SYSTEM_RULES` says "Space Age plus mods such as maraxsis, Cerys, factorissimo-2". Fine for this save, wrong for anyone else; build the line from `script.active_mods` in the prototype dump instead. Release blocker for other players
 
 - [ ] FC-109 Entity settings actions: train stop limits and filters (rest of FC-093)
 - [ ] FC-104 Registry scan outlier ticks

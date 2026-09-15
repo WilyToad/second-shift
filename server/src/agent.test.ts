@@ -6,7 +6,7 @@ import type { ActionName } from "@companion/interfaces";
 import { DigestSchema, PrototypesSchema } from "@companion/interfaces";
 import { encodeBlueprintString } from "./blueprint";
 import { RecipeRetriever } from "./retrieval";
-import { Agent, anchorFor, anchorSpot, compactHistory, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsBlueprint, wantsChart, type GameActions, type SessionData, type SessionStore } from "./agent";
+import { Agent, fileSession, mapSession, anchorFor, anchorSpot, compactHistory, compactUserContent, fallbackChart, needsWorldTools, parseTarget, targetRate, wantsBlueprint, wantsChart, type GameActions, type SessionData, type SessionStore } from "./agent";
 import { rowPrototypes } from "./fixtures/row-prototypes";
 import type { ServerMessage } from "./messages";
 import type { ChatMessage, ChatModel, StreamOptions, StreamResult } from "./model";
@@ -101,6 +101,7 @@ test("acting without a search, or with an unknown tool, is refused without touch
 
 test("world questions are told apart from recipe questions", () => {
   for (const q of ["How many rails are near me on the right?", "Mark them for deconstruction", "find inserters around me", "delete all the rails instantly"]) expect(needsWorldTools(q, true)).toBe(true);
+  for (const q of ["yeah, look around", "what did I just build?", "I just built something", "what do you see?"]) expect(needsWorldTools(q, false)).toBe(true);
   for (const q of ["What's the recipe for carbon fiber?", "How many copper cables does a green circuit take?", "What do I need before I can research agricultural science?", "How do I craft a quantum widget?"]) expect(needsWorldTools(q, false)).toBe(false);
 });
 
@@ -400,4 +401,113 @@ test("in map view, a paste card names the map view as the spot", async () => {
   await agent.ask("Paste it here");
   const card = events.filter((e) => e.type === "approval").at(-1) as any;
   expect(card.title).toBe("Paste the blueprint at the map view (55, 40)?");
+});
+
+function firstHourGame() {
+  const calls: { action: ActionName; args: any }[] = [];
+  const game: GameActions = {
+    latest: () => undefined,
+    async call(action: ActionName, args?: any): Promise<any> {
+      calls.push({ action, args });
+      if (action === "player_status") return { character: true, surface: "nauvis", x: 0, y: 0, items: [{ name: "iron-plate", count: 8 }], total_items: 1, craftable: [{ name: "iron-gear-wheel", count: 4 }], more_craftable: false, crafting_queue: [], recent_builds: [{ name: "stone-furnace", ghost: false, surface: "nauvis", x: 3, y: 0, age_ticks: 120, still_there: true }] };
+      if (action === "surroundings") return { surface: "nauvis", x: 0, y: 0, radius: 32, mine: [{ name: "stone-furnace", count: 1, x: 3, y: 0 }], resources: [{ name: "iron-ore", count: 200, amount: 90000, x: 0, y: -15 }], other: [], trees: 40, rocks: 2, enemies: 0, water_tiles: 0 };
+      if (action === "research_options") return { options: [], available: 0, queue: [], triggers: [{ name: "electronics", trigger: "craft 10 copper-cable" }] };
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  return { game, calls };
+}
+
+test("S22: 'yeah' after an offer to look around looks, and the guidance never rules tools out", async () => {
+  const { game, calls } = firstHourGame();
+  const model = fakeModel([{ text: "Nothing here yet. Want me to look around to see what you built?" }, { text: "A stone furnace 3 tiles east." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask("I just finished something over there");
+  await agent.ask("yeah");
+  expect(calls.map((c) => c.action)).toEqual(["player_status", "surroundings"]);
+  const turn = model.seen[1]!.at(-1)!.content;
+  expect(turn).toContain("[the player right now]");
+  expect(turn).toContain("player's recent builds, newest first: stone-furnace 3 tiles east");
+  expect(turn).toContain("- built: stone-furnace 1");
+  expect(turn).not.toContain("no tool call");
+  expect(turn).not.toContain("data provided");
+});
+
+test("S22: a question nothing matched gets no 'no tool call' note; a recipe question still does", async () => {
+  const { game } = firstHourGame();
+  const model = fakeModel([{ text: "ok" }, { text: "ok" }]);
+  const prototypes = PrototypesSchema.parse(rowPrototypes);
+  const retriever = new RecipeRetriever(prototypes);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => retriever, prototypes: () => prototypes, emit: () => {} });
+  await agent.ask("that went well");
+  expect(model.seen[0]!.at(-1)!.content).not.toContain("no tool call");
+  await agent.ask("what's the recipe for electronic circuits?");
+  expect(model.seen[1]!.at(-1)!.content).toContain("no tool call is needed");
+});
+
+test("S22: start-of-game advice is grounded on inventory, surroundings and trigger research", async () => {
+  const { game, calls } = firstHourGame();
+  const model = fakeModel([{ text: "Mine the iron ore 15 tiles north." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask("help me... what do I do?");
+  expect(new Set(calls.map((c) => c.action))).toEqual(new Set(["player_status", "surroundings", "research_options"]));
+  const turn = model.seen[0]!.at(-1)!.content;
+  expect(turn).toContain("inventory (1 kinds): iron-plate 8");
+  expect(turn).toContain("iron-ore 200 tiles, 90k total (nearest 15 tiles north)");
+  expect(turn).toContain("unlocked by doing, no labs needed: electronics (craft 10 copper-cable)");
+  expect(turn).toContain("name no item, building or technology that isn't in them");
+  // Compacted history keeps only the question.
+  expect(compactUserContent(turn)).toBe("help me... what do I do?");
+});
+
+test("S22: an older mod without the player actions still answers", async () => {
+  const model = fakeModel([{ text: "ok" }]);
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask("what can I craft right now?");
+  expect(model.seen[0]!.at(-1)!.content).not.toContain("[the player right now]");
+});
+
+test("FC-137: one conversation per map; the first map adopts the conversation from before map ids", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "maps-"));
+  const legacy = join(dir, "session.json");
+  const sessions = join(dir, "sessions");
+  writeFileSync(legacy, JSON.stringify({ savedAt: "", history: [{ role: "user", content: "old question" }, { role: "assistant", content: "old answer" }], transcript: [{ kind: "user", text: "old question" }, { kind: "agent", text: "old answer" }] } satisfies SessionData));
+  const events: ServerMessage[] = [];
+  const agent = new Agent({ model: fakeModel([{ text: "new answer" }]), game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: (m) => events.push(m), session: fileSession(legacy) });
+
+  agent.useSession(mapSession(sessions, "abc-0", legacy));
+  expect(agent.history.map((m) => m.content)).toEqual(["old question", "old answer"]);
+  expect(events.map((e) => e.type)).toEqual(["reset", "transcript"]);
+
+  events.length = 0;
+  agent.useSession(mapSession(sessions, "def-1", legacy));
+  expect(agent.history).toEqual([]);
+  expect(agent.transcript()).toEqual([]);
+  expect(events.map((e) => e.type)).toEqual(["reset"]);
+  await agent.ask("hello on the new map");
+  await Bun.sleep(5);
+
+  agent.useSession(mapSession(sessions, "abc-0", legacy));
+  expect(agent.history[0]!.content).toBe("old question");
+  agent.useSession(mapSession(sessions, "def-1", legacy));
+  expect(agent.transcript()[0]!.text).toBe("hello on the new map");
+});
+
+test("FC-127: an unasked-for screenshot is dropped and the round's answer stands", async () => {
+  const game = fakeGame();
+  const model: ChatModel & { seen: ChatMessage[][] } = {
+    seen: [],
+    async stream(messages, opts) {
+      this.seen.push(messages);
+      opts?.onToken?.("Yumako spoils in 60 minutes.");
+      return { text: "Yumako spoils in 60 minutes.", toolCalls: [{ id: "c1", type: "function", function: { name: "screenshot", arguments: "{}" } }], totalMs: 1 };
+    },
+  };
+  const events: ServerMessage[] = [];
+  const agent = new Agent({ model, game: game.game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: (m) => events.push(m) });
+  await agent.ask("How long does yumako last before it spoils?");
+  expect(model.seen.length).toBe(1);
+  expect(game.calls).toEqual([]);
+  expect(events.some((e) => e.type === "done")).toBe(true);
+  expect(agent.history.at(-1)).toEqual({ role: "assistant", content: "Yumako spoils in 60 minutes." });
 });

@@ -31,6 +31,7 @@ require("scripts.events")(handlers)
 require("scripts.machines").register(handlers)
 require("scripts.planning")(handlers)
 require("scripts.selection")(handlers)
+require("scripts.player").register(handlers)
 
 local function fail(id, code, message)
   return { id = id, ok = false, error = { code = code, message = message } }

@@ -1,7 +1,7 @@
 // Second Shift server: game link + model + web chat on localhost.
 import chatPage from "../../displays/src/chat.html";
 import { DigestSchema } from "@companion/interfaces";
-import { Agent, fileSession, SELECTED_PREFIX, TOOLS } from "./agent";
+import { Agent, fileSession, mapSession, SELECTED_PREFIX, TOOLS } from "./agent";
 import { GameLink, type Snapshot } from "./game";
 import type { ClientMessage, ServerMessage } from "./messages";
 import { OmlxClient, readOmlxApiKey } from "./model";
@@ -32,6 +32,11 @@ const replayDigest = process.env.COMPANION_REPLAY_DIGEST
   ? DigestSchema.parse(await Bun.file(process.env.COMPANION_REPLAY_DIGEST).json())
   : null;
 
+// One conversation per map (FC-137). Until the game reports its map id, the last conversation without one is shown.
+const SESSIONS_DIR = process.env.COMPANION_SESSIONS ?? new URL("../../data/sessions", import.meta.url).pathname;
+const LEGACY_SESSION = new URL("../../data/session.json", import.meta.url).pathname;
+let mapId: string | undefined;
+
 const agent = new Agent({
   model,
   game,
@@ -42,7 +47,7 @@ const agent = new Agent({
   emit: (m) => broadcast(m),
   turnLog: process.env.COMPANION_TURN_LOG ?? new URL("../../data/eval/turns.jsonl", import.meta.url).pathname,
   scriptOutput: join(USER_DIR, "script-output"),
-  session: fileSession(process.env.COMPANION_SESSION ?? new URL("../../data/session.json", import.meta.url).pathname),
+  session: fileSession(LEGACY_SESSION),
 });
 
 const server = Bun.serve({
@@ -117,6 +122,17 @@ async function warmUp(): Promise<void> {
 
 let lastDigestSent: Snapshot | undefined;
 game.onStatus((s) => {
+  const id = s.latest?.digest.map_id;
+  if (id && id !== mapId) {
+    const first = mapId === undefined;
+    mapId = id;
+    busy = busy.then(async () => {
+      agent.useSession(mapSession(SESSIONS_DIR, id, LEGACY_SESSION));
+      console.log(`Map ${id}: ${agent.history.length ? "picking up its conversation" : "new conversation"}.`);
+      // Re-warm with the other map's conversation so its first follow-up hits the cache.
+      if (!first || agent.history.length) await warmUp();
+    });
+  }
   broadcast(statusMessage());
   if (s.latest && s.latest !== lastDigestSent) {
     lastDigestSent = s.latest;
@@ -142,7 +158,7 @@ game.onPrototypes((p) => {
   retriever = new RecipeRetriever(p.data);
   console.log(`Grounding on ${Object.keys(p.data.recipes).length} recipes (${p.source}).`);
   busy = busy.then(async () => {
-    const base = systemPrompt(p.data);
+    const base = systemPrompt(p.data, p.mods);
     // Research only flips enabled and researched flags, which the system prompt doesn't show: the
     // aligned prompt and the model's cache are still good, so skip re-measuring and re-warming.
     if (base === alignedBase) return;

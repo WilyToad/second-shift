@@ -21,6 +21,19 @@ local function resolve(player, ref)
   return player.surface.find_entity(ref.name, { x = ref.x, y = ref.y })
 end
 
+local function describe_trigger(t)
+  if not t then return nil end
+  local function item_name(v) return type(v) == "table" and v.name or v end
+  if t.type == "craft-item" then return "craft " .. (t.count or 1) .. " " .. tostring(item_name(t.item)) end
+  if t.type == "craft-fluid" then return "make " .. (t.amount or 0) .. " " .. tostring(t.fluid) end
+  if t.type == "mine-entity" then return "mine " .. tostring(t.entity) end
+  if t.type == "build-entity" then return "build " .. tostring(item_name(t.entity)) end
+  if t.type == "send-item-to-orbit" then return "send " .. tostring(item_name(t.item)) .. " to orbit" end
+  if t.type == "capture-spawner" then return "capture " .. tostring(t.entity or "a spawner") end
+  if t.type == "create-space-platform" then return "create a space platform" end
+  return "a scripted condition"
+end
+
 return function(handlers)
   -- Small request: add a technology to the research queue, as the research screen would allow.
   handlers.queue_research = function(args)
@@ -54,12 +67,15 @@ return function(handlers)
   -- Look: technologies the player could queue right now (prerequisites done, researched by labs), cheapest first.
   handlers.research_options = function()
     local player = require_player()
-    local out = {}
+    local out, triggers = {}, {}
     for name, tech in pairs(player.force.technologies) do
-      if tech.enabled and not tech.researched and not tech.prototype.hidden and not tech.prototype.research_trigger then
+      if tech.enabled and not tech.researched and not tech.prototype.hidden then
         local ready = true
         for _, pre in pairs(tech.prerequisites) do if not pre.researched then ready = false; break end end
-        if ready then
+        -- Trigger technologies unlock by doing something (early game: craft, mine, build), not in labs (S22).
+        if ready and tech.prototype.research_trigger then
+          triggers[#triggers + 1] = { name = name, trigger = describe_trigger(tech.prototype.research_trigger) }
+        elseif ready then
           local packs = {}
           for _, ing in pairs(tech.research_unit_ingredients) do packs[#packs + 1] = ing.name end
           out[#out + 1] = { name = name, count = tech.research_unit_count, packs = packs }
@@ -71,7 +87,10 @@ return function(handlers)
     for i = 1, math.min(25, #out) do top[i] = out[i] end
     local queue = {}
     for _, t in pairs(player.force.research_queue or {}) do queue[#queue + 1] = t.name end
-    return { options = top, available = #out, queue = queue }
+    table.sort(triggers, function(a, b) return a.name < b.name end)
+    local top_triggers = {}
+    for i = 1, math.min(15, #triggers) do top_triggers[i] = triggers[i] end
+    return { options = top, available = #out, queue = queue, triggers = top_triggers }
   end
 
   -- Small request: a map tag where the player could place one (charted map on their surface).

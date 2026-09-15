@@ -1,7 +1,7 @@
 // The agent loop: retrieval + snapshot → model → tools → answer, with approvals for map changes.
 // Looks run immediately; map changes wait for the player to confirm a card in the web page.
 import { join } from "node:path";
-import { readFileSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ActionArgs, ActionData, ActionName, Digest, EntityRef, FindEntitiesResult, Prototypes } from "@companion/interfaces";
@@ -18,6 +18,7 @@ import type { ChatMessage, ChatModel, ToolCall, ToolSpec } from "./model";
 import { buildMessages, formatSnapshot, userTurn } from "./prompt";
 import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
+import { acceptedOffer, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -34,8 +35,8 @@ export type TurnRecord = {
   question: string;
   world: boolean;
   chart: boolean;
-  chars: { system: number; history: number; question: number; retrieved: number; snapshot: number };
-  rounds: { promptTokens?: number; cachedTokens?: number; serverTtftS?: number; completionTokens?: number; ms: number; toolCalls: number }[];
+  chars: { system: number; history: number; question: number; retrieved: number; player?: number; snapshot: number };
+  rounds: { promptTokens?: number; cachedTokens?: number; serverTtftS?: number; completionTokens?: number; ms: number; toolCalls: number; tools?: string[] }[];
   visibleTtftMs?: number;
   totalMs: number;
 };
@@ -66,11 +67,25 @@ export function fileSession(path: string): SessionStore {
   };
 }
 
+/**
+ * One conversation per map, in `dir` (FC-137). The first map ever seen adopts the conversation saved
+ * before maps had ids (`legacyPath`), so an upgrade doesn't lose the thread.
+ */
+export function mapSession(dir: string, mapId: string, legacyPath?: string): SessionStore {
+  const path = join(dir, `${mapId.replace(/[^\w-]/g, "_")}.json`);
+  const firstMap = !existsSync(dir) || readdirSync(dir).length === 0;
+  if (legacyPath && firstMap && existsSync(legacyPath)) {
+    mkdirSync(dir, { recursive: true });
+    renameSync(legacyPath, path);
+  }
+  return fileSession(path);
+}
+
 /** Estimated history size that triggers compaction (FC-076). ~2.8 characters per token measured. */
 const HISTORY_BUDGET_TOKENS = 8000;
 const KEEP_RECENT_TURNS = 2;
 const CHARS_PER_TOKEN = 2.8;
-const TAIL_MARKERS = ["\n\n[recipes and technologies from this save]", "\n\n[game state", "\n\n(Answer from the data provided", "\n\n(Review from the checked summary"];
+const TAIL_MARKERS = ["\n\n[recipes and technologies from this save]", "\n\n[the player right now]", "\n\n[game state", "\n\n(Answer in ", "\n\n(Answer from the data provided", "\n\n(Review from the checked summary"];
 
 /** A user turn without its bulky, now-stale data: retrieved lines, snapshot and guidance notes. */
 export function compactUserContent(content: string): string {
@@ -215,6 +230,9 @@ export const TOOLS: ToolSpec[] = [
 export function needsWorldTools(question: string, hasLastResult: boolean): boolean {
   const q = question.toLowerCase();
   if (/\b(near|nearby|around me|next to me|close to me|here|to my|on my|of me|in view|on screen|visible)\b/.test(q)) return true;
+  // Looking around and the player's own builds are world questions too (S22: "yeah, look around" got "I can't see").
+  if (/\b(look around|look at (this|here|that)|what'?s around|what do you see|what can you see|surroundings|explore)\b/.test(q)) return true;
+  if (/\b(i (just |have |'ve )?(built|placed|put down)|what (did|have) i (just )?(build|built|place|placed|make|made))\b/.test(q)) return true;
   if (/\b(find|search|look for|highlight|show me|where are|count|which)\b/.test(q)) return true;
   if (/\b(mark|unmark|deconstruct\w*|remove|delete|clear|cancel|upgrade\w*|queue|start research\w*|research it|tag|pin|camera|jump|take me|paste|place|build it)\b/.test(q)) return true;
   if (/\b(set|switch|change)\b.*\b(to|recipe)\b/.test(q)) return true;
@@ -223,6 +241,9 @@ export function needsWorldTools(question: string, hasLastResult: boolean): boole
   if (hasLastResult && /\b(them|those|these|it|that)\b/.test(q)) return true;
   return false;
 }
+
+/** The player asked to see a picture (FC-127). */
+export const PICTURE = /\b(screenshot|screen shot|picture|photo|image|snapshot|what does .+ look like|show me what)\b/i;
 
 /** A production target in the question ("60 bioflux per minute", "2/s") as items per minute, plus the words naming what. */
 export function parseTarget(question: string): { perMinute: number; phrase: string } | null {
@@ -351,11 +372,35 @@ export class Agent {
       scriptOutput?: string;
     },
   ) {
-    const saved = deps.session?.load();
+    this.session = deps.session;
+    this.restore();
+  }
+
+  private session: SessionStore | undefined;
+
+  private restore(): void {
+    const saved = this.session?.load();
     if (saved) {
       this.history.push(...saved.history);
       this.shown.push(...saved.transcript);
     }
+  }
+
+  /**
+   * Switches to another conversation store, for a different map (FC-137): the current conversation
+   * stays saved in its own store, and pages are told to show the other one.
+   */
+  useSession(store: SessionStore): void {
+    this.history.length = 0;
+    this.shown.length = 0;
+    this.lastResult = null;
+    this.lastBlueprint = null;
+    this.pending.clear();
+    this.notes = [];
+    this.session = store;
+    this.restore();
+    this.deps.emit({ type: "reset" });
+    if (this.shown.length) this.deps.emit({ type: "transcript", items: this.transcript() });
   }
 
   /** What the page showed in this conversation, for pages that connect later. */
@@ -364,7 +409,7 @@ export class Agent {
   }
 
   private saveSession(): void {
-    this.deps.session?.save({ savedAt: new Date(this.now()).toISOString(), history: this.history, transcript: this.shown.slice(-MAX_TRANSCRIPT) });
+    this.session?.save({ savedAt: new Date(this.now()).toISOString(), history: this.history, transcript: this.shown.slice(-MAX_TRANSCRIPT) });
   }
 
   private now(): number {
@@ -374,7 +419,7 @@ export class Agent {
   reset(): void {
     this.history.length = 0;
     this.shown.length = 0;
-    this.deps.session?.clear();
+    this.session?.clear();
     this.lastResult = null;
     this.pending.clear();
     this.notes = [];
@@ -391,19 +436,37 @@ export class Agent {
     const snap = this.deps.game.latest() ?? this.deps.fallbackSnapshot?.();
     const found = this.deps.retriever()?.retrieve(question);
     const plannedTarget = parseTarget(question) !== null;
-    const snapshot = snap ? formatSnapshot(snap.digest, this.now() - snap.receivedAt, { question, items: found?.items ?? [], planned: plannedTarget }) : null;
+    // "yeah" after "Want me to look around?" is classified as the offer it accepts (S22).
+    const offer = acceptedOffer(question, this.history.findLast((m) => m.role === "assistant" && m.content)?.content);
+    const intent = offer ? `${offer} ${question}` : question;
+    const world = needsWorldTools(intent, this.lastResult !== null);
+    const snapshot = snap ? formatSnapshot(snap.digest, this.now() - snap.receivedAt, { question: intent, items: found?.items ?? [], planned: plannedTarget, world }) : null;
     // Outcomes of approvals since the last turn go in front of the question, keeping history append-only.
     const withBlueprints = pasted.summaries.length ? `${question}\n\n${pasted.summaries.join("\n\n")}` : question;
     const noted = this.notes.length ? `[since your last reply: ${this.notes.join("; ")}]\n\n${withBlueprints}` : withBlueprints;
     this.notes = [];
     // Turn guidance decided in code, kept in the uncached tail so the system prompt stays stable.
-    const world = needsWorldTools(question, this.lastResult !== null);
     // A pasted blueprint isn't running yet, so "is anything holding it back?" is about the design, not a trend.
     const chart = !pasted.summaries.length && wantsChart(question);
     // A new "how many / where" question is a new search: earlier results may be for another spot (FC-092 follow-up:
     // "how many belts are here?" after "…near me?" reused the character's result instead of searching the view).
     const searchAgain = world && /\b(how many|find|where (are|is)|count|search|look for|any \w+ (here|near))\b/i.test(question);
-    const notes = [world ? "" : "no tool call is needed", chart ? "" : "no chart block", searchAgain ? "call find_entities again for this question, even if an earlier result looks similar" : ""].filter(Boolean);
+    // The player's own situation, fetched only when the question is about it (S22).
+    const start = !pasted.summaries.length && wantsStartAdvice(intent);
+    const [status, around] = pasted.summaries.length ? [null, null] : await Promise.all([
+      wantsPlayerStatus(intent) ? this.lookup("player_status") : null,
+      wantsSurroundings(intent) ? this.lookup("surroundings") : null,
+    ]);
+    const playerLines = [...(status ? formatPlayerStatus(status, { builds: start || /\b(buil\w*|plac\w*|made)\b/i.test(intent) }) : []), ...(around ? formatSurroundings(around) : [])];
+    // Tools are ruled out only when the retrieved data answers the question; a question nothing matched
+    // gets no note, so "I just built something" is free to look (S22).
+    const answeredFromData = Boolean(found?.lines.length || playerLines.length);
+    const notes = [
+      world || !answeredFromData ? "" : "no tool call is needed",
+      chart ? "" : "no chart block",
+      searchAgain ? "call find_entities again for this question, even if an earlier result looks similar" : "",
+      start ? "base next steps only on the inventory, hand-craftable, surroundings and research lines; name no item, building or technology that isn't in them" : "",
+    ].filter(Boolean);
     // Blueprint requests are built in code; the model only explains the result (S14).
     const requested = !pasted.summaries.length && wantsBlueprint(question) ? this.blueprintFor(question, found?.items ?? []) : null;
     // Rate targets get an exact plan computed in code; the model narrates it (S09).
@@ -418,13 +481,13 @@ export class Agent {
       : top && notes.length
       // The plan's own headline number goes in the guidance: answers sometimes listed inputs but skipped it (FC-114).
       ? `${noted}\n\n(Answer from the computed plan in 80 words or fewer: start with ${top.machines}× ${top.machine} for ${plan!.perMinute}/min ${top.item}, then the inputs; ${notes.join(", ")}.)`
-      : notes.length ? `${noted}\n\n(Answer from the data provided in 60 words or fewer; ${notes.join(", ")}.)` : noted;
+      : notes.length ? `${noted}\n\n(Answer in ${start ? 80 : 60} words or fewer; ${notes.join(", ")}.)` : noted;
     // Research questions get the live list of what can be queued right now (decided in code, not guessed).
-    const researchLines = /\b(research\w*|tech\w*|unlock\w*|queue)\b/i.test(question) ? await this.researchOptions() : [];
+    const researchLines = start || /\b(research\w*|tech\w*|unlock\w*|queue)\b/i.test(question) ? await this.researchOptions() : [];
     const planLines = plan ? [formatPlan(plan)] : requested ? [requested.line] : [];
     const unknown = pasted.summaries.length ? null : this.deps.retriever()?.unknownName(question);
     const unknownLines = unknown ? [`[save data: no item, fluid, recipe or building in this save is named "${unknown}"; if it's a nickname, ask which item they mean]`] : [];
-    const working: ChatMessage[] = [userTurn(guided, { recipes: [...unknownLines, ...planLines, ...researchLines, ...(found?.lines ?? [])], snapshot })];
+    const working: ChatMessage[] = [userTurn(guided, { recipes: [...unknownLines, ...planLines, ...researchLines, ...(found?.lines ?? [])], player: playerLines, snapshot })];
     const record: TurnRecord = {
       at: new Date(this.now()).toISOString(), question, world, chart, rounds: [], totalMs: 0,
       chars: {
@@ -432,6 +495,7 @@ export class Agent {
         history: this.history.reduce((n, m) => n + m.content.length, 0),
         question: guided.length,
         retrieved: (found?.lines ?? []).join("\n").length,
+        player: playerLines.join("\n").length,
         snapshot: snapshot?.length ?? 0,
       },
     };
@@ -459,6 +523,8 @@ export class Agent {
     }
 
     let ttftMs: number | undefined;
+    // Text the model wrote in rounds that also called tools: the page showed it, so the transcript keeps it (FC-127).
+    const earlier: string[] = [];
     try {
       for (let round = 0; ; round++) {
         const tools = round < MAX_TOOL_ROUNDS ? TOOLS : undefined;
@@ -479,8 +545,16 @@ export class Agent {
           promptTokens: result.usage?.prompt_tokens, cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens,
           serverTtftS: result.usage?.time_to_first_token, completionTokens: result.usage?.completion_tokens,
           ms: result.totalMs, toolCalls: result.toolCalls.length,
+          ...(result.toolCalls.length ? { tools: result.toolCalls.map((c) => c.function.name) } : {}),
         });
-        if (result.toolCalls.length === 0) {
+        // Screenshots nobody asked for are dropped (FC-127): the round's answer stands without them.
+        const calls = result.toolCalls.filter((c) => c.function.name !== "screenshot" || PICTURE.test(intent));
+        if (calls.length === 0 && result.toolCalls.length && !result.text.trim()) {
+          working.push({ role: "assistant", content: "", tool_calls: result.toolCalls });
+          for (const call of result.toolCalls) working.push({ role: "tool", tool_call_id: call.id, content: "Error: the player didn't ask for a picture. Answer in words." });
+          continue;
+        }
+        if (calls.length === 0) {
           let text = chart ? result.text : stripChartBlocks(result.text);
           if (chart && !text.includes("```rate_chart")) {
             const block = fallbackChart(question, found?.items ?? [], snap?.digest);
@@ -490,7 +564,7 @@ export class Agent {
           // Store the question without its bulky retrieved lines and snapshot: the next turn re-reads the
           // previous turn anyway (it sits past the last cache block), so a short version is much cheaper (S08).
           this.history.push(...working.map((m, i) => (i === 0 && m.role === "user" ? { ...m, content: compactUserContent(m.content) } : m)));
-          this.shown.push({ kind: "agent", text });
+          this.shown.push({ kind: "agent", text: [...earlier, text].filter((t) => t.trim()).join("\n\n") });
           record.visibleTtftMs = ttftMs;
           record.totalMs = performance.now() - started;
           this.logTurn(record);
@@ -502,8 +576,9 @@ export class Agent {
           });
           return;
         }
-        working.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls });
-        for (const call of result.toolCalls) working.push({ role: "tool", tool_call_id: call.id, content: await this.runTool(call) });
+        if (result.text.trim()) earlier.push(chart ? result.text : stripChartBlocks(result.text));
+        working.push({ role: "assistant", content: result.text, tool_calls: calls });
+        for (const call of calls) working.push({ role: "tool", tool_call_id: call.id, content: await this.runTool(call) });
       }
     } catch (e) {
       this.deps.emit({ type: "error", message: (e as Error).message });
@@ -553,12 +628,25 @@ export class Agent {
     return plan.steps.length ? plan : null;
   }
 
+  /** A look the player could make themselves; null when the game can't answer (not connected, older mod). */
+  private async lookup<A extends "player_status" | "surroundings">(action: A): Promise<ActionData<A> | null> {
+    try {
+      return await this.deps.game.call(action);
+    } catch {
+      return null;
+    }
+  }
+
   private async researchOptions(): Promise<string[]> {
     try {
       const r = await this.deps.game.call("research_options");
-      if (!r.options.length) return [`researchable now: nothing (${r.available} available)`];
       const packs = (p: string[]) => p.map((n) => n.replace(/-science-pack$/, "")).join("+");
-      return [`researchable now (${r.available}, cheapest first): ${r.options.map((o) => `${o.name} ${o.count}×${packs(o.packs)}`).join(", ")}${r.queue.length ? ` | queue: ${r.queue.join(", ")}` : " | queue: empty"}`];
+      const lines = [r.options.length
+        ? `researchable now (${r.available}, cheapest first): ${r.options.map((o) => `${o.name} ${o.count}×${packs(o.packs)}`).join(", ")}${r.queue.length ? ` | queue: ${r.queue.join(", ")}` : " | queue: empty"}`
+        : `researchable now: nothing (${r.available} available)`];
+      // Early technologies unlock by doing something, not in labs (S22).
+      if (r.triggers?.length) lines.push(`unlocked by doing, no labs needed: ${r.triggers.map((t) => `${t.name} (${t.trigger})`).join(", ")}`);
+      return lines;
     } catch {
       return [];
     }

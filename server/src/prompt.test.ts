@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { DigestSchema } from "@companion/interfaces";
-import { alignToCacheBlock, buildMessages, diagnose, formatSnapshot, systemPrompt, userTurn } from "./prompt";
+import { alignToCacheBlock, buildMessages, diagnose, formatMods, formatSnapshot, systemPrompt, userTurn } from "./prompt";
 
 const digest = DigestSchema.parse({
   tick: 100, player: { name: "p", surface: "gleba", position: { x: 1, y: 2 } },
@@ -22,7 +22,8 @@ test("production lines only when the question is about rates or names a tracked 
   const recipeQ = formatSnapshot(digest, 0, { question: "what's the recipe for carbon fiber?", items: ["carbon-fiber"] });
   expect(recipeQ).not.toContain("produced/min");
   expect(recipeQ).toContain("(production rates omitted");
-  expect(recipeQ).toContain("research: carbon-fiber 62%"); // header always present
+  expect(recipeQ).not.toContain("research:"); // research state only when it's relevant (S22)
+  expect(formatSnapshot(digest, 0, { question: "what should I research next?", items: [] })).toContain("research: carbon-fiber 62%");
   expect(formatSnapshot(digest, 0, { question: "how much bioflux am I making?", items: ["bioflux"] })).toContain("gleba produced/min: bioflux 37.9");
   expect(formatSnapshot(digest, 0, { question: "is bioflux ok", items: ["bioflux"] })).toContain("gleba rates/min for items asked about: bioflux 37.9");
 });
@@ -123,4 +124,24 @@ test("planned rate questions skip machine and production blocks", () => {
   expect(text).not.toContain("stuck machines");
   expect(text).toContain("gleba rates/min for items asked about: bioflux 38");
   expect(text).not.toContain("jelly");
+});
+
+test("S22: position and research only when they matter; idle labs always show", () => {
+  const craft = formatSnapshot(digest, 0, { question: "what can I craft right now?", items: [] });
+  expect(craft).not.toContain("player:");
+  expect(craft).not.toContain("research:");
+  expect(formatSnapshot(digest, 0, { question: "where am I?", items: [] })).toContain("player: p on gleba at (1, 2)");
+  expect(formatSnapshot(digest, 0, { question: "yeah", items: [], world: true })).toContain("player: p on gleba");
+  const idle = DigestSchema.parse({
+    tick: 1, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {},
+    machines: { progress: { machines: 4, scanned: true, refresh_ticks: 1 }, stuck: [{ surface: "nauvis", recipes: [{ recipe: "(research)", total: 4, stuck: 4, statuses: { no_research_in_progress: 4 } }] }] },
+  });
+  expect(formatSnapshot(idle, 0, { question: "what can I craft right now?", items: [] })).toContain("research: nothing researching (4 labs idle)");
+});
+
+test("FC-131: the system prompt lists the save's own mods, not the author's", () => {
+  expect(systemPrompt(null)).not.toContain("maraxsis");
+  expect(formatMods(["base", "core", "second-shift"])).toContain("none: an unmodded base game");
+  expect(formatMods(["space-age", "base", "quality", "elevated-rails", "second-shift"])).toBe("[save data: mods]\nelevated-rails, quality, space-age");
+  expect(systemPrompt(null, ["base", "space-age"])).toContain("[save data: mods]\nspace-age");
 });

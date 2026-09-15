@@ -25,6 +25,12 @@
 - [ ] FC-137 A new map starts a new conversation
   - Notes: the new game's thread opened with a test question from another save; `data/session.json` isn't tied to a map
   - Acceptance: the mod gives each save a stable id (created once in `on_init`); the server keeps one conversation per map id and switches when the connected map changes; unit test; in-game check switching saves
+- [ ] FC-131 The system prompt names one player's mods
+  - Notes: moved from the backlog: a new player on plain Space Age was told the game has maraxsis, Cerys and factorissimo-2
+  - Acceptance: the mod line is built from the game's active mods (kept with the prototype cache); unit test; latency report after the prompt change
+- [ ] FC-127 Unasked-for screenshots
+  - Notes: moved from the backlog. Came back on recipe questions after the S22 prompt changes: the grounding eval's bioflux and yumako questions called `screenshot` after answering ("That's your spot on Gleba for reference")
+  - Acceptance: a `screenshot` call runs only when the question (or the offer it accepts) asks for a picture; otherwise the round's answer stands without another round; the transcript keeps every text part of a turn; unit tests; grounding eval shows no screenshot calls
 - [ ] FC-138 New-game eval
   - Acceptance: `scripts/eval-new-game.ts` creates a fresh map with `--create`, hosts it, and runs the first-hour questions above with checks, saving to `data/eval/`; passes
 
