@@ -9,6 +9,9 @@ local MAX_ITEMS = 40
 local MAX_CRAFTABLE = 40
 local MAX_RADIUS = 64
 local MAX_NAMES = 25
+-- Effects that aren't things in the world: the crash site's fires are on the enemy force and read as 34 enemies (S22 eval).
+local TRANSIENT = { explosion = true, fire = true, ["smoke-with-trigger"] = true, sticker = true, projectile = true, beam = true, stream = true, ["particle-source"] = true, corpse = true }
+local ENEMY_TYPES = { unit = true, ["unit-spawner"] = true, turret = true, ["spider-unit"] = true, ["segmented-unit"] = true }
 
 local function require_player()
   local player = companion_player()
@@ -165,6 +168,8 @@ function M.register(handlers)
     local visible_chunk = {}
     local groups = { mine = {}, resources = {}, other = {} }
     local trees, rocks, enemies = 0, 0, 0
+    -- Containers the player didn't build (the crash site's wreckage): hovering one shows what's inside.
+    local salvage, salvage_containers = {}, 0
     local function nearer(entry, e)
       local dx, dy = e.position.x - center.x, e.position.y - center.y
       local d = dx * dx + dy * dy
@@ -175,8 +180,9 @@ function M.register(handlers)
       if visible_chunk[key] == nil then visible_chunk[key] = helmet.visible(player.force, surface, e.position) end
       if not visible_chunk[key] then
         -- not counted: the player can't see there
-      elseif e.type == "character" or e.prototype.hidden then
-        -- the player themselves, and engine-internal entities
+      elseif e.type == "character" or TRANSIENT[e.type] or not e.prototype.selectable_in_game then
+        -- the player themselves, and what can't be pointed at (fire, smoke). Not prototype.hidden: the
+        -- crash site's wrecks are hidden from menus but are the first thing a new player mines (S22).
       elseif e.type == "tree" then
         trees = trees + 1
       elseif e.type == "resource" then
@@ -190,11 +196,18 @@ function M.register(handlers)
         entry.count = entry.count + 1
         nearer(entry, e)
         groups.mine[e.name] = entry
-      elseif e.force.name == "enemy" then
+      elseif ENEMY_TYPES[e.type] and e.force.name == "enemy" then
         enemies = enemies + 1
       elseif e.type == "simple-entity" then
         rocks = rocks + 1
       else
+        if e.type == "container" and salvage_containers < MAX_NAMES then
+          local inv = e.get_inventory(defines.inventory.chest)
+          if inv and not inv.is_empty() then
+            salvage_containers = salvage_containers + 1
+            for _, stack in pairs(inv.get_contents()) do salvage[stack.name] = (salvage[stack.name] or 0) + stack.count end
+          end
+        end
         local entry = groups.other[e.name] or { name = e.name, count = 0 }
         entry.count = entry.count + 1
         nearer(entry, e)
@@ -226,6 +239,8 @@ function M.register(handlers)
       resources = listed(groups.resources),
       other = listed(groups.other),
       trees = trees, rocks = rocks, enemies = enemies, water_tiles = water,
+      salvage = (function() local out = {} for name, count in pairs(salvage) do out[#out + 1] = { name = name, count = count } end return out end)(),
+      salvage_containers = salvage_containers,
     }
   end
 end

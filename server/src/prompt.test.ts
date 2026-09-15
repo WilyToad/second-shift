@@ -126,12 +126,10 @@ test("planned rate questions skip machine and production blocks", () => {
   expect(text).not.toContain("jelly");
 });
 
-test("S22: position and research only when they matter; idle labs always show", () => {
+test("S22: research only when it matters; idle labs always show", () => {
   const craft = formatSnapshot(digest, 0, { question: "what can I craft right now?", items: [] });
-  expect(craft).not.toContain("player:");
+  expect(craft).toContain("player: p on gleba at (1, 2)");
   expect(craft).not.toContain("research:");
-  expect(formatSnapshot(digest, 0, { question: "where am I?", items: [] })).toContain("player: p on gleba at (1, 2)");
-  expect(formatSnapshot(digest, 0, { question: "yeah", items: [], world: true })).toContain("player: p on gleba");
   const idle = DigestSchema.parse({
     tick: 1, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {},
     machines: { progress: { machines: 4, scanned: true, refresh_ticks: 1 }, stuck: [{ surface: "nauvis", recipes: [{ recipe: "(research)", total: 4, stuck: 4, statuses: { no_research_in_progress: 4 } }] }] },

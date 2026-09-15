@@ -440,7 +440,7 @@ export class Agent {
     const offer = acceptedOffer(question, this.history.findLast((m) => m.role === "assistant" && m.content)?.content);
     const intent = offer ? `${offer} ${question}` : question;
     const world = needsWorldTools(intent, this.lastResult !== null);
-    const snapshot = snap ? formatSnapshot(snap.digest, this.now() - snap.receivedAt, { question: intent, items: found?.items ?? [], planned: plannedTarget, world }) : null;
+    const snapshot = snap ? formatSnapshot(snap.digest, this.now() - snap.receivedAt, { question: intent, items: found?.items ?? [], planned: plannedTarget }) : null;
     // Outcomes of approvals since the last turn go in front of the question, keeping history append-only.
     const withBlueprints = pasted.summaries.length ? `${question}\n\n${pasted.summaries.join("\n\n")}` : question;
     const noted = this.notes.length ? `[since your last reply: ${this.notes.join("; ")}]\n\n${withBlueprints}` : withBlueprints;
@@ -463,9 +463,12 @@ export class Agent {
     const answeredFromData = Boolean(found?.lines.length || playerLines.length);
     const notes = [
       world || !answeredFromData ? "" : "no tool call is needed",
+      // With a fresh look already in the lines, the model still searched twice, narrating "let me scan wider" (S22 eval).
+      around && !searchAgain ? "the surroundings lines are a fresh look, so don't search again unless the player asks for a wider search" : "",
       chart ? "" : "no chart block",
       searchAgain ? "call find_entities again for this question, even if an earlier result looks similar" : "",
-      start ? "base next steps only on the inventory, hand-craftable, surroundings and research lines; name no item, building or technology that isn't in them" : "",
+      start ? "base next steps only on the inventory, hand-craftable, surroundings and research lines; name no item, building or technology that isn't in them"
+        : playerLines.length ? "name no item, building or technology that isn't in the lines above" : "",
     ].filter(Boolean);
     // Blueprint requests are built in code; the model only explains the result (S14).
     const requested = !pasted.summaries.length && wantsBlueprint(question) ? this.blueprintFor(question, found?.items ?? []) : null;
@@ -481,7 +484,9 @@ export class Agent {
       : top && notes.length
       // The plan's own headline number goes in the guidance: answers sometimes listed inputs but skipped it (FC-114).
       ? `${noted}\n\n(Answer from the computed plan in 80 words or fewer: start with ${top.machines}× ${top.machine} for ${plan!.perMinute}/min ${top.item}, then the inputs; ${notes.join(", ")}.)`
-      : notes.length ? `${noted}\n\n(Answer in ${start ? 80 : 60} words or fewer; ${notes.join(", ")}.)` : noted;
+      // "from the data provided" kept recipe answers grounded (tool calls rose without it), but was echoed back
+      // as "the data provided doesn't list…" when nothing matched, so it's only used with recipe lines (S22).
+      : notes.length ? `${noted}\n\n(${found?.lines.length && !playerLines.length ? "Answer from the data provided in" : "Answer in"} ${start ? 80 : 60} words or fewer; ${notes.join(", ")}.)` : noted;
     // Research questions get the live list of what can be queued right now (decided in code, not guessed).
     const researchLines = start || /\b(research\w*|tech\w*|unlock\w*|queue)\b/i.test(question) ? await this.researchOptions() : [];
     const planLines = plan ? [formatPlan(plan)] : requested ? [requested.line] : [];

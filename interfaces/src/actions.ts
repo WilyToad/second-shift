@@ -49,6 +49,9 @@ export const SurroundingsSchema = z.object({
   rocks: z.number(),
   enemies: z.number(),
   water_tiles: z.number(),
+  // What containers the player didn't build hold (the crash site's wreckage), from up to 25 containers.
+  salvage: luaArray(NameCount).default([]),
+  salvage_containers: z.number().default(0),
 });
 export type Surroundings = z.infer<typeof SurroundingsSchema>;
 
@@ -150,6 +153,7 @@ export const actions = {
     kind: "look",
   },
   player_status: { args: z.object({}), data: PlayerStatusSchema, kind: "look" },
+  map_id: { args: z.object({}), data: z.object({ map_id: z.string().optional() }), kind: "look" },
   surroundings: { args: z.object({ radius: z.number().positive().max(64).optional() }), data: SurroundingsSchema, kind: "look" },
   queue_research: { args: z.object({ technology: z.string() }), data: z.object({ queued: z.string(), queue: luaArray(z.string()) }), kind: "small_request" },
   add_map_tag: { args: z.object({ x: z.number().optional(), y: z.number().optional(), surface: z.string().optional(), text: z.string().max(200) }), data: z.object({ x: z.number(), y: z.number(), text: z.string() }), kind: "small_request" },

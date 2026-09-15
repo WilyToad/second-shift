@@ -58,7 +58,6 @@ export function diagnose(digest: Digest): string[] {
 
 const MACHINE_QUESTION = /\b(slow|stuck|bottleneck\w*|why|problem\w*|broken|idle|starv\w*|backed up|back(ing)? up|not working|blocked|jam\w*|full)\b/i;
 const RESEARCH_QUESTION = /\b(research\w*|tech\w*|unlock\w*|queue\w*|labs?)\b/i;
-const POSITION_QUESTION = /\b(where|position|location|coordinates?|surface|planet|am i\b|here|near|nearby|around)\b/i;
 const RATE_QUESTION = /\b(rate|rates|per minute|\/min|output|throughput|production|produc\w*|making|consum\w*|science|bottleneck|slow|stalled)\b/i;
 
 /**
@@ -66,13 +65,13 @@ const RATE_QUESTION = /\b(rate|rates|per minute|\/min|output|throughput|producti
  * Production lines are included only when the question is about rates or names an item the
  * digest tracks (`items`: prototype names matched in the question). Pass no options for everything.
  */
-export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { question: string; items: string[]; planned?: boolean; world?: boolean }): string {
+export function formatSnapshot(digest: Digest, ageMs: number, relevance?: { question: string; items: string[]; planned?: boolean }): string {
   // A computed plan already answers rate targets; only lines for the planned items stay (S10 latency).
   const wantsRates = !relevance || (!relevance.planned && RATE_QUESTION.test(relevance.question));
   const mentioned = new Set(relevance?.items ?? []);
   const lines = [`[game state at tick ${digest.tick}, ${Math.round(ageMs / 1000)} s old${digest.paused ? ", game is PAUSED: rates and machine status are frozen" : ""}]`];
-  // Position only when it matters: answers otherwise opened with "You're on nauvis at (0, 0)" (S22).
-  if (digest.player && (!relevance || relevance.world || POSITION_QUESTION.test(relevance.question))) {
+  // Always sent: without it the model called screenshot "to show your spot" on recipe questions (S22 A/B: 0 of 5 with, 2 of 5 without).
+  if (digest.player) {
     const p = digest.player;
     // In remote view the position is the map view; say so, and where the character is (FC-092).
     lines.push(p.remote_view && p.character_position

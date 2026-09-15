@@ -24,7 +24,7 @@ test("first-hour questions fetch what the player has and sees", () => {
     expect(wantsPlayerStatus(q)).toBe(true);
     expect(wantsSurroundings(q)).toBe(true);
   }
-  for (const q of ["What's the recipe for carbon fiber?", "How much iron plate am I making? Chart it.", "Give me a blueprint for 120 gears a minute."]) {
+  for (const q of ["How do I craft agricultural science packs?", "What makes bioflux, and where can it be crafted?", "What's the recipe for carbon fiber?", "How much iron plate am I making? Chart it.", "Give me a blueprint for 120 gears a minute."]) {
     expect(wantsPlayerStatus(q)).toBe(false);
     expect(wantsSurroundings(q)).toBe(false);
   }
@@ -63,11 +63,13 @@ test("surroundings lines name resources with amounts and where the nearest is", 
     mine: {}, other: [{ name: "crash-site-spaceship-wreck-big-1", count: 1, x: -10, y: 0 }],
     resources: [{ name: "iron-ore", count: 300, amount: 245000, x: 0, y: -20 }],
     trees: 120, rocks: 3, enemies: 0, water_tiles: 0,
+    salvage: [{ name: "iron-plate", count: 8 }], salvage_containers: 1,
   });
   const text = formatSurroundings(around).join("\n");
   expect(text).toContain("within 32 tiles of their character on nauvis");
-  expect(text).toContain("- built: nothing");
+  expect(text).toContain("- the player's own (built or owned): nothing");
   expect(text).toContain("iron-ore 300 tiles, 245k total (nearest 20 tiles north)");
   expect(text).toContain("crash-site-spaceship-wreck-big-1 1 (nearest 10 tiles west)");
   expect(text).toContain("trees 120, rocks 3, water tiles 0, enemies 0");
+  expect(text).toContain("inside 1 of those containers (mining one by hand takes what's inside): iron-plate 8");
 });

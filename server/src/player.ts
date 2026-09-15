@@ -17,7 +17,8 @@ export function acceptedOffer(question: string, lastAnswer: string | undefined):
 }
 
 const START = /\b(what (should|do|can) i do|help me|i need help|get(ting)? started|where (do|should) i (start|begin)|what now|what next|what'?s next|next steps?|first steps?|just (started|landed|crashed|spawned)|new (game|map)|how do i (start|begin))\b|^\s*help\b/i;
-const CARRY = /\b(inventory|carry\w*|holding|in my hands?|what do i have|have on me|craft\w*|hand ?craft\w*|pick(ed)? up|debris|wreck\w*|scrap|materials)\b/i;
+// "How do I craft X?" is a recipe question; only what the player can craft or has counts here.
+const CARRY = /\b(inventory|carrying|holding|in my hands?|what do i have|have on me|what (can|could|should) i (hand ?)?(craft|make)|can i (hand ?)?craft|craftable|craft (right )?now|pick(ed)? up|debris|wreck\w*|materials)\b/i;
 const BUILT = /\b(i (just |have |'ve )?(built|placed|put down|set up)|what (did|have) i (just )?(build|built|place|placed|make|made)|what you('ve| have)? ?(just )?(built|placed|made)|my (last|latest|new|recent) builds?|i just (made|build) (something|a|an|some))\b/i;
 const LOOK = /\b(look around|look at (this|here|what)|what'?s (around|nearby|here|near me)|what is (around|nearby|here|near me)|around (me|here)|what do you see|what can you see|can you see|see what|surroundings|found (some |an? |the )?[\w -]{0,24}\b(ore|resources?|patch|water|oil|coal|stone|trees|rocks)|where('?s| is| are| can i find) (the |some )?(nearest |closest )?[\w -]{0,24}\b(ore|resources?|water|coal|stone|oil)\b|explore)\b/i;
 
@@ -51,6 +52,8 @@ export function formatPlayerStatus(s: PlayerStatus, opts: { builds?: boolean } =
   const lines = [
     `inventory (${s.total_items} kinds${s.total_items > s.items.length ? `, top ${s.items.length}` : ""}): ${s.items.length ? s.items.map((i) => `${i.name} ${i.count}`).join(", ") : "empty"}`,
   ];
+  // Vanilla memory (and 1.x guides) says to craft a pickaxe or axe first; the answers repeated it (S22 eval).
+  lines.push("the character mines rocks, trees and ore by hand: there are no axes or pickaxes");
   if (s.hand) lines.push(`in hand: ${s.hand.name} ${s.hand.count}`);
   lines.push(s.craftable.length
     ? `hand-craftable now from the inventory (most you could make): ${s.craftable.map((c) => `${c.name} ${c.count}`).join(", ")}${s.more_craftable ? " (and more)" : ""}`
@@ -69,9 +72,10 @@ export function formatSurroundings(s: Surroundings): string[] {
   const here = { x: s.x, y: s.y };
   const named = (list: Surroundings["mine"]) => list.map((e) => `${e.name} ${e.count} (nearest ${bearing(here, e)})`).join(", ");
   const lines = [`what the player can see within ${s.radius} tiles of their character on ${s.surface}:`];
-  lines.push(`- built: ${s.mine.length ? named(s.mine) : "nothing"}`);
+  lines.push(`- the player's own (built or owned): ${s.mine.length ? named(s.mine) : "nothing"}`);
   lines.push(`- resources: ${s.resources.length ? s.resources.map((r) => `${r.name} ${r.count} tiles, ${thousands(r.amount)} total (nearest ${bearing(here, r)})`).join(", ") : "none"}`);
   if (s.other.length) lines.push(`- other: ${named(s.other)}`);
+  if (s.salvage.length) lines.push(`- inside ${s.salvage_containers} of those containers (mining one by hand takes what's inside): ${s.salvage.map((i) => `${i.name} ${i.count}`).join(", ")}`);
   lines.push(`- trees ${s.trees}, rocks ${s.rocks}, water tiles ${s.water_tiles}, enemies ${s.enemies}`);
   return lines;
 }

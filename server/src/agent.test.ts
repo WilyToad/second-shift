@@ -410,7 +410,7 @@ function firstHourGame() {
     async call(action: ActionName, args?: any): Promise<any> {
       calls.push({ action, args });
       if (action === "player_status") return { character: true, surface: "nauvis", x: 0, y: 0, items: [{ name: "iron-plate", count: 8 }], total_items: 1, craftable: [{ name: "iron-gear-wheel", count: 4 }], more_craftable: false, crafting_queue: [], recent_builds: [{ name: "stone-furnace", ghost: false, surface: "nauvis", x: 3, y: 0, age_ticks: 120, still_there: true }] };
-      if (action === "surroundings") return { surface: "nauvis", x: 0, y: 0, radius: 32, mine: [{ name: "stone-furnace", count: 1, x: 3, y: 0 }], resources: [{ name: "iron-ore", count: 200, amount: 90000, x: 0, y: -15 }], other: [], trees: 40, rocks: 2, enemies: 0, water_tiles: 0 };
+      if (action === "surroundings") return { surface: "nauvis", x: 0, y: 0, radius: 32, mine: [{ name: "stone-furnace", count: 1, x: 3, y: 0 }], resources: [{ name: "iron-ore", count: 200, amount: 90000, x: 0, y: -15 }], other: [], trees: 40, rocks: 2, enemies: 0, water_tiles: 0, salvage: [], salvage_containers: 0 };
       if (action === "research_options") return { options: [], available: 0, queue: [], triggers: [{ name: "electronics", trigger: "craft 10 copper-cable" }] };
       throw new Error(`unexpected ${action}`);
     },
@@ -428,7 +428,7 @@ test("S22: 'yeah' after an offer to look around looks, and the guidance never ru
   const turn = model.seen[1]!.at(-1)!.content;
   expect(turn).toContain("[the player right now]");
   expect(turn).toContain("player's recent builds, newest first: stone-furnace 3 tiles east");
-  expect(turn).toContain("- built: stone-furnace 1");
+  expect(turn).toContain("- the player's own (built or owned): stone-furnace 1");
   expect(turn).not.toContain("no tool call");
   expect(turn).not.toContain("data provided");
 });
