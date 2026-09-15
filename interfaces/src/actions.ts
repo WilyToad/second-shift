@@ -99,7 +99,7 @@ const ApplyResultSchema = z.object({
 export const GameEventSchema = z.object({
   seq: z.number(),
   tick: z.number(),
-  kind: z.enum(["alert", "research_finished", "selection"]),
+  kind: z.enum(["alert", "research_finished", "selection", "talk"]),
   severity: z.enum(["critical", "warning", "info"]),
   type: z.string().optional(),
   count: z.number().optional(),
@@ -148,6 +148,7 @@ export const actions = {
   mark_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
   cancel_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
   events: { args: z.object({ since: z.number().default(0) }), data: EventsSchema, kind: "look" },
+  debug_push_talk: { args: z.object({}), data: z.object({ seq: z.number() }), kind: "look" },
   research_options: {
     args: z.object({}),
     data: z.object({

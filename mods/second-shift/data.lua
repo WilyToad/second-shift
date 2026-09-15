@@ -2,6 +2,15 @@
 local icon = "__base__/graphics/icons/blueprint.png"
 
 data:extend({
+  -- Push to talk from the game (FC-147): the console on the second monitor starts listening. Rebindable under
+  -- Controls → Mods. Alt+V matches the console's own shortcut.
+  {
+    type = "custom-input",
+    name = "second-shift-talk",
+    key_sequence = "ALT + V",
+    consuming = "none",
+    order = "a",
+  },
   {
     type = "selection-tool",
     name = "companion-selection-tool",

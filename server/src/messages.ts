@@ -29,7 +29,9 @@ export type ServerMessage =
   | { type: "blueprint"; blueprint: BlueprintCard }
   | { type: "image"; url: string; caption: string }
   | { type: "transcript"; items: { kind: "user" | "agent"; text: string }[] }
-  | { type: "reset" };
+  | { type: "reset" }
+  // The player pressed the push-to-talk key in the game (FC-147).
+  | { type: "talk" };
 
 export type ClientMessage =
   | { type: "ask"; text: string; thinking?: boolean }

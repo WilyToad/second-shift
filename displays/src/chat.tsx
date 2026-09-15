@@ -3,6 +3,7 @@ import { useEffect, useRef } from "preact/hooks";
 import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
 import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
+import { deviceStatus, finishListening, heard, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, startListening, stopListening, stopSpeaking, voiceError } from "./voice";
 
 /** Bold and inline code the model writes in Markdown (`**1,493/min**`, `` `iron-plate` ``) render as such, not as raw marks (FC-125). */
 export function Emphasis({ text }: { text: string }) {
@@ -96,30 +97,85 @@ export function Thread() {
   );
 }
 
-export function Composer() {
+function MicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
+      <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" fill="currentColor" />
+      <path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+    </svg>
+  );
+}
+
+/** Where the voice goes, in the player's words (FC-062): the browser may send it to its speech service. */
+export function whereLabel(where: string): string {
+  return where === "on-device" ? "Voice is recognized on this device." : where === "speech-service" ? "Voice is sent to your browser's speech service to turn it into text." : "";
+}
+
+export function Composer({ onAsk = (text: string, thinking: boolean) => send({ type: "ask", text, thinking }), recognition = recognitionCtor() }: { onAsk?: (text: string, thinking: boolean) => void; recognition?: ReturnType<typeof recognitionCtor> } = {}) {
   const text = useSignal("");
   const thinking = useSignal(false);
   const submit = () => {
     const value = text.value.trim();
     if (!value) return;
-    send({ type: "ask", text: value, thinking: thinking.value });
+    stopSpeaking();
+    onAsk(value, thinking.value);
     text.value = "";
   };
+  const listening = listenState.value === "listening";
+  const toggleMic = (fromGame = false) => {
+    if (listenState.peek() === "listening") finishListening();
+    else startListening((spoken) => { stopSpeaking(); onAsk(spoken, thinking.value); }, recognition, undefined, { fromGame });
+  };
+  // Push to talk from the game (FC-147): each press toggles, like clicking Talk.
+  const seenTalk = useRef(talkRequests.peek());
+  useEffect(() => {
+    if (!recognition || talkRequests.value === seenTalk.current) return;
+    seenTalk.current = talkRequests.value;
+    toggleMic(true);
+  }, [talkRequests.value]);
+  // Option+V (Alt+V) talks from anywhere on the page; Escape cancels listening or speech.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (recognition && e.altKey && e.code === "KeyV") { e.preventDefault(); toggleMic(); }
+      if (e.key === "Escape") { stopListening(); stopSpeaking(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
   return (
     <form id="composer" onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <label for="ask" class="visually-hidden">Ask the companion</label>
       <textarea
-        id="ask" rows={2} value={text.value} placeholder="Ask about your factory, e.g. “how many rails are near me on the right?”"
+        id="ask" rows={2} value={listening && heard.value ? heard.value : text.value} placeholder={listening ? "Listening…" : "Ask about your factory, e.g. “how many rails are near me on the right?”"}
         onInput={(e) => (text.value = e.currentTarget.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
       />
       <div class="bar">
-        <label><input type="checkbox" id="thinking" checked={thinking.value} onChange={(e) => (thinking.value = e.currentTarget.checked)} /> Think it through</label>
+        <span class="voice">
+          <label><input type="checkbox" id="thinking" checked={thinking.value} onChange={(e) => (thinking.value = e.currentTarget.checked)} /> Think it through</label>
+          <label title="Reads each answer aloud as it arrives"><input type="checkbox" id="read-aloud" checked={readAloud.value} onChange={(e) => { readAloud.value = e.currentTarget.checked; saveSetting("second-shift.readAloud", readAloud.value); if (!readAloud.value) stopSpeaking(); }} /> Read answers aloud</label>
+        </span>
         <span>
           <button type="button" class="cancel" onClick={() => send({ type: "reset" })}>New conversation</button>{" "}
+          {recognition && (
+            <button type="button" id="mic" class={`mic${listening ? " listening" : ""}`} aria-pressed={listening} title="Talk (Option+V). Click again to send, Escape to cancel." onClick={() => toggleMic()}>
+              <MicIcon /> {listening ? "Listening" : "Talk"}
+            </button>
+          )}{" "}
           <button type="submit">Send</button>
         </span>
       </div>
+      {recognition && (voiceError.value || listening) && (
+        <div class={`voice-note${voiceError.value ? " error" : ""}`} role="status">{voiceError.value ?? whereLabel(recognizedWhere.value)}</div>
+      )}
+      {recognition && !voiceError.value && (deviceStatus.value === "downloadable" || deviceStatus.value === "downloading") && (
+        <div class="voice-note">
+          Voice goes to your browser's speech service.{" "}
+          <button type="button" class="link" id="on-device" disabled={deviceStatus.value === "downloading"} onClick={() => void installOnDevice(recognition)}>
+            {deviceStatus.value === "downloading" ? "Downloading on-device recognition…" : "Recognize on this device instead"}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

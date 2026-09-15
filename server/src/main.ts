@@ -78,7 +78,7 @@ const server = Bun.serve({
         ws.send(JSON.stringify({ type: "series", series: buildSeries(game.history()) } satisfies ServerMessage));
         ws.send(JSON.stringify({ type: "digest", digest: latest.digest, receivedAt: latest.receivedAt } satisfies ServerMessage));
       }
-      const recent = game.events();
+      const recent = game.events().filter((e) => e.kind !== "talk"); // an old key press must not start listening
       if (recent.length) ws.send(JSON.stringify({ type: "events", events: recent } satisfies ServerMessage));
     },
     message(_ws, raw) {
@@ -139,8 +139,11 @@ game.onStatus((s) => {
     broadcast({ type: "digest", digest: s.latest.digest, receivedAt: s.latest.receivedAt });
   }
 });
-game.onEvents((events, dropped) => {
-  broadcast({ type: "events", events, ...(dropped ? { dropped } : {}) });
+game.onEvents((all, dropped) => {
+  // A push-to-talk press goes to the pages as its own message and never into the alert feed (FC-147).
+  if (all.some((e) => e.kind === "talk")) broadcast({ type: "talk" });
+  const events = all.filter((e) => e.kind !== "talk");
+  if (events.length || dropped) broadcast({ type: "events", events, ...(dropped ? { dropped } : {}) });
   // The player dragged the companion's selection tool over a build: review it like a pasted blueprint (FC-046).
   for (const e of events) if (e.kind === "selection" && e.count) busy = busy.then(() => reviewSelection(e.seq));
 });

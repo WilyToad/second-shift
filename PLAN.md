@@ -578,6 +578,13 @@ and car driving is last, split into a spike and an implementation.
 - Background Factorio test instance for measuring blueprints
 - ~~Session memory across play sessions~~ done in S18 (FC-063) and per map in S22 (FC-137)
 
+**Voice (S26, decided by the player 2026-09-15):** the Web Speech API in the console, as in Chrome's demo; Brave
+doesn't work and that's fine. Recognition prefers the device: Chrome 153 reports on-device recognition as
+"downloadable" for en-US with `install()`, so the console offers the one-time download and uses `processLocally` after.
+Until then voice goes to Chrome's speech service and the console says so, and the README qualifies "nothing is sent to
+the cloud". Answers are read with a local voice (`localService`) sentence by sentence as they stream. The game's
+push-to-talk key (custom input `second-shift-talk`, Alt+V) reaches the console in ~80 ms through the event feed.
+
 **Phase 5 — character control** (was Phase 3b)
 - Stop hotkey first; decide how agent control and the player's own inputs interact (§8 Q11)
 - `mine_by_hand`, `craft`, `transfer_items`, each with a confirm

@@ -5,6 +5,7 @@ import type { ClientMessage, ServerMessage } from "../../server/src/messages";
 import type { Plan } from "../../server/src/planner";
 import type { BlueprintCard } from "../../server/src/messages";
 import type { Point, SeriesMap } from "../../server/src/series";
+import { answerSpeech, talkRequests } from "./voice";
 
 export type ThreadItem =
   | { kind: "user"; key: number; text: string }
@@ -40,11 +41,13 @@ export function onMessage(m: ServerMessage): void {
       break;
     case "user":
       append({ kind: "user", key: keys++, text: m.text });
+      answerSpeech.onQuestion();
       streaming = { kind: "agent", key: keys++, text: signal(""), meta: signal(null), plan: signal(null), blueprint: signal(null), images: signal([]) };
       append(streaming);
       break;
     case "token":
       if (streaming) streaming.text.value += m.text;
+      answerSpeech.onToken(m.text);
       break;
     case "tool": {
       // Tool summaries go just above the answer that's streaming.
@@ -55,6 +58,7 @@ export function onMessage(m: ServerMessage): void {
       break;
     }
     case "done":
+      answerSpeech.onDone();
       if (streaming) {
         streaming.meta.value = `first token ${m.ttftMs ? (m.ttftMs / 1000).toFixed(1) : "?"} s · total ${(m.totalMs / 1000).toFixed(1)} s · prompt ${m.promptTokens ?? "?"} tok (${m.cachedTokens ?? 0} cached) · ${m.completionTokens ?? "?"} tok out`;
         // A turn that only produced tool calls and a card leaves an empty bubble; drop it.
@@ -74,7 +78,11 @@ export function onMessage(m: ServerMessage): void {
       append({ kind: "error", key: keys++, text: m.message });
       streaming = null;
       break;
+    case "talk":
+      talkRequests.value++;
+      break;
     case "reset":
+      answerSpeech.onQuestion();
       thread.value = [];
       streaming = null;
       break;

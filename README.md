@@ -20,7 +20,7 @@ reads the answer from the running game and your save's own recipe data. When you
 shows you exactly what will happen and waits for your OK. It never plays the game for you.
 
 Everything runs on your machine: the game, a small mod, a local server and a local language model. Nothing is sent to
-the cloud.
+the cloud, unless you talk to it with voice input and your browser uses its online speech service (see [Talk to it](#talk-to-it)).
 
 > **Status: early.** It works end to end on the author's macOS machine with a heavily modded Space Age save. It
 > hasn't been tried on Windows or Linux yet, and it only talks to a local oMLX model for now. See [Requirements](#requirements) before you start.
@@ -52,6 +52,17 @@ Click the **Show the companion a build** shortcut in-game and drag over part of 
 it: what's there, whether the belts and inserters keep up, and anything that looks wrong.
 
 <img src="docs/media/selection-review.png" alt="A review of a selected build: 22 entities, the throughput of each input, and a layout sketch" width="880">
+
+### Talk to it
+
+Click **Talk** in the console, or press **Alt+V** in the console or in the game, and ask out loud. Press it again to
+send, or just stop talking; Escape cancels. Tick **Read answers aloud** to hear each answer as it arrives.
+
+Voice uses the browser's [Web Speech API](https://webaudio.github.io/web-speech-api/), so it needs Chrome (it doesn't
+work in Brave). By default Chrome sends your voice to its online speech service to turn it into text. Click
+**Recognize on this device instead** under the composer for a one-time download, and after that recognition stays on
+your Mac. Answers are read with a voice on your Mac when one is installed. The in-game key is **Talk to Second
+Shift** under **Settings → Controls → Mods**.
 
 ### Also
 
@@ -185,6 +196,9 @@ The full design, measurements and decisions are in [`PLAN.md`](PLAN.md).
 | Steam asks to "launch with custom arguments" | Make sure Steam is running; always start the game through `bun run launch` |
 | `game: not connected` in the console | The game isn't hosted, or is still loading. A single-player game can't connect: use **Multiplayer → Host new game** or `bun run launch`. The server keeps retrying, so there's no need to restart it |
 | `model: error` | Check that oMLX is running on port 8888, the model name matches `COMPANION_MODEL`, and `~/.omlx/settings.json` has an API key |
+| Voice says the microphone is blocked | Allow the microphone for `127.0.0.1:5170` from the icon in Chrome's address bar |
+| Voice says the speech service couldn't be reached | Use Chrome with a network connection, or click **Recognize on this device instead** once |
+| Alt+V in the game doesn't start listening | Click **Talk** once in the console tab first so Chrome allows it; check the key under Controls → Mods |
 | The first answer is very slow | The model is loading or its cache is cold. Later answers are faster |
 
 ## Development

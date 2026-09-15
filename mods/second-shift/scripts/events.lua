@@ -50,6 +50,20 @@ end
 return function(handlers)
   util.on_nth_tick(SAMPLE_EVERY_TICKS, sample_alerts)
 
+  -- The player's push-to-talk key (FC-147): one event per press, read by the console. Only the player the
+  -- companion rides with can start it.
+  script.on_event("second-shift-talk", function(e)
+    local player = companion_player()
+    if not (player and player.index == e.player_index) then return end
+    push({ kind = "talk", severity = "info" })
+  end)
+
+  -- Test tooling: the same event a key press makes (custom inputs can't be raised from script).
+  handlers.debug_push_talk = function()
+    push({ kind = "talk", severity = "info" })
+    return { seq = state().seq }
+  end
+
   script.on_event(defines.events.on_research_finished, function(e)
     if e.research.force.name ~= "player" then return end
     push({ kind = "research_finished", severity = "info", research = e.research.name })
