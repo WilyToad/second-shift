@@ -47,7 +47,7 @@ return function(handlers)
     local found = surface.find_entities_filtered(filter)
     local visible_chunk = {}
     local entities, by_name, hidden = {}, {}, 0
-    local count, not_visible = 0, 0
+    local count = 0
     for _, e in ipairs(found) do
       if e.prototype.hidden then
         hidden = hidden + 1
@@ -58,9 +58,9 @@ return function(handlers)
           count = count + 1
           by_name[e.name] = (by_name[e.name] or 0) + 1
           if #entities < MAX_RESULTS then entities[#entities + 1] = { name = e.name, x = e.position.x, y = e.position.y } end
-        else
-          not_visible = not_visible + 1
         end
+        -- Entities in chunks the player can't see aren't counted at all: even a count tells the companion
+        -- something the player couldn't know (FC-142).
       end
     end
     return {
@@ -72,7 +72,6 @@ return function(handlers)
       area = area,
       count = count,
       by_name = by_name,
-      not_visible = not_visible,
       entities = entities,
       truncated = count > #entities,
     }

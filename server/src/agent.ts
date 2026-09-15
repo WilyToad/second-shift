@@ -18,7 +18,7 @@ import type { ChatMessage, ChatModel, StreamResult, ToolCall, ToolSpec } from ".
 import { buildMessages, formatSnapshot, userTurn } from "./prompt";
 import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
-import { acceptedOffer, craftableRecipes, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -235,7 +235,7 @@ export function needsWorldTools(question: string, hasLastResult: boolean): boole
   const q = question.toLowerCase();
   if (/\b(near|nearby|around me|next to me|close to me|here|to my|on my|of me|in view|on screen|visible)\b/.test(q)) return true;
   // Looking around and the player's own builds are world questions too (S22: "yeah, look around" got "I can't see").
-  if (/\b(look around|look at (this|here|that)|what'?s around|what do you see|what can you see|surroundings|explore)\b/.test(q)) return true;
+  if (/\b(look around|look at (this|here|that)|what'?s around|what do you see|what can you see|surroundings|explore|scan\w*|search wider|look (further|wider|farther))\b/.test(q)) return true;
   if (/\b(i (just |have |'ve )?(built|placed|put down)|what (did|have) i (just )?(build|built|place|placed|make|made))\b/.test(q)) return true;
   if (/\b(find|search|look for|highlight|show me|where are|count|which)\b/.test(q)) return true;
   if (/\b(mark|unmark|deconstruct\w*|remove|delete|clear|cancel|upgrade\w*|queue|start research\w*|research it|tag|pin|camera|jump|take me|paste|place|build it)\b/.test(q)) return true;
@@ -494,10 +494,15 @@ export class Agent {
       world || !answeredFromData ? "" : "no tool call is needed",
       // With a fresh look already in the lines, the model still searched twice, narrating "let me scan wider" (S22 eval).
       around && !searchAgain ? "the surroundings lines are a fresh look, so don't search again unless the player asks for a wider search" : "",
+      lootNote(status, around),
       chart ? "" : "no chart block",
       searchAgain ? "call find_entities again for this question, even if an earlier result looks similar" : "",
       start ? "base next steps only on the inventory, hand-craftable, recipe, surroundings and research lines; name no item, building or technology that isn't in them"
         : playerLines.length ? "name no item, building or technology that isn't in the lines above" : "",
+      // "That's 50 iron plates from the debris" with 1 in the inventory (FC-140).
+      status?.character ? "any count of what the player has comes from the inventory line, exactly" : "",
+      // "look around" answered with "burner-inserter (1 iron-plate + 1 gear)" from an earlier turn's memory (S24 eval).
+      playerLines.length && !found?.lines.length && !craftableRecipes(status).length ? "give no recipe ingredients or amounts: this turn has no recipe lines" : "",
     ].filter(Boolean);
     // Blueprint requests are built in code; the model only explains the result (S14).
     const requested = !pasted.summaries.length && wantsBlueprint(question) ? this.blueprintFor(question, found?.items ?? []) : null;
@@ -784,8 +789,6 @@ export class Agent {
     this.deps.emit({ type: "tool", summary: `${summary}${r.count ? ` Highlighted in-game for ${HIGHLIGHT_SECONDS} s.` : ""}` });
     return [
       summary,
-      // Nothing about what's in chunks the player can't see: its count is a helmet-rule leak, and answers repeated it
-      // ("1,580 ore tiles exist in chunks you can't see", S23 eval). Their own machines (findStuck) are different.
       r.truncated ? `Only the first ${r.entities.length} are remembered.` : "",
       r.count ? `They are highlighted in-game for ${HIGHLIGHT_SECONDS} s and remembered as the last result.` : "",
       // After "0 found" an answer still placed "the big patch 82 tiles south-west" (FC-139).
@@ -812,7 +815,7 @@ export class Agent {
     for (const c of candidates.slice(0, 2)) {
       const r = await this.deps.game.call("find_machines", { recipe: c.recipe, surface: c.surface });
       const statuses = Object.entries(r.by_status).map(([st, n]) => `${st.replace(/_/g, " ")} ${n}`).join(", ");
-      parts.push(`${r.count} ${c.recipe} machines not working on ${c.surface}${statuses ? ` (${statuses})` : ""}${r.not_visible ? `, ${r.not_visible} more in chunks the player can't see` : ""}${r.same_surface ? "" : " (not highlighted: the player is on another surface)"}`);
+      parts.push(`${r.count} ${c.recipe} machines not working on ${c.surface}${statuses ? ` (${statuses})` : ""}${r.not_visible ? `, and ${r.not_visible} more elsewhere in their own factory, out of view (not highlighted)` : ""}${r.same_surface ? "" : " (not highlighted: the player is on another surface)"}`);
       if (r.same_surface) refs = [...refs, ...r.entities];
     }
     if (refs.length) {

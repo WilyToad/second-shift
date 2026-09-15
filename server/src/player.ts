@@ -21,7 +21,7 @@ const START = /\b(what (should|do|can) i do|what (should|do|can) i (build|make|c
 // "How do I craft X?" is a recipe question; only what the player can craft or has counts here.
 const CARRY = /\b(inventory|carrying|holding|in my hands?|what do i have|have on me|what (can|could|should) i (hand ?)?(craft|make)|can i (hand ?)?craft|craftable|craft (right )?now|pick(ed)? up|debris|wreck\w*|materials)\b/i;
 const BUILT = /\b(i (just |have |'ve )?(built|placed|put down|set up)|what (did|have) i (just )?(build|built|place|placed|make|made)|what you('ve| have)? ?(just )?(built|placed|made)|my (last|latest|new|recent) builds?|i just (made|build) (something|a|an|some))\b/i;
-const LOOK = /\b(look around|look at (this|here|what)|what'?s (around|nearby|here|near me)|what is (around|nearby|here|near me)|around (me|here)|what do you see|what can you see|can you see|see what|surroundings|found (some |an? |the )?[\w -]{0,24}\b(ore|resources?|patch|water|oil|coal|stone|trees|rocks)|where('?s| is| are| can i find) (the |some )?(nearest |closest )?[\w -]{0,24}\b(ore|resources?|water|coal|stone|oil)\b|explore)\b/i;
+const LOOK = /\b(scan\w*|search (wider|further|around|for (ore|resources?|coal|iron|copper|stone|trees))|look (further|wider|farther)|look around|look at (this|here|what)|what'?s (around|nearby|here|near me)|what is (around|nearby|here|near me)|around (me|here)|what do you see|what can you see|can you see|see what|surroundings|found (some |an? |the )?[\w -]{0,24}\b(ore|resources?|patch|water|oil|coal|stone|trees|rocks)|where('?s| is| are| can i find) (the |some )?(nearest |closest )?[\w -]{0,24}\b(ore|resources?|water|coal|stone|oil)\b|explore)\b/i;
 
 export function wantsStartAdvice(text: string): boolean {
   return START.test(text);
@@ -31,8 +31,11 @@ export function wantsPlayerStatus(text: string): boolean {
   return START.test(text) || CARRY.test(text) || BUILT.test(text);
 }
 
+// Loot talk needs the wreckage line: without it, answers called the loot "scrap" (FC-141).
+const SALVAGE = /\b(debris|wreck\w*|crash(ed)? ?(site|ship)|salvage|loot\w*)\b/i;
+
 export function wantsSurroundings(text: string): boolean {
-  return START.test(text) || LOOK.test(text) || BUILT.test(text);
+  return START.test(text) || LOOK.test(text) || BUILT.test(text) || SALVAGE.test(text);
 }
 
 const COMPASS = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"];
@@ -51,6 +54,16 @@ const thousands = (n: number) => (n >= 10_000 ? `${Math.round(n / 1000)}k` : Str
 /** Recipes for what the player can hand-craft now, so ingredient claims come from the save (FC-139). */
 export function craftableRecipes(s: PlayerStatus | null, max = 10): string[] {
   return s?.character ? s.craftable.slice(0, max).map((c) => c.name) : [];
+}
+
+/**
+ * A turn note when wreckage loot is in view and nothing called scrap is (FC-141): the model kept calling crash-site
+ * loot "scrap" from memory. Scrap is a real Space Age item (Fulgora), so the note is skipped whenever the data has it.
+ */
+export function lootNote(status: PlayerStatus | null, around: Surroundings | null): string {
+  if (!around?.salvage.length) return "";
+  const names = [...(status?.items ?? []), ...(status?.craftable ?? []), ...around.salvage, ...around.resources, ...around.other, ...around.mine].map((x) => x.name);
+  return names.some((n) => /scrap/.test(n)) ? "" : `wreckage loot is ${around.salvage.map((i) => i.name).join(", ")}: use those item names and never call it scrap`;
 }
 
 export function formatPlayerStatus(s: PlayerStatus, opts: { builds?: boolean } = {}): string[] {
@@ -83,7 +96,7 @@ export function formatSurroundings(s: Surroundings): string[] {
   lines.push(`- resources${reach}: ${s.resources.length ? s.resources.map((r) => `${r.name} ${r.count} tiles, ${thousands(r.amount)} total (nearest ${bearing(here, r)})`).join(", ") : "none"}`);
   if (s.other.length) lines.push(`- other: ${named(s.other)}`);
   // Answers said wreckage gives "scrap" (a Fulgora item) until the contents were listed as the only loot (S22 eval).
-  if (s.salvage.length) lines.push(`- wreckage and other containers here hold only: ${s.salvage.map((i) => `${i.name} ${i.count}`).join(", ")} (in ${s.salvage_containers}; mining one by hand takes those items and nothing else: call them by these names, not scrap)`);
+  if (s.salvage.length) lines.push(`- wreckage and other containers here hold only: ${s.salvage.map((i) => `${i.name} ${i.count}`).join(", ")} (in ${s.salvage_containers}; still inside the wreckage, not in the player's inventory; mining one by hand takes those items and nothing else)`);
   lines.push(`- trees ${s.trees}, rocks ${s.rocks}, water tiles ${s.water_tiles}, enemies ${s.enemies}`);
   return lines;
 }

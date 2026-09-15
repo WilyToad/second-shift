@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PlayerStatusSchema, SurroundingsSchema } from "@companion/interfaces";
-import { acceptedOffer, bearing, craftableRecipes, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, bearing, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 test("a short yes takes up the question the last answer offered", () => {
   const last = "Start by mining iron.\n\nWant me to look around to see what you built?";
@@ -20,7 +20,7 @@ test("first-hour questions fetch what the player has and sees", () => {
     expect(wantsSurroundings(q)).toBe(true);
   }
   for (const q of ["what can I craft right now?", "what's in my inventory?", "I just picked up a bunch of debris from a crashed ship!"]) expect(wantsPlayerStatus(q)).toBe(true);
-  for (const q of ["yeah, look around", "I think I found some ore", "where's the nearest coal?", "what do you see?"]) expect(wantsSurroundings(q)).toBe(true);
+  for (const q of ["yeah, look around", "I think I found some ore", "where's the nearest coal?", "what do you see?", "Want me to scan wider for ore? yeah"]) expect(wantsSurroundings(q)).toBe(true);
   for (const q of ["I just built something", "what did I just place?"]) {
     expect(wantsPlayerStatus(q)).toBe(true);
     expect(wantsSurroundings(q)).toBe(true);
@@ -72,7 +72,7 @@ test("surroundings lines name resources with amounts and where the nearest is", 
   expect(text).toContain("iron-ore 300 tiles, 245k total (nearest 20 tiles north)");
   expect(text).toContain("crash-site-spaceship-wreck-big-1 1 (nearest 10 tiles west)");
   expect(text).toContain("trees 120, rocks 3, water tiles 0, enemies 0");
-  expect(text).toContain("wreckage and other containers here hold only: iron-plate 8 (in 1; mining one by hand takes those items and nothing else: call them by these names, not scrap)");
+  expect(text).toContain("wreckage and other containers here hold only: iron-plate 8 (in 1; still inside the wreckage, not in the player's inventory; mining one by hand takes those items and nothing else)");
 });
 
 test("FC-139: resources looked for further out say so; craftable recipes come with their lines", () => {
@@ -86,4 +86,14 @@ test("FC-139: resources looked for further out say so; craftable recipes come wi
   expect(craftableRecipes(status)).toEqual(["iron-gear-wheel"]);
   expect(craftableRecipes({ ...status, character: false })).toEqual([]);
   expect(craftableRecipes(null)).toEqual([]);
+});
+
+test("FC-141: wreckage loot gets a 'not scrap' note, unless the data really has scrap (Fulgora)", () => {
+  const base = { surface: "nauvis", x: 0, y: 0, radius: 32, mine: [], other: [{ name: "crash-site-spaceship-wreck-big-1", count: 1, x: -20, y: 0 }], resources: [], trees: 0, rocks: 0, enemies: 0, water_tiles: 0 };
+  const wreck = SurroundingsSchema.parse({ ...base, salvage: [{ name: "iron-plate", count: 8 }], salvage_containers: 1 });
+  expect(lootNote(null, wreck)).toBe("wreckage loot is iron-plate: use those item names and never call it scrap");
+  const fulgora = SurroundingsSchema.parse({ ...base, surface: "fulgora", salvage: [{ name: "iron-plate", count: 8 }], salvage_containers: 1, resources: [{ name: "scrap", count: 200, amount: 90000, x: 5, y: 5 }] });
+  expect(lootNote(null, fulgora)).toBe("");
+  expect(lootNote(null, SurroundingsSchema.parse({ ...base, salvage: [], salvage_containers: 0 }))).toBe("");
+  expect(wantsSurroundings("I just picked up a bunch of debris from a crashed ship!")).toBe(true);
 });

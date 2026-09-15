@@ -557,11 +557,34 @@ test("FC-130: a doubled answer reaches the page and the history once, and the tu
 test("helmet: a search result never tells the model what's in chunks the player can't see", async () => {
   const game = fakeGame([]);
   const call = game.game.call.bind(game.game);
+  // An older mod still sent the count; the server must not pass it on either (FC-142).
   game.game.call = async (action: any, args?: any) => (action === "find_entities" ? { ...(await call(action, args)), not_visible: 1580 } : call(action, args));
   const { agent, model } = setup([{ tool: "find_entities", args: { what: "rails" } }, { text: "None nearby." }], game);
   await agent.ask("any rails near me?");
   const toolMsg = model.seen[1]!.at(-1)!.content;
   expect(toolMsg).toContain("Found 0 rails");
   expect(toolMsg).not.toContain("1580");
+  expect(toolMsg).not.toContain("can't see");
+});
+
+test("FC-142: own stuck machines out of view are counted as elsewhere in the factory, never as 'chunks you can't see'", async () => {
+  const digest = DigestSchema.parse({
+    tick: 1, player: { name: "p", surface: "nauvis", position: { x: 0, y: 0 } }, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {},
+    machines: { progress: { machines: 42, scanned: true, refresh_ticks: 1 }, stuck: [{ surface: "nauvis", recipes: [{ recipe: "iron-gear-wheel", total: 42, stuck: 42, statuses: { item_ingredient_shortage: 42 } }] }] },
+  });
+  const game: GameActions = {
+    latest: () => ({ digest, receivedAt: 0 }),
+    async call(action: any): Promise<any> {
+      if (action === "find_machines") return { surface: "nauvis", recipe: "iron-gear-wheel", count: 12, not_visible: 30, same_surface: true, by_status: { item_ingredient_shortage: 12 }, entities: [{ name: "assembling-machine-2", x: 1, y: 1 }] };
+      if (action === "highlight") return { drawn: 1, seconds: 10 };
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  const model = fakeModel([{ tool: "find_stuck_machines", args: { what: "iron gear wheel" } }, { text: "12 here, 30 more elsewhere." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask("show me the stuck iron gear wheel assemblers");
+  const toolMsg = model.seen[1]!.at(-1)!.content;
+  expect(toolMsg).toContain("12 iron-gear-wheel machines not working on nauvis");
+  expect(toolMsg).toContain("30 more elsewhere in their own factory, out of view");
   expect(toolMsg).not.toContain("can't see");
 });

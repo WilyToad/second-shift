@@ -76,7 +76,11 @@ check("the new map starts with no conversation from another map", switched >= 0 
 const turns = new URL("../data/eval/turns.jsonl", import.meta.url).pathname;
 const lastTurn = async () => JSON.parse((await Bun.file(turns).text()).trim().split("\n").at(-1)!);
 const turnsByQuestion: { q: string; text: string; turn: any }[] = [];
+// The inventory when each question was asked: counts an answer gives are checked against it (FC-140).
+const inventoryAt: Record<string, Record<string, number>> = {};
 const send = async (text: string) => {
+  const inv = await call("player_status");
+  inventoryAt[text] = Object.fromEntries((inv.items as { name: string; count: number }[]).map((i) => [i.name, i.count]));
   answer = "";
   const done = new Promise<ServerMessage>((r) => (onDone = r));
   ws.send(JSON.stringify({ type: "ask", text }));
@@ -195,7 +199,7 @@ const memory = all.filter(([, a]) => MEMORY.test(a));
 check("no answer repeats vanilla-memory mistakes (craft a pickaxe or axe, scrap)", memory.length === 0, memory.map(([q]) => q).join(" | "));
 // FC-139: details the data contradicts.
 // A build the answer says the player made must be in the build record.
-const builtClaims = all.flatMap(([q, a]) => [...a.matchAll(/\byou(?:'ve| have)? (?:just )?(?:placed|built|put down|set up) (?!with |for |it |that |this |in |on |to |so |and |there |here )(?:a |an |your |the )?([a-z][a-z0-9 -]{2,40}?)(?= \d| tiles|,|\.|!| to | at | near | next | south| north| east| west| —|$)/gi)].map((m) => ({ q, said: m[1]! })));
+const builtClaims = all.flatMap(([q, a]) => [...a.matchAll(/\byou(?:'ve| have)? (?:just )?(?:placed|built|put down|set up) (?:a |an |your |the )([a-z][a-z0-9 -]{2,40}?)(?= \d| tiles|,|\.|!| to | at | near | next | south| north| east| west| —|$)/gi)].map((m) => ({ q, said: m[1]! })));
 const wrongBuilds = builtClaims.filter((c) => !buildNames.some((n) => norm(c.said).includes(norm(n))));
 check("named builds match the build record", wrongBuilds.length === 0, wrongBuilds.map((c) => `"${c.said}" in: ${c.q}`).join(" | ") || `${builtClaims.length} claims, record: ${buildNames.join(", ")}`);
 // An ore the answer places near the player must be among the resources the player can see (out to 96 tiles).
@@ -210,15 +214,30 @@ const clauses = (a: string) => a.split(/(?<=[.!?])\s+|\n+|\s+[—–]\s+|;\s+/).
 const oreClaims = all.flatMap(([q, a]) => clauses(a).filter((c) => absent.some((o) => c.includes(o)) && LOCATES.test(c) && !HEDGES.test(c)).map((c) => `${q}: ${c.slice(0, 100)}`));
 check("ore claims match what's around", oreClaims.length === 0, oreClaims.join(" | ") || `absent: ${absent.join(", ")}`);
 // Ingredient amounts on a turn with the player's data need recipe lines in that turn.
-const INGREDIENTS = /\(\s*\d+\s+[a-z][a-z -]+(\s*\+\s*\d+\s+[a-z][a-z -]+)+\s*\)|\bneeds? \d+ [a-z-]+ (plates?|gears?|wheels?|wood|stone)\b/i;
+// "(1 you had + 7 from the wreckage)" is a count, not a recipe: sums that say where things came from don't count.
+const INGREDIENTS = /\((?![^)]*\b(you had|from|already)\b)\s*\d+\s+[a-z][a-z -]+(\s*\+\s*\d+\s+[a-z][a-z -]+)+\s*\)|\bneeds? \d+ [a-z-]+ (plates?|gears?|wheels?|wood|stone)\b/i;
 const ungrounded = turnsByQuestion.filter((t) => INGREDIENTS.test(t.text) && (t.turn.chars.player ?? 0) > 0 && !(t.turn.chars.retrieved > 0));
 check("ingredient claims come with recipe lines", ungrounded.length === 0, ungrounded.map((t) => t.q).join(" | "));
 const leaksHidden = all.filter(([, a]) => /\b(in )?(chunks|areas?|places?) (you|the player) can'?t (currently )?see\b|\bexist in (chunks|areas)\b/i.test(a));
 check("no answer reveals what's in chunks the player can't see (helmet rule)", leaksHidden.length === 0, leaksHidden.map(([q]) => q).join(" | "));
+// Counts of what the player has must match the inventory at that question (FC-140).
+const WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+const singularName = (s: string) => norm(s).trim().replace(/ +/g, " ").replace(/(ch|sh|x)es$/, "$1").replace(/([^s])s$/, "$1");
+const countClaims = turnsByQuestion.flatMap((t) => {
+  const inv = inventoryAt[t.q] ?? {};
+  const claims = [...t.text.matchAll(/\b(?:you(?:'ve| have)? (?:now )?(?:got|have|carry(?:ing)?|holding|picked up)|now you(?:'ve| have)? (?:got )?|that'?s|you'?re carrying|inventory (?:has|holds|shows)(?: just)?) (?:just |only |exactly )?(\d+|one|two|three|four|five|six|seven|eight|nine|ten) ([a-z][a-z -]{2,30}?)(?=[.,;:!)(—]| and | from | in | to | for | now| total|$)/gi)];
+  return claims.flatMap((m) => {
+    const n = /\d/.test(m[1]!) ? Number(m[1]) : WORDS[m[1]!.toLowerCase()]!;
+    const said = singularName(m[2]!.replace(/\b(scrap|more|new|of)\b/gi, ""));
+    const item = Object.keys(inv).find((name) => singularName(name) === said || said.endsWith(singularName(name)));
+    return item && inv[item] !== n ? [`${t.q}: said ${n} ${m[2]}, inventory ${inv[item]}`] : [];
+  });
+});
+check("counts of what the player has match the inventory", countClaims.length === 0, countClaims.join(" | "));
 const unaskedCards = got.filter((m) => m.type === "approval");
 check("no approval cards (nothing was asked for)", unaskedCards.length === 0, unaskedCards.map((m: any) => m.title).join(" | "));
 
-const nags = all.filter(([q, a]) => !RESEARCH.test(q) && /nothing is research|not research|no research/i.test(a));
+const nags = all.filter(([q, a]) => !RESEARCH.test(q) && /\bnothing is (being )?researched?\b|\bnothing is researching\b|\bnot researching\b|\bno research (is )?(running|queued|in progress|going)|\bresearch (has )?(stopped|stalled)/i.test(a));
 check("no answer nags about research on a map without labs", nags.length === 0, nags.map(([q]) => q).join(" | "));
 
 // 4. Back to the dev save: its conversation returns (FC-137).

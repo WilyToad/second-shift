@@ -113,6 +113,10 @@ Mockup: https://claude.ai/code/artifact/433cce2c-e0d4-421d-a875-49a8a582033b
   right (per-surface status, science rates, research, and a view of prompt size and cache use).
   The composer has a "Quick answer / Think it through" switch that maps to `enable_thinking`.
 - **Camera jumps** happen when the player asks for one. It never moves the camera unprompted.
+- **Unseen things stay unseen (decided 2026-09-15, FC-142).** Looks count only what's in chunks the player can see;
+  the mod doesn't even count entities in unseen chunks for `find_entities`. The player's own machines are the exception:
+  stuck machines out of view may be counted, worded as elsewhere in their factory (the player knows their factory, and
+  the live panel already shows stuck counts for every surface).
 - **Suggestions are offered in words (decided 2026-09-15, FC-126).** An action the player didn't ask for (in the
   question, or in an offer they said yes to) isn't run and gets no card: the call is dropped in code (`ASKS_FOR` in
   `server/src/agent.ts`) and the model offers it as a question instead. A yes makes it asked; map changes then still
@@ -380,6 +384,10 @@ second 5-run pass 0.054). Nothing new runs per tick; the player's own builds now
 with an empty inventory and 1.7 ms with plates (asking `get_craftable_count` for all 233 hand recipes measured
 6.8 ms, so it's only asked for recipes the inventory can reach); `surroundings` 1.5 ms at radius 32 (the server's
 default) and 7.6 ms at the 64 cap on a dense Gleba base.
+
+**Re-run after S24 (2026-09-15, `find_entities` stops counting unseen entities, 5 runs):** without 0.624, with 0.708, so
+**0.085 ms/tick**. No per-tick change since S22, but the readings have gone 0.055, 0.070, 0.085: profile per-tick
+script time (`scripts/probes/bench-ticks.ts`) before the next mod change.
 
 **Re-run after S23 (2026-09-15, wider resource look in `surroundings`, 5 runs):** without 0.619, with 0.689, so
 **0.070 ms/tick**, within the noise of 0.055 (nothing new per tick). On demand on the dev save: `surroundings` with no

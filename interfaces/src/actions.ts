@@ -82,7 +82,6 @@ export const FindEntitiesSchema = z.object({
   area: z.object({ left_top: PositionSchema, right_bottom: PositionSchema }),
   count: z.number(),
   by_name: z.preprocess((v) => (Array.isArray(v) ? {} : v), z.record(z.string(), z.number())),
-  not_visible: z.number(),
   from: z.enum(["character", "view"]).optional(),
   entities: luaArray(EntityRefSchema),
   truncated: z.boolean(),
