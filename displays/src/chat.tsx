@@ -3,6 +3,7 @@ import { useEffect, useRef } from "preact/hooks";
 import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
 import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
+import { setSoundsOn, soundsOn } from "./sounds";
 import { chooseVoice, deviceStatus, elevenVoices, voiceChoice, heard, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
 
 const SILENCE_CHOICES = [1, 1.5, 2, 3, 4, 5];
@@ -158,6 +159,7 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
       <div class="bar">
         <span class="voice">
           <label><input type="checkbox" id="thinking" checked={thinking.value} onChange={(e) => (thinking.value = e.currentTarget.checked)} /> Think it through</label>
+          <label title="Short sounds for listening, alerts, research and cards"><input type="checkbox" id="sounds" checked={soundsOn.value} onChange={(e) => setSoundsOn(e.currentTarget.checked)} /> Sounds</label>
           <label title="Reads each answer aloud as it arrives"><input type="checkbox" id="read-aloud" checked={readAloud.value} onChange={(e) => { readAloud.value = e.currentTarget.checked; saveSetting("second-shift.readAloud", readAloud.value); if (!readAloud.value) stopSpeaking(); }} /> Read answers aloud</label>
           {readAloud.value && elevenVoices.value.length > 0 && (
             <label title="ElevenLabs voices send the answer text to ElevenLabs">

@@ -13,6 +13,8 @@ import { join } from "node:path";
 import { USER_DIR } from "./factorio";
 import { SHOT_NAME } from "./screenshots";
 import { ElevenLabs, elevenLabsKey } from "./tts";
+import { SOUND_NAMES, type SoundName } from "./sfx";
+import { existsSync } from "node:fs";
 
 export type { ClientMessage, ServerMessage } from "./messages";
 
@@ -51,6 +53,8 @@ const agent = new Agent({
   session: fileSession(LEGACY_SESSION),
 });
 
+const SOUNDS_DIR = new URL("../../data/sounds", import.meta.url).pathname;
+
 // ElevenLabs voices (FC-148), only when the player has put a key in the environment or .env.
 const tts = elevenLabsKey() ? new ElevenLabs({ key: elevenLabsKey()!, model: process.env.ELEVENLABS_MODEL, defaultVoice: process.env.ELEVENLABS_VOICE_ID }) : null;
 
@@ -64,6 +68,14 @@ const server = Bun.serve({
       const name = req.params.name;
       if (!SHOT_NAME.test(name)) return new Response("Not found", { status: 404 });
       return new Response(Bun.file(join(USER_DIR, "script-output", "companion", name)), { headers: { "content-type": "image/jpeg", "cache-control": "no-store" } });
+    },
+    // Generated sound effects (FC-150, bun run sounds); the page falls back to built-in tones for any that are missing.
+    "/sounds": () => Response.json({ sounds: SOUND_NAMES.filter((n) => existsSync(join(SOUNDS_DIR, `${n}.mp3`))) }),
+    "/sounds/:name": (req) => {
+      const name = req.params.name.replace(/\.mp3$/, "") as SoundName;
+      if (!SOUND_NAMES.includes(name)) return new Response("Not found", { status: 404 });
+      const file = Bun.file(join(SOUNDS_DIR, `${name}.mp3`));
+      return new Response(file, { headers: { "content-type": "audio/mpeg", "cache-control": "no-cache" } });
     },
     "/tts/voices": async () => {
       if (!tts) return Response.json({ available: false, voices: [] });
@@ -102,7 +114,8 @@ const server = Bun.serve({
         ws.send(JSON.stringify({ type: "digest", digest: latest.digest, receivedAt: latest.receivedAt } satisfies ServerMessage));
       }
       const recent = game.events().filter((e) => e.kind !== "talk"); // an old key press must not start listening
-      if (recent.length) ws.send(JSON.stringify({ type: "events", events: recent } satisfies ServerMessage));
+      // Marked as a replay: old alerts fill the feed without making sounds (FC-150).
+      if (recent.length) ws.send(JSON.stringify({ type: "events", events: recent, replay: true } satisfies ServerMessage));
     },
     message(_ws, raw) {
       const msg = JSON.parse(String(raw)) as ClientMessage;

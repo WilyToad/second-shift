@@ -22,7 +22,7 @@ export type ServerMessage =
   | { type: "approval"; id: string; title: string; detail: string }
   | { type: "approval_result"; id: string; status: "done" | "declined" | "failed" | "expired"; message: string }
   | { type: "error"; message: string }
-  | { type: "events"; events: GameEvent[]; dropped?: number }
+  | { type: "events"; events: GameEvent[]; dropped?: number; replay?: boolean }
   | { type: "digest"; digest: Digest; receivedAt: number }
   | { type: "series"; series: SeriesMap }
   | { type: "plan"; plan: Plan }

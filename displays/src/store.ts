@@ -6,6 +6,7 @@ import type { Plan } from "../../server/src/planner";
 import type { BlueprintCard } from "../../server/src/messages";
 import type { Point, SeriesMap } from "../../server/src/series";
 import { answerSpeech, talkRequests } from "./voice";
+import { playSound } from "./sounds";
 
 export type ThreadItem =
   | { kind: "user"; key: number; text: string }
@@ -68,10 +69,12 @@ export function onMessage(m: ServerMessage): void {
       break;
     case "approval":
       append({ kind: "approval", key: keys++, id: m.id, title: m.title, detail: m.detail, status: signal(null), result: signal(null) });
+      playSound("approval");
       break;
     case "approval_result": {
       const card = thread.value.find((i) => i.kind === "approval" && i.id === m.id);
       if (card && card.kind === "approval") { card.status.value = m.status; card.result.value = m.message; }
+      if (m.status === "done") playSound("done");
       break;
     }
     case "error":
@@ -89,7 +92,14 @@ export function onMessage(m: ServerMessage): void {
       break;
     case "events": {
       const seen = new Set(events.value.map((e) => e.seq));
-      events.value = [...events.value, ...m.events.filter((e) => !seen.has(e.seq))].slice(-MAX_EVENTS);
+      const fresh = m.events.filter((e) => !seen.has(e.seq));
+      events.value = [...events.value, ...fresh].slice(-MAX_EVENTS);
+      // Live events make a sound; the replay a page gets on connect doesn't (FC-150).
+      if (!m.replay) {
+        if (fresh.some((e) => e.kind === "alert" && e.severity === "critical")) playSound("alert-critical");
+        else if (fresh.some((e) => e.kind === "alert" && e.severity === "warning")) playSound("alert-warning");
+        if (fresh.some((e) => e.kind === "research_finished")) playSound("research");
+      }
       if (m.dropped) droppedEvents.value += m.dropped;
       break;
     }

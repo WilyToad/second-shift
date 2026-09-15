@@ -19,7 +19,8 @@
     "site:dev": "bun --port=5181 website/src/index.html",
     "site:build": "bun website/build.ts",
     "site:serve": "bun website/serve.ts",
-    "site:deploy": "bun website/build.ts && npx --yes wrangler@4 deploy --config website/wrangler.jsonc"
+    "site:deploy": "bun website/build.ts && npx --yes wrangler@4 deploy --config website/wrangler.jsonc",
+    "sounds": "bun scripts/generate-sounds.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",

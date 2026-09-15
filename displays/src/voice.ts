@@ -3,6 +3,7 @@
 // the speech service. Recognition runs on the device when the browser offers that (`processLocally`), otherwise the
 // audio goes to the browser's speech service, and the console says which.
 import { signal } from "@preact/signals";
+import { playSound } from "./sounds";
 
 type Alternative = { transcript: string };
 type Result = { isFinal: boolean; 0: Alternative; length: number };
@@ -187,6 +188,7 @@ export function startTalking(onUtterance: (text: string) => void, ctor = recogni
   awaitingAnswer = false;
   answerDone = true;
   voiceError.value = null;
+  playSound("listen");
   listen();
 }
 
@@ -260,6 +262,7 @@ function send(text: string): void {
   if (!s) return;
   heard.value = "";
   pauseForAnswer();
+  playSound("sent");
   s.onUtterance(text);
 }
 
@@ -281,6 +284,7 @@ function endRecognition(): void {
 function maybeResume(): void {
   if (!session || !awaitingAnswer || !answerDone || isSpeaking()) return;
   awaitingAnswer = false;
+  playSound("listen"); // the mic is open again
   listen();
 }
 

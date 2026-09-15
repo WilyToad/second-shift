@@ -3,6 +3,7 @@ import { Composer, Thread } from "./chat";
 import { AlertFeed, LivePanel } from "./console";
 import { connect, connected, status } from "./store";
 import { loadElevenVoices, probeRecognition } from "./voice";
+import { loadSounds } from "./sounds";
 
 /** The Second Shift mark (brand/logo/mark.svg), drawn from the tokens so it follows the theme. */
 function Mark() {
@@ -54,4 +55,5 @@ function App() {
 connect();
 void probeRecognition();
 void loadElevenVoices();
+void loadSounds();
 render(<App />, document.getElementById("app")!);

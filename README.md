@@ -74,6 +74,10 @@ ELEVENLABS_API_KEY=your-key
 
 Restart `bun run start`, tick **Read answers aloud**, and pick a voice from the list next to it. The server holds the key
 and sends each answer's text to ElevenLabs (flash model, lowest latency); if a sentence fails, the Mac voice reads it.
+**Sound effects.** Short cues play when listening starts, a question is sent, an alert or finished research arrives,
+and a card needs you or is done (the **Sounds** switch turns them off). With an ElevenLabs key, `bun run sounds`
+generates proper ones into `data/sounds/` (they stay local, not in git); otherwise the console plays simple built-in tones.
+
 `ELEVEN_LABS_KEY` works as the name too. Optional: `ELEVENLABS_VOICE_ID` sets a default voice and `ELEVENLABS_MODEL` another model.
 
 ### Also
