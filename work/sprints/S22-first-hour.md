@@ -53,7 +53,7 @@ Activated on the player's request after their first-run walkthrough ("these are 
 A new game now gets a companion that looks: the walkthrough's questions are answered from the character's inventory, what it can hand-craft, what's around it (the crash site's wreckage and loot included), what the player just built, and the trigger technologies that start the tech tree. Research isn't raised on a map without labs, answers don't talk about tools or "the data provided", and each map keeps its own conversation.
 
 - Measured: mod 0.055 ms/tick (5-run benchmark); `player_status` 1.5–1.7 ms and `surroundings` 1.5 ms on demand on the dev save; first-hour turns with player data: first token median 1.20 s over 18 turns; grounding eval first token median 1.17 s, 10/10.
-- Suites: new-game eval 18/18 ×3, test-player 15/15, helmet 13/13, planning 13/13, grounding 10/10, diagnosis 4/4, ratios 8/8, console 4/4, session 3/3.
+- Suites: new-game eval 18/18 ×3, test-player 15/15, helmet 13/13, planning 13/13, machines 7/7 (shared unfiltered build handler), screenshot 4/4 (the new picture check), grounding 10/10, diagnosis 4/4, ratios 8/8, console 4/4, session 3/3.
 - Pulled in: FC-131 (a new player's prompt named the author's mods) and FC-127 (unrequested screenshots came back with the prompt changes).
 - Found and fixed along the way: crash-site wreckage invisible to the look (hidden prototypes), fires counted as enemies, "ore" not searchable, plural "patches".
 - Still seen in eval answers, logged as FC-139: invented details (said an assembling-machine-1 was placed when a stone furnace was; recipe details from memory) and unasked-for map tag cards ("I've dropped a tag, confirm it in the app"), which is FC-126's pattern outside blueprints.
