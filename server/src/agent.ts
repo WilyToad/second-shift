@@ -18,6 +18,7 @@ import type { ChatMessage, ChatModel, StreamResult, ToolCall, ToolSpec } from ".
 import { buildMessages, formatSnapshot, userTurn } from "./prompt";
 import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
+import { arithmeticCorrections } from "./numbers";
 import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatPointedAt, wantsContents, wantsPointedAt, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
@@ -124,6 +125,8 @@ export function compactHistory(history: ChatMessage[], budgetTokens = HISTORY_BU
   return { history: next, beforeTokens, afterTokens };
 }
 const RESULT_TTL_MS = 10 * 60_000;
+/** A follow-up that points back instead of naming things: "what do I use these for?" (FC-153). */
+const REFERENCE = /\b(these|those|them|they|that one|this one)\b|\b(use|make|need|craft|do with|build|place|put|feed) (it|that)\b/i;
 const HIGHLIGHT_SECONDS = 60;
 
 export const TOOLS: ToolSpec[] = [
@@ -483,7 +486,10 @@ export class Agent {
     this.currentQuestion = question;
     if (pasted.raws.length) this.lastBlueprint = { raw: pasted.raws.at(-1)!, at: this.now() };
     const snap = this.deps.game.latest() ?? this.deps.fallbackSnapshot?.();
-    const found = this.deps.retriever()?.retrieve(question);
+    let found = this.deps.retriever()?.retrieve(question);
+    // "What do I use these for?" names nothing: it means what the last turn was about (FC-153).
+    const referred = found && !found.items.length && REFERENCE.test(question) ? this.referredItems() : [];
+    if (referred.length) found = this.deps.retriever()?.retrieve(`${question} ${referred.join(" ")}`);
     const plannedTarget = parseTarget(question) !== null;
     // "yeah" after "Want me to look around?" is classified as the offer it accepts (S22).
     const offer = acceptedOffer(question, this.history.findLast((m) => m.role === "assistant" && m.content)?.content);
@@ -537,6 +543,8 @@ export class Agent {
       status?.character ? "any count of what the player has comes from the inventory line, exactly" : "",
       // "look around" answered with "burner-inserter (1 iron-plate + 1 gear)" from an earlier turn's memory (S24 eval).
       playerLines.length && !found?.lines.length && !craftableRecipes(status).length ? "give no recipe ingredients or amounts: this turn has no recipe lines" : "",
+      // "25,000 units each, 1,250,000 total" for storage tanks: neither number is in the save data (FC-153).
+      referred.length ? `"${REFERENCE.exec(question)![0]}" means ${referred.join(", ")} from the last answer; give no capacities, sizes, totals or other numbers that aren't in the lines, and if one is asked for, say the save data doesn't have it` : "",
     ].filter(Boolean);
     // Blueprint requests are built in code; the model only explains the result (S14).
     const requested = !pasted.summaries.length && wantsBlueprint(question) ? this.blueprintFor(question, found?.items ?? []) : null;
@@ -663,7 +671,7 @@ export class Agent {
             if (block) { text += block; this.deps.emit({ type: "token", text: block }); }
           }
           // What the answer says the player has or built, checked against their data (FC-140).
-          const corrections = await this.checkClaims(text, status);
+          const corrections = [...(await this.checkClaims(text, status)), ...arithmeticCorrections(text)];
           if (corrections.length) {
             const add = `\n\n${corrections.join(" ")}`;
             text += add;
@@ -739,6 +747,16 @@ export class Agent {
   }
 
   /** Corrections for counts and builds the answer got wrong; fetches the player's data only when the answer makes such a claim. */
+  /** Items the last exchange was about: named in the last question, else the first ones the last answer named. */
+  private referredItems(): string[] {
+    const retriever = this.deps.retriever();
+    if (!retriever) return [];
+    const lastQuestion = compactUserContent(this.history.findLast((m) => m.role === "user")?.content ?? "");
+    const lastAnswer = this.history.findLast((m) => m.role === "assistant" && m.content)?.content ?? "";
+    const asked = lastQuestion ? retriever.retrieve(lastQuestion).items : [];
+    return (asked.length ? asked : lastAnswer ? retriever.retrieve(lastAnswer).items : []).slice(0, 2);
+  }
+
   private async checkClaims(text: string, status: ActionData<"player_status"> | null): Promise<string[]> {
     if (!/\b(you|your inventory|inventory:)\b/i.test(text) || !/\d|\b(built|placed)\b/.test(text)) return [];
     const protos = this.deps.prototypes();

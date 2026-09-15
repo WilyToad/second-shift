@@ -674,3 +674,17 @@ test("FC-151 FC-152: 'what's in this chest' looks at what's under the mouse and 
   await agent.ask("what do I have in my inventory?");
   expect(calls.map((c) => c.action)).not.toContain("container_contents");
 });
+
+test("FC-153: 'what do I use these for?' retrieves what the last answer was about, and wrong sums get corrected", async () => {
+  const prototypes = PrototypesSchema.parse({ ...rowPrototypes, items: { "iron-gear-wheel": { type: "item", stack_size: 100 }, "engine-unit": { type: "item", stack_size: 50 } } });
+  const retriever = new RecipeRetriever(prototypes);
+  const model = fakeModel([{ text: "You have 7 iron gear wheels." }, { text: "Engines. 7 × 2 = 12 plates." }]);
+  const events: any[] = [];
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => retriever, prototypes: () => prototypes, emit: (e) => events.push(e) });
+  await agent.ask("What's in my inventory now");
+  await agent.ask("What do I use these for");
+  const turn = model.seen[1]!.at(-1)!.content;
+  expect(turn).toContain("engine-unit"); // a recipe that uses gears
+  expect(turn).toContain('"these" means iron-gear-wheel from the last answer');
+  expect(agent.transcript().at(-1)!.text).toContain("Correction: 7 × 2 = 14, not 12.");
+});

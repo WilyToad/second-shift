@@ -33,3 +33,7 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Tech debt and risks
 
+- [ ] FC-160 Game-mechanics claims from memory
+  - Notes: in the S27 replay, "what is this?" on a passive provider chest added "Requester chests won't pull from it; only you can take by hand", which is wrong (requester chests are filled from passive providers). Recipes are grounded on the save, but how entities behave (logistics, fluids, trains, circuit rules) comes from the model's memory and modded saves change it
+  - Acceptance: measured how often answers add mechanics nobody asked about (eval over pointing and "what is this" questions); either a turn rule to state only what the lines say about an entity, or short save-grounded entity facts (type, logistic mode, fluid capacity) in the pointed-at line; replay check
+

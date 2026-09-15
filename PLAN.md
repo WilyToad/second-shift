@@ -414,6 +414,15 @@ token 2.2–7.4 s). Two measured causes:
   drops back each block (the session's turns at 6,144 cached had 376–950 uncached). Keep history append-only:
   compacting earlier rewrites cached blocks, which costs a cold prefill.
 
+**Numbers in answers (FC-153, 2026-09-15):** no calculator tool. Every tool round pays another first token (1–2.5 s in
+the voice session's logs; turns with a tool round reached first words in 3.3–5.4 s vs 1.5–2.0 s for one round in
+`scripts/e2e-wake.ts`), and the model would still have to choose to call it. Instead the save's facts come in the
+turn's lines (follow-ups like "what do I use these for?" retrieve for what the last answer named) and sums written out
+in an answer are checked in code afterwards, adding a correction line (no model time).
+
+**Voice session replay (S27 acceptance, 2026-09-15, `scripts/eval-voice-session.ts`):** 8/8; first words median
+1.52 s, max 4.16 s, against 5.66 s and 10.02 s in the original session.
+
 **Re-run after S27 mod changes (2026-09-15, hover record, `pointed_at`, `container_contents`, highlight boxes tied to
 entities, 5 runs):** without 0.779, with 0.899, so 0.121 ms/tick whole-tick, while per-tick script time
 (`scripts/probes/bench-ticks.ts`) reads 0.075 ms with the mod vs 0.019 without (last 600 ticks 0.055 vs 0.014), slowest
