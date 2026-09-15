@@ -1,7 +1,8 @@
 # S27 — What you're looking at
 
-- **Status:** planned
+- **Status:** active
 - **Goal:** The companion knows what the player is pointing at, holding or has open, can say what's inside a container they can see, keeps a request when they correct themselves, stops repeating research status, gets numbers right, and stays fast in long conversations.
+- **Started:** 2026-09-15
 - **Acceptance:** Each item's acceptance below; the player's voice session from 2026-09-15 replayed as an eval (same questions, with the game in the same state where it matters) gives none of the odd replies found in it; existing suites still pass.
 
 ## Items
@@ -30,7 +31,10 @@
 - [ ] FC-158 Long conversations lose the prompt cache
   - Notes: in the session, first words took 5–7.6 s (server first token 2.2–5.1 s) against ~1.2–2 s before. Prompts were 5,000–6,100 tokens: past the cached 4,096-token system block but short of the next full 2,048-token block, so 1,000–2,000 tokens of history were read again on every turn
   - Acceptance: measured cause and a fix (compact earlier, align history to blocks, or a smaller tail), with first-token times before and after on a replayed long conversation recorded in PLAN §5
+- [ ] FC-159 Highlight boxes outlive what they mark
+  - Notes: player (2026-09-15): after approving a deconstruction, "the marks stayed on the screen after the deconstruction for about 30 seconds". The boxes are drawn at fixed positions with a 30–60 s time to live, so they stay after the robots remove the entities
+  - Acceptance: highlight boxes are tied to their entities, so a box disappears when its entity is removed (the rendering API destroys objects whose entity target is gone), still expiring on their timer otherwise; in-game test: highlight, destroy the entity, the box is gone
 
 ## Notes
 
-Planned from the player's first real voice session (2026-09-15). Not active until the player says so.
+Planned from the player's first real voice session (2026-09-15) and activated after they confirmed the rest of S26.

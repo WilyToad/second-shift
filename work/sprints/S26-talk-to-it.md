@@ -1,9 +1,10 @@
 # S26 — Talk to it
 
-- **Status:** active
+- **Status:** done
 - **Goal:** The player can ask by voice and hear answers in the console, and start talking without leaving the game.
 - **Acceptance:** In Chrome, speaking a question into the console sends it and the answer is read aloud as it streams; the console says whether recognition is on-device or goes to the browser's speech service; a hotkey in the game starts listening in the console (or, if the browser refuses without focus, the limit is measured and recorded with the fallback the player sees); display and unit tests; the player tries it in Chrome.
 - **Started:** 2026-09-15
+- **Finished:** 2026-09-15
 
 ## Items
 
@@ -12,7 +13,7 @@
   - Decision (player, 2026-09-15): use the Web Speech API as in Chrome's demo (https://www.google.com/intl/en/chrome/demos/speech.html, spec https://webaudio.github.io/web-speech-api/). Not working in Brave is fine
   - Acceptance: a mic button (and a keyboard shortcut) in the composer listens, shows the words as they're recognized, and sends the question when speech ends; errors say what to do (blocked microphone, no speech, speech service unreachable as in Brave, no microphone); recognition runs on the device when the browser offers it (`processLocally` via `available()`), otherwise the console says the voice goes to the browser's speech service; "Read answers aloud" speaks each answer sentence by sentence as it streams, with a local voice when there is one, skipping chart blocks and markdown, and stops when the player talks or asks again; settings remembered per browser; the mic hides where the API doesn't exist; display tests with fake recognition and synthesis; checked by the player in Chrome
   - Built: `displays/src/voice.ts` and the composer: Talk button and Alt+V (again to send, Escape to cancel), words shown as recognized, sent when speech ends; error messages per spec error code; "Read answers aloud" speaks whole sentences as tokens stream (chart blocks, markdown, `/min` and item-name hyphens cleaned) with a local voice, stopped by talking or a new question; settings in localStorage. In the player's Chrome 153: `SpeechRecognition` unprefixed, on-device recognition "downloadable" with `install()`, 180 voices (Samantha local): the console shows "Voice goes to your browser's speech service. Recognize on this device instead", which downloads it once and then sets `processLocally`. 8 display tests with fake recognition and synthesis. README gained a "Talk to it" section, troubleshooting rows and a qualified "nothing is sent to the cloud"; the website copy still says "Nothing leaves your machine" (needs a change and a deploy when the player wants). Pending the player: speaking into it in Chrome, the on-device download, and hearing answers
-- [~] FC-147 Push to talk from the game
+- [x] FC-147 Push to talk from the game
   - Notes: the console sits on the second monitor while the game has focus. A mod hotkey (custom input, e.g. V) can reach the console through the server as an event; whether Chrome lets a page without focus start `SpeechRecognition` is the open question
   - Acceptance: pressing the hotkey in-game starts listening in the console within ~0.5 s and the answer is read aloud; the hotkey is a player setting under Controls; if Chrome won't start recognition without focus, that's measured and recorded, and the console shows a clear prompt instead; mod benchmark unchanged (one event per key press)
   - Built: custom input `second-shift-talk` (Alt+V, rebindable under Controls → Mods) pushes a feed event; the server turns it into a `talk` message, keeps it out of the alert feed and out of what later pages get; the composer toggles listening on each press. `scripts/e2e-talk.ts` 5/5: the key is registered, a press reaches the console in 82 ms. If Chrome refuses to start listening from the hotkey ("not-allowed"), the console says to click Talk once in the tab. Benchmark 0.057 ms/tick. Pending the player: pressing Alt+V in the game with Chrome unfocused on the second monitor
@@ -24,13 +25,24 @@
   - Notes: player request (2026-09-15): "When I push Talk, it shouldn't stop after each time I talk. It should send when I stop speaking for 2 seconds (make that configurable). Then it should wait for me to speak again. It should continue on like that until I've clicked the Talk button again"
   - Acceptance: Talk (or Alt+V, in the console or the game) starts a session: continuous recognition sends each question after the chosen pause (1–5 s, default 2, remembered per browser), the mic pauses while the answer arrives and is read aloud (so it never hears the companion), then listens again; Chrome ending recognition on its own restarts it; clicking Talk again ends the session and sends words not yet sent; Escape ends it without sending; errors other than silence end it with a reason; display tests; the player tries it
   - Built: `startTalking`/`stopTalking` in `displays/src/voice.ts` (continuous recognition, a silence timer per result, pause on any question, resume when the answer is done and speech, Mac or ElevenLabs, is idle), a "send after N s" picker, Talk button states Listening / Waiting. 26 display tests
-- [~] FC-150 Sound effects in the console
+- [x] FC-150 Sound effects in the console
   - Notes: offered after FC-148; player: "Yeah, make those effects!" (they granted the key sound-effects access)
   - Acceptance: short sounds for listening starts, question sent, critical and warning alerts, research finished, a card needing the player and an action done; generated once with ElevenLabs into gitignored `data/sounds/` (generated audio follows the account's terms, so it isn't committed) with built-in tones where missing; throttled repeats; no sounds for the alerts replayed on connect; a Sounds switch remembered per browser; tests; the player hears them
   - Built: `server/src/sfx.ts` (POST /v1/sound-generation, prompts in a quiet industrial-HUD voice, 0.5–1.2 s) and `bun run sounds`; server `/sounds` and `/sounds/:name`; `displays/src/sounds.ts` (files or Web Audio tones, per-sound minimum gaps, 45% volume); hooks in the talk session, the store (live events only: the connect replay is marked) and cards. Generated all 7 with the player's key: 0.48–1.2 s, peaks −3 to −15 dB, none silent or clipped. 1 server and 3 display tests
 
 ## Notes
 
-Player check (2026-09-15, first voice session on the dev save): talking hands-free "worked great" (FC-062, FC-149) and the ElevenLabs voice is "amazing" (FC-148). Still unconfirmed: Alt+V from the game with Chrome unfocused (no talk press reached the mod's event feed during the session, FC-147) and the sound effects (FC-150). The session's odd replies are planned as S27.
+Player check (2026-09-15, first voice session on the dev save): talking hands-free "worked great" (FC-062, FC-149) and the ElevenLabs voice is "amazing" (FC-148). Then Alt+V from the game "worked great" with Chrome on the other monitor (FC-147), and the card sound played before an approved deconstruction and a cancelled radar card (FC-150). The session's odd replies are planned as S27.
 
 Activated on the player's request ("Go ahead", after reordering the phases so voice comes first). The console promise "nothing leaves your machine" needs care: Chrome's recognition may use Google's speech service unless it runs on the device, so the console labels which one is in use, and the README and site copy get updated to match.
+
+## Review
+
+The player talks to the companion hands-free and hears answers in an ElevenLabs voice, from the console or from inside the game, with sound cues for listening, alerts, research and cards.
+
+- Built: Web Speech API talk sessions (send after a chosen pause, the mic pauses while the answer is read, Alt+V in the console and as a game control), on-device recognition offered and tracked while Chrome downloads it, answers read sentence by sentence with a Mac or ElevenLabs voice (key kept on the server), seven ElevenLabs sound effects generated locally with built-in tones as a fallback.
+- Measured: a game key press reaches the console in 82 ms; mod 0.057 ms/tick. 30 display tests, 5 server tests, e2e-talk 5/5.
+- Player checks: all five items tried and confirmed in the player's Chrome on the dev save.
+- Found in the session and planned as S27: invented answers about what the player hovers, no container contents, arithmetic from memory, a correction losing its request, an offer's wording not recognized, research status repeated, drifting directions, and first words slowing to 5–7 s in a long conversation. Also: highlight boxes stayed on screen for ~30 s after the robots removed the marked entities (FC-159).
+- Docs: README "Talk to it" section with a capture and a what-stays-local table; website Talk feature and opt-in wording (built, not deployed).
+
