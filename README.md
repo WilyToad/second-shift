@@ -72,7 +72,7 @@ ELEVENLABS_API_KEY=your-key
 
 Restart `bun run start`, tick **Read answers aloud**, and pick a voice from the list next to it. The server holds the key
 and sends each answer's text to ElevenLabs (flash model, lowest latency); if a sentence fails, the Mac voice reads it.
-Optional: `ELEVENLABS_VOICE_ID` sets a default voice and `ELEVENLABS_MODEL` another model.
+`ELEVEN_LABS_KEY` works as the name too. Optional: `ELEVENLABS_VOICE_ID` sets a default voice and `ELEVENLABS_MODEL` another model.
 
 ### Also
 

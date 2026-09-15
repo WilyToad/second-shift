@@ -11,6 +11,7 @@ test("FC-148: the key comes from the environment only; blank means off", () => {
   expect(elevenLabsKey({ ELEVENLABS_API_KEY: " sk_abc " })).toBe("sk_abc");
   expect(elevenLabsKey({ ELEVENLABS_API_KEY: "" })).toBeNull();
   expect(elevenLabsKey({})).toBeNull();
+  expect(elevenLabsKey({ ELEVEN_LABS_KEY: "sk_alt" })).toBe("sk_alt");
 });
 
 test("FC-148: speech streams from ElevenLabs' flash model with the key in a header, never in the URL", async () => {
@@ -27,6 +28,14 @@ test("FC-148: speech streams from ElevenLabs' flash model with the key in a head
   expect(speech.url).not.toContain("sk_secret");
   expect((speech.init!.headers as Record<string, string>)["xi-api-key"]).toBe("sk_secret");
   expect(JSON.parse(String(speech.init!.body))).toEqual({ text: "Gleba makes 1,493 per minute of jelly.", model_id: "eleven_flash_v2_5", previous_text: "Earlier sentence." });
+});
+
+test("FC-148: a key limited to speech still gets the standard voices", async () => {
+  const { fn } = fakeFetch(() => Response.json({ detail: { status: "missing_permissions", message: "The API key you used is missing the permission voices_read to execute this operation." } }, { status: 401 }));
+  const tts = new ElevenLabs({ key: "sk_speech_only", fetch: fn });
+  const voices = await tts.listVoices();
+  expect(voices.map((v) => v.name)).toContain("George");
+  expect(voices.length).toBe(9);
 });
 
 test("FC-148: a refused key or a failure comes back with ElevenLabs' reason", async () => {

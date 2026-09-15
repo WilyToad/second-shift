@@ -9,10 +9,27 @@ const DEFAULT_MODEL = "eleven_flash_v2_5";
 const MAX_CHARS = 600;
 
 export type TtsVoice = { id: string; name: string; category?: string };
+
+/**
+ * ElevenLabs' standard voices, for keys limited to speech (no `voices_read` permission): the voice list is refused but
+ * these still speak. Each ID was checked against the API with a one-word request (2026-09-15).
+ */
+export const STANDARD_VOICES: TtsVoice[] = [
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah" },
+  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George" },
+  { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel" },
+  { id: "pNInz6obpgDQGcFmaJgB", name: "Adam" },
+  { id: "nPczCjzI2devNBz1zQrb", name: "Brian" },
+  { id: "XB0fDUnXU5powFXDhCwa", name: "Charlotte" },
+  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel" },
+  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily" },
+  { id: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger" },
+].map((v) => ({ ...v, category: "premade" }));
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export function elevenLabsKey(env: Record<string, string | undefined> = process.env): string | null {
-  const key = env.ELEVENLABS_API_KEY?.trim();
+  // ELEVENLABS_API_KEY is ElevenLabs' own name for it; ELEVEN_LABS_KEY is accepted too.
+  const key = (env.ELEVENLABS_API_KEY ?? env.ELEVEN_LABS_KEY)?.trim();
   return key ? key : null;
 }
 
@@ -29,7 +46,12 @@ export class ElevenLabs {
   async listVoices(): Promise<TtsVoice[]> {
     if (this.voices) return this.voices;
     const res = await this.fetch(`${API}/v2/voices?page_size=100&sort=name&sort_direction=asc`, { headers: { "xi-api-key": this.opts.key } });
-    if (!res.ok) throw new Error(await failure(res));
+    if (!res.ok) {
+      const message = await failure(res);
+      // A key without voices_read can still speak: offer the standard voices instead of nothing.
+      if (res.status === 401 && /voices_read/.test(message)) return (this.voices = STANDARD_VOICES);
+      throw new Error(message);
+    }
     const body = (await res.json()) as { voices?: { voice_id: string; name: string; category?: string }[] };
     this.voices = (body.voices ?? []).map((v) => ({ id: v.voice_id, name: v.name, category: v.category }));
     return this.voices;
