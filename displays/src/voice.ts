@@ -261,17 +261,141 @@ function synth(): Synth | null {
   return (globalThis as unknown as { speechSynthesis?: Synth }).speechSynthesis ?? null;
 }
 
-/** A voice for the page language, preferring ones that run on this machine. */
-export function pickVoice<V extends { lang: string; localService: boolean; default: boolean }>(voices: V[], lang: string): V | null {
+/**
+ * A voice for the page language, preferring ones that run on this machine, and macOS's Premium or Enhanced voices
+ * (System Settings → Accessibility → Spoken Content) over the older compact ones.
+ */
+export function pickVoice<V extends { name?: string; lang: string; localService: boolean; default: boolean }>(voices: V[], lang: string): V | null {
   const base = lang.split("-")[0]!.toLowerCase();
   const same = voices.filter((v) => v.lang.toLowerCase().startsWith(base));
-  const rank = (v: V) => (v.localService ? 0 : 2) + (v.lang.toLowerCase() === lang.toLowerCase() ? 0 : 1) - (v.default ? 0.5 : 0);
+  const quality = (v: V) => (/\(Premium\)/.test(v.name ?? "") ? -2 : /\(Enhanced\)/.test(v.name ?? "") ? -1.5 : 0);
+  const rank = (v: V) => (v.localService ? 0 : 2) + (v.lang.toLowerCase() === lang.toLowerCase() ? 0 : 1) - (v.default ? 0.5 : 0) + quality(v);
   return [...same].sort((a, b) => rank(a) - rank(b))[0] ?? null;
 }
 
 let queue: SentenceQueue | null = null;
 
+// ElevenLabs voices (FC-148): the choice is "browser" or "eleven:<voice id>", remembered per browser.
+export type ElevenVoice = { id: string; name: string; category?: string };
+export const voiceChoice = signal(loadText("second-shift.voice", "browser"));
+export const elevenVoices = signal<ElevenVoice[]>([]);
+export const elevenError = signal<string | null>(null);
+
+function loadText(key: string, fallback: string): string {
+  try {
+    return globalThis.localStorage?.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function chooseVoice(choice: string): void {
+  voiceChoice.value = choice;
+  stopSpeaking();
+  try {
+    globalThis.localStorage?.setItem("second-shift.voice", choice);
+  } catch {
+    // per-browser convenience
+  }
+}
+
+/** Asks the server which ElevenLabs voices the player's key can use (none without a key). */
+export async function loadElevenVoices(get: typeof fetch = fetch): Promise<void> {
+  try {
+    const body = (await (await get("/tts/voices")).json()) as { available: boolean; voices: ElevenVoice[]; error?: string };
+    elevenVoices.value = body.available ? body.voices : [];
+    elevenError.value = body.error ?? null;
+  } catch {
+    elevenVoices.value = [];
+  }
+  if (voiceChoice.value.startsWith("eleven:") && !elevenVoices.value.some((v) => `eleven:${v.id}` === voiceChoice.value)) voiceChoice.value = "browser";
+}
+
+type AudioLike = { play(): Promise<void>; pause(): void; onended: (() => void) | null; onerror: (() => void) | null; src: string };
+
+/** Plays ElevenLabs audio for each sentence in order; each is fetched as soon as it's queued, so playback flows. */
+export class ElevenPlayer {
+  private items: { text: string; audio: Promise<string | null> }[] = [];
+  private playing: AudioLike | null = null;
+  private busy = false;
+  private stop = new AbortController();
+  private previous = "";
+
+  constructor(
+    private readonly deps: {
+      post?: typeof fetch;
+      makeAudio?: (src: string) => AudioLike;
+      fallback: (text: string) => void;
+      voice: () => string;
+      onError: (message: string) => void;
+    },
+  ) {}
+
+  enqueue(text: string): void {
+    const previous = this.previous;
+    this.previous = text;
+    const signal = this.stop.signal;
+    const post = this.deps.post ?? fetch;
+    const audio = post("/tts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, voice: this.deps.voice(), previous }), signal })
+      .then(async (res) => {
+        if (!res.ok) { this.deps.onError(await res.text()); return null; }
+        return URL.createObjectURL(await res.blob());
+      })
+      .catch((e) => { if (!signal.aborted) this.deps.onError((e as Error).message); return null; });
+    this.items.push({ text, audio });
+    void this.next();
+  }
+
+  private async next(): Promise<void> {
+    if (this.busy) return;
+    const item = this.items.shift();
+    if (!item) return;
+    this.busy = true;
+    const signal = this.stop.signal;
+    const url = await item.audio;
+    if (signal.aborted) return;
+    if (!url) {
+      this.deps.fallback(item.text);
+      this.busy = false;
+      return this.next();
+    }
+    const audio = (this.deps.makeAudio ?? ((src) => new Audio(src) as unknown as AudioLike))(url);
+    this.playing = audio;
+    const done = () => {
+      URL.revokeObjectURL(url);
+      if (this.playing !== audio) return;
+      this.playing = null;
+      this.busy = false;
+      void this.next();
+    };
+    audio.onended = done;
+    audio.onerror = done;
+    audio.play().catch(() => { this.deps.fallback(item.text); done(); });
+  }
+
+  cancel(): void {
+    this.stop.abort();
+    this.stop = new AbortController();
+    this.items = [];
+    this.previous = "";
+    this.playing?.pause();
+    this.playing = null;
+    this.busy = false;
+  }
+}
+
+const eleven = new ElevenPlayer({
+  fallback: (text) => speakWithBrowser(text),
+  voice: () => voiceChoice.value.replace(/^eleven:/, ""),
+  onError: (message) => { voiceError.value = `ElevenLabs couldn't speak (${message}); using this Mac's voice instead.`; },
+});
+
 export function speak(sentence: string): void {
+  if (voiceChoice.value.startsWith("eleven:")) eleven.enqueue(sentence);
+  else speakWithBrowser(sentence);
+}
+
+function speakWithBrowser(sentence: string): void {
   const s = synth();
   const Utterance = (globalThis as unknown as { SpeechSynthesisUtterance?: UtteranceCtor }).SpeechSynthesisUtterance;
   if (!s || !Utterance || !sentence) return;
@@ -287,6 +411,7 @@ export function speak(sentence: string): void {
 export function stopSpeaking(): void {
   queue = null;
   synth()?.cancel();
+  eleven.cancel();
 }
 
 /** Feeds the answer stream to speech while "Read answers aloud" is on. */

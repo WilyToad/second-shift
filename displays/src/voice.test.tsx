@@ -217,3 +217,87 @@ test("FC-147: the game's push-to-talk key starts listening in the console, and a
   expect(voice.voiceError.value).toContain("Click Talk once in this tab");
   render(null, root);
 });
+
+test("FC-148: ElevenLabs sentences are fetched as they arrive and played in order; stopping cancels everything", async () => {
+  const { ElevenPlayer } = await import("./voice");
+  Object.assign(globalThis.URL, { createObjectURL: (b: { text: string }) => `blob:${b.text}`, revokeObjectURL: () => {} });
+  const posts: any[] = [];
+  const release: Record<string, () => void> = {};
+  const post = (async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    posts.push(body);
+    await new Promise<void>((r) => (release[body.text] = r));
+    return { ok: true, blob: async () => ({ text: body.text }) } as unknown as Response;
+  }) as typeof fetch;
+  const played: string[] = [];
+  const audios: any[] = [];
+  const player = new ElevenPlayer({
+    post,
+    makeAudio: (src) => { const a = { src, onended: null as any, onerror: null as any, paused: false, play: async () => { played.push(src); }, pause() { this.paused = true; } }; audios.push(a); return a; },
+    fallback: () => {},
+    voice: () => "v1",
+    onError: () => {},
+  });
+  player.enqueue("First.");
+  player.enqueue("Second.");
+  expect(posts.map((p) => [p.text, p.voice, p.previous])).toEqual([["First.", "v1", ""], ["Second.", "v1", "First."]]);
+  release["Second."]!(); // the second finishes downloading first; it still waits its turn
+  await new Promise((r) => setTimeout(r, 5));
+  expect(played).toEqual([]);
+  release["First."]!();
+  await new Promise((r) => setTimeout(r, 5));
+  expect(played).toEqual(["blob:First."]);
+  audios[0].onended();
+  await new Promise((r) => setTimeout(r, 5));
+  expect(played).toEqual(["blob:First.", "blob:Second."]);
+
+  player.enqueue("Third.");
+  player.cancel();
+  release["Third."]?.();
+  await new Promise((r) => setTimeout(r, 5));
+  expect(played.length).toBe(2);
+  expect(audios[1].paused).toBe(true);
+});
+
+test("FC-148: a failed ElevenLabs sentence is read with the Mac voice and the console says why", async () => {
+  const { ElevenPlayer } = await import("./voice");
+  const fellBack: string[] = [];
+  const errors: string[] = [];
+  const player = new ElevenPlayer({
+    post: (async () => ({ ok: false, text: async () => "ElevenLabs 401: Invalid API key" })) as unknown as typeof fetch,
+    makeAudio: () => { throw new Error("no audio expected"); },
+    fallback: (t) => fellBack.push(t),
+    voice: () => "v1",
+    onError: (m) => errors.push(m),
+  });
+  player.enqueue("Hello there.");
+  await new Promise((r) => setTimeout(r, 5));
+  expect(fellBack).toEqual(["Hello there."]);
+  expect(errors).toEqual(["ElevenLabs 401: Invalid API key"]);
+});
+
+test("FC-148: the voice picker lists ElevenLabs voices only when the server has a key, and remembers the choice", async () => {
+  const { render } = await import("preact");
+  const { Composer } = await import("./chat");
+  const voice = await import("./voice");
+  voice.readAloud.value = true;
+  await voice.loadElevenVoices((async () => Response.json({ available: false, voices: [] })) as unknown as typeof fetch);
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  render(<Composer onAsk={() => {}} recognition={null} />, root);
+  await new Promise((r) => setTimeout(r, 5));
+  expect(root.querySelector("#voice")).toBeNull();
+
+  await voice.loadElevenVoices((async () => Response.json({ available: true, voices: [{ id: "v1", name: "Aria" }, { id: "v2", name: "Roger" }] })) as unknown as typeof fetch);
+  await new Promise((r) => setTimeout(r, 5));
+  const select = root.querySelector("#voice") as HTMLSelectElement;
+  expect([...select.querySelectorAll("option")].map((o) => o.textContent)).toEqual(["This Mac's voice", "Aria", "Roger"]);
+  voice.chooseVoice("eleven:v2");
+  expect(voice.voiceChoice.value).toBe("eleven:v2");
+  // A remembered voice the key no longer has falls back to the Mac voice.
+  await voice.loadElevenVoices((async () => Response.json({ available: true, voices: [{ id: "v1", name: "Aria" }] })) as unknown as typeof fetch);
+  expect(voice.voiceChoice.value).toBe("browser");
+  expect(voice.pickVoice([{ name: "Samantha", lang: "en-US", localService: true, default: true }, { name: "Ava (Premium)", lang: "en-US", localService: true, default: false }], "en-US")?.name).toBe("Ava (Premium)");
+  voice.readAloud.value = false;
+  render(null, root);
+});

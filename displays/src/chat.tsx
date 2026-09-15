@@ -3,7 +3,7 @@ import { useEffect, useRef } from "preact/hooks";
 import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
 import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
-import { deviceStatus, finishListening, heard, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, startListening, stopListening, stopSpeaking, voiceError } from "./voice";
+import { chooseVoice, deviceStatus, elevenVoices, finishListening, voiceChoice, heard, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, startListening, stopListening, stopSpeaking, voiceError } from "./voice";
 
 /** Bold and inline code the model writes in Markdown (`**1,493/min**`, `` `iron-plate` ``) render as such, not as raw marks (FC-125). */
 export function Emphasis({ text }: { text: string }) {
@@ -154,6 +154,17 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
         <span class="voice">
           <label><input type="checkbox" id="thinking" checked={thinking.value} onChange={(e) => (thinking.value = e.currentTarget.checked)} /> Think it through</label>
           <label title="Reads each answer aloud as it arrives"><input type="checkbox" id="read-aloud" checked={readAloud.value} onChange={(e) => { readAloud.value = e.currentTarget.checked; saveSetting("second-shift.readAloud", readAloud.value); if (!readAloud.value) stopSpeaking(); }} /> Read answers aloud</label>
+          {readAloud.value && elevenVoices.value.length > 0 && (
+            <label title="ElevenLabs voices send the answer text to ElevenLabs">
+              <span class="visually-hidden">Voice</span>
+              <select id="voice" value={voiceChoice.value} onChange={(e) => chooseVoice(e.currentTarget.value)}>
+                <option value="browser">This Mac's voice</option>
+                <optgroup label="ElevenLabs (online)">
+                  {elevenVoices.value.map((v) => <option key={v.id} value={`eleven:${v.id}`}>{v.name}</option>)}
+                </optgroup>
+              </select>
+            </label>
+          )}
         </span>
         <span>
           <button type="button" class="cancel" onClick={() => send({ type: "reset" })}>New conversation</button>{" "}

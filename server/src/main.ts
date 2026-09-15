@@ -12,6 +12,7 @@ import { buildSeries } from "./series";
 import { join } from "node:path";
 import { USER_DIR } from "./factorio";
 import { SHOT_NAME } from "./screenshots";
+import { ElevenLabs, elevenLabsKey } from "./tts";
 
 export type { ClientMessage, ServerMessage } from "./messages";
 
@@ -50,6 +51,9 @@ const agent = new Agent({
   session: fileSession(LEGACY_SESSION),
 });
 
+// ElevenLabs voices (FC-148), only when the player has put a key in the environment or .env.
+const tts = elevenLabsKey() ? new ElevenLabs({ key: elevenLabsKey()!, model: process.env.ELEVENLABS_MODEL, defaultVoice: process.env.ELEVENLABS_VOICE_ID }) : null;
+
 const server = Bun.serve({
   port: PORT,
   hostname: "127.0.0.1",
@@ -60,6 +64,25 @@ const server = Bun.serve({
       const name = req.params.name;
       if (!SHOT_NAME.test(name)) return new Response("Not found", { status: 404 });
       return new Response(Bun.file(join(USER_DIR, "script-output", "companion", name)), { headers: { "content-type": "image/jpeg", "cache-control": "no-store" } });
+    },
+    "/tts/voices": async () => {
+      if (!tts) return Response.json({ available: false, voices: [] });
+      try {
+        return Response.json({ available: true, voices: await tts.listVoices() });
+      } catch (e) {
+        return Response.json({ available: false, error: (e as Error).message, voices: [] });
+      }
+    },
+    "/tts": {
+      POST: async (req) => {
+        if (!tts) return new Response("ElevenLabs isn't set up: add ELEVENLABS_API_KEY to .env and restart the server", { status: 404 });
+        const body = (await req.json().catch(() => ({}))) as { text?: string; voice?: string; previous?: string };
+        try {
+          return await tts.speak(String(body.text ?? ""), body.voice, body.previous, req.signal);
+        } catch (e) {
+          return new Response((e as Error).message, { status: 502 });
+        }
+      },
     },
   },
   fetch(req, srv) {

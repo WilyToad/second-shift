@@ -61,8 +61,18 @@ send, or just stop talking; Escape cancels. Tick **Read answers aloud** to hear 
 Voice uses the browser's [Web Speech API](https://webaudio.github.io/web-speech-api/), so it needs Chrome (it doesn't
 work in Brave). By default Chrome sends your voice to its online speech service to turn it into text. Click
 **Recognize on this device instead** under the composer for a one-time download, and after that recognition stays on
-your Mac. Answers are read with a voice on your Mac when one is installed. The in-game key is **Talk to Second
-Shift** under **Settings → Controls → Mods**.
+your Mac. Answers are read with a voice on your Mac; for better ones, download a Premium or Enhanced voice in System Settings →
+Accessibility → Spoken Content. The in-game key is **Talk to Second Shift** under **Settings → Controls → Mods**.
+
+**ElevenLabs voices (optional, online).** Put your key in a `.env` file at the top of the repo (git ignores it):
+
+```sh
+ELEVENLABS_API_KEY=your-key
+```
+
+Restart `bun run start`, tick **Read answers aloud**, and pick a voice from the list next to it. The server holds the key
+and sends each answer's text to ElevenLabs (flash model, lowest latency); if a sentence fails, the Mac voice reads it.
+Optional: `ELEVENLABS_VOICE_ID` sets a default voice and `ELEVENLABS_MODEL` another model.
 
 ### Also
 

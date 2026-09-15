@@ -585,6 +585,10 @@ Until then voice goes to Chrome's speech service and the console says so, and th
 the cloud". Answers are read with a local voice (`localService`) sentence by sentence as they stream. The game's
 push-to-talk key (custom input `second-shift-talk`, Alt+V) reaches the console in ~80 ms through the event feed.
 
+**ElevenLabs voices (S26, FC-148, player request):** opt-in online voices for reading answers. The server keeps
+`ELEVENLABS_API_KEY` (gitignored `.env`) and streams `eleven_flash_v2_5` audio per sentence through `/tts`, so the key
+never reaches the page; the picker labels them online.
+
 **Phase 5 — character control** (was Phase 3b)
 - Stop hotkey first; decide how agent control and the player's own inputs interact (§8 Q11)
 - `mine_by_hand`, `craft`, `transfer_items`, each with a confirm

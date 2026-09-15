@@ -2,7 +2,7 @@ import { render } from "preact";
 import { Composer, Thread } from "./chat";
 import { AlertFeed, LivePanel } from "./console";
 import { connect, connected, status } from "./store";
-import { probeRecognition } from "./voice";
+import { loadElevenVoices, probeRecognition } from "./voice";
 
 /** The Second Shift mark (brand/logo/mark.svg), drawn from the tokens so it follows the theme. */
 function Mark() {
@@ -53,4 +53,5 @@ function App() {
 
 connect();
 void probeRecognition();
+void loadElevenVoices();
 render(<App />, document.getElementById("app")!);
