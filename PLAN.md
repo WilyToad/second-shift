@@ -229,8 +229,11 @@ Long actions (walking, mining a row by hand, placing many ghosts) are spread acr
   checker.
 - **Output:** a before/after preview, a copyable string, and `place_blueprint` (a map change, so
   it's confirmed).
-- **Later:** a separate background Factorio instance with the same mods that loads a proposed
-  blueprint into a test map and measures real output, without touching the real game.
+- **Approximate, not simulated (decided by the player 2026-09-15):** no second Factorio instance and no custom
+  simulator. Estimates only need the right bottleneck and a roughly right rate, said as a rounded range, pessimistic
+  side first; they use measured inserter tables and machine insertion limits (FC-161) and are regression-tested
+  against rates measured in the dev game. When the exact rate matters, it's measured in the player's own game from
+  machines' `products_finished` over a minute (FC-162).
 
 ---
 
@@ -607,7 +610,7 @@ and car driving is last, split into a spike and an implementation.
 **Phase 4 — voice and extras**
 - Voice in/out in the web console, using the browser's own speech features (Chrome, Safari) first
 - In-game UI (mod GUI chat panel / hotkey popup)
-- Background Factorio test instance for measuring blueprints
+- ~~Background Factorio test instance for measuring blueprints~~ dropped (see Blueprints): better estimates and measuring builds in the player's game instead
 - ~~Session memory across play sessions~~ done in S18 (FC-063) and per map in S22 (FC-137)
 
 **Voice (S26, decided by the player 2026-09-15):** the Web Speech API in the console, as in Chrome's demo; Brave
