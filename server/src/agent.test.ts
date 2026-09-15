@@ -257,7 +257,7 @@ test("a blueprint request is built in code: the page gets a card, the model gets
   expect(card.blueprint.summary).toContain("3 assembling-machine-2");
   expect(card.blueprint.sketch.filter((e) => e.kind === "assembling-machine")).toHaveLength(3);
   const prompt = model.seen[0]!.at(-1)!.content;
-  expect(prompt).toContain("[generated blueprint: 3 assembling-machine-2 making iron-gear-wheel at 270/min");
+  expect(prompt).toContain("[generated blueprint: 3 assembling-machine-2 making iron-gear-wheel at about 270/min");
   expect(prompt).not.toContain(card.blueprint.string);
   expect(events.some((e) => e.type === "plan")).toBe(false);
 

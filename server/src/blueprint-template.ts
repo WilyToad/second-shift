@@ -168,5 +168,6 @@ export function productionRow(p: Prototypes, req: RowRequest): RowResult {
 
 /** One line for the model: what was built and what to feed it. */
 export function describeRow(b: RowBuild): string {
-  return `[generated blueprint: ${b.machines} ${b.machine} making ${b.item} at ${round(b.perMinute)}/min (recipe ${b.recipe}) | needs ${b.inputs.map((i) => `${i.name} ${round(i.perMinute)}/min`).join(", ")} | ${b.belt}, ${b.insertersPerMachine} ${b.inserter} in and out per machine, ${b.pole} | ${b.notes.join("; ")}]`;
+  // "about": the rate comes from machine speed and productivity, and the review gives the same number as a range (FC-161).
+  return `[generated blueprint: ${b.machines} ${b.machine} making ${b.item} at about ${round(b.perMinute)}/min (recipe ${b.recipe}) | needs ${b.inputs.map((i) => `${i.name} ${round(i.perMinute)}/min`).join(", ")} | ${b.belt}, ${b.insertersPerMachine} ${b.inserter} in and out per machine, ${b.pole} | ${b.notes.join("; ")}]`;
 }

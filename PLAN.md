@@ -417,6 +417,20 @@ token 2.2–7.4 s). Two measured causes:
   drops back each block (the session's turns at 6,144 cached had 376–950 uncached). Keep history append-only:
   compacting earlier rewrites cached blocks, which costs a cold prefill.
 
+**Throughput estimates against the game (FC-161, 2026-09-15):** `scripts/test-generated-builds.ts` now feeds each
+generated row through its own belts (the level script tops up the head of the input belt and empties the tail of the
+output belt, one surface per case), so belts, inserters and machines all count. Three healthy rows and two crippled
+ones (half the input inserters removed; every inserter replaced with a plain one), 13/13: measured 149.8, 300.2 and
+30.2/min against promises of 150, 300 and 30, and the estimate landed within **1.1%** of the game on every case,
+blaming the right part each time. What the estimate gained: a belt lane cap (`belt_speed × 240` items a second, the
+biggest correction — a bulk inserter with a big hand on a yellow belt moves ~6.4/s, not 30/s), a hand-size share for
+belt ends fitted to the wiki's 2.0.26 tables and to a measured row (plain inserter, hand 3: 2.38/s measured, 2.39/s
+estimated), the game's machine insertion rule (a machine holds one craft plus what it finishes in one swing), and
+zero output for a machine with no inserter on a side. Rates are now given as a range with the cautious end first.
+An input-belt lane limit can't be measured with this rig: a scripted feed isn't held to belt speed the way a real
+source is (`scripts/probes/belt-feed.ts` measures the feed at exactly one lane per lane, but a consumer taking a
+batch frees the entry sooner), so the lane cap is checked against the wiki's tables in unit tests instead.
+
 **Numbers in answers (FC-153, 2026-09-15):** no calculator tool. Every tool round pays another first token (1–2.5 s in
 the voice session's logs; turns with a tool round reached first words in 3.3–5.4 s vs 1.5–2.0 s for one round in
 `scripts/e2e-wake.ts`), and the model would still have to choose to call it. Instead the save's facts come in the

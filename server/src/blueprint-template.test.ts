@@ -26,7 +26,7 @@ test("a gear row: machine count, slowest inserter that keeps up, and a valid blu
   const t = blueprintThroughput(b.blueprint, p);
   expect(t.outputs).toEqual([{ name: "iron-gear-wheel", perMinute: 270, fluid: false, belts: 0.15 }]);
   expect(t.limits).toEqual([]);
-  expect(describeRow(b)).toContain("3 assembling-machine-2 making iron-gear-wheel at 270/min");
+  expect(describeRow(b)).toContain("3 assembling-machine-2 making iron-gear-wheel at about 270/min");
 });
 
 test("poles reach every inserter and are wired together", () => {
