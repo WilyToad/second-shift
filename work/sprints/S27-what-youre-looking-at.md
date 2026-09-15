@@ -1,6 +1,6 @@
 # S27 — What you're looking at
 
-- **Status:** active
+- **Status:** done
 - **Goal:** The companion knows what the player is pointing at, holding or has open, can say what's inside a container they can see, keeps a request when they correct themselves, stops repeating research status, gets numbers right, and stays fast in long conversations.
 - **Started:** 2026-09-15
 - **Acceptance:** Each item's acceptance below; the player's voice session from 2026-09-15 replayed as an eval (same questions, with the game in the same state where it matters) gives none of the odd replies found in it; existing suites still pass.
@@ -50,4 +50,14 @@ Planned from the player's first real voice session (2026-09-15) and activated af
 
 **Acceptance run (2026-09-15):** `scripts/eval-voice-session.ts` replays the session's questions on the dev save (a red chest selected by test tooling, 7 storage tanks inserted): 8/8, first words median 1.52 s and max 4.16 s (5.66 s and 10.02 s in the session). Along the way: eval-grounding 10/10, eval-diagnosis 4/4, eval-new-game 26/26 (one earlier run 25/26: "no tools needed" about hand tools tripped the tool-talk check), test-player 27/27, test-helmet 13/13. Two runs showed model variance the checks allow: the model sometimes reads "rocket salad" as the silo and points right away. With the game window focused, the client's real mouse clears a scripted selection within a tick, so the replay's "what is this?" was answered from the last hovered entity.
 
-**For the player to check:** hovering with the real mouse ("what is this?", "what's in this chest?"), and talking in a long conversation to feel the wake-ups (first words should stay near 1.5 s). One reply in the first replay run stated a mechanic from memory, "requester chests won't pull from it" about a passive provider chest (they do): filed as FC-160.
+**Player checks (confirmed 2026-09-15: "Works great!" and "Good!"):** hovering with the real mouse ("what is this?", "what's in this chest?"), and talking in a long conversation to feel the wake-ups (first words should stay near 1.5 s). One reply in the first replay run stated a mechanic from memory, "requester chests won't pull from it" about a passive provider chest (they do): filed as FC-160.
+
+## Review
+
+The companion knows what the player points at, holds and has open, reads what's inside a container they can see, keeps a request through a correction, leaves research status out unless asked, gives one direction and position for a thing, doesn't invent numbers for "these", and answers a long spoken conversation in about 1.5 s.
+
+- Built: `pointed_at` and `container_contents` looks (hover record from `on_selected_entity_changed`, module-local), highlight boxes tied to entities, correction carry-over, wider offer patterns and a not-run reply without cards, research line only for research/rate/machine/what-next questions, whole-tile bearings with nearest positions, follow-up references and arithmetic checked in code, and wake-ups that keep the model from idling while the player talks or types.
+- Measured: the model idles ~3 s after a request and then waits 1.5–2.7 s; with wake-ups the server's first token went from a median of 2.7 s to 1.1 s. Uncached history costs ~1 ms a token. A hover change costs ≤18 µs; mod script 0.056 ms/tick.
+- Evals: voice session replay 8/8 (first words median 1.52 s vs 5.66 s in the session), grounding 10/10, diagnosis 4/4, new-game 26/26, test-player 27/27, test-helmet 13/13.
+- Player checks: real-mouse hovering and a long spoken conversation, both confirmed.
+- Filed: FC-160 (mechanics stated from memory).
