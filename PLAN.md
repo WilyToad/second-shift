@@ -399,6 +399,21 @@ benchmark readings have ranged 0.043–0.107 ms across runs with no per-tick cha
 same conditions). `alignToCacheBlock` now swaps the overshooting padding line for shorter ones: 4,126 tokens, first
 token 1.14–1.39 s. Check the "aligned" line after adding tools or rules.
 
+**Long voice conversations (FC-158, 2026-09-15):** the first voice session's first words took 5–7.6 s (server first
+token 2.2–7.4 s). Two measured causes:
+- **The model idles.** oMLX waits ~1.5 s before starting a request that arrives ≥3 s after the last one (1–2 s after:
+  no wait); with the game running the wait was ~2.7 s in the logs. A 1-token request on a one-word prompt wakes it and
+  leaves the conversation's cached blocks alone (`scripts/probes/idle-gap.ts`, `wake.ts`). Evals ask back to back, so
+  they never showed it. The console now sends "wake" every 1.2 s while the player talks (words heard) or typed in the
+  last 10 s; the server sends the ping unless a turn is running. A/B on 12 alternating turns with a 6 s pause and 4 s
+  of talking each (`scripts/e2e-wake.ts`, game running): server first token median **1.1 s with wake-ups vs 2.7 s
+  without** (1.00–1.59 vs 2.23–3.12); visible first words median 1.98 s vs 3.99 s.
+- **History past the last cached block.** Prefill costs ~1 ms per uncached token past the cached 4,096 (410 → 0.70 s,
+  1,215 → 1.14 s, 1,714 → 1.55 s, 2,216 → 2.34 s; `scripts/probes/suffix-prefill.ts`). History grows ~100–125 tokens a
+  turn and oMLX stores the next block only once the prompt crosses it, so the uncached part rises to ~2,000 tokens and
+  drops back each block (the session's turns at 6,144 cached had 376–950 uncached). Keep history append-only:
+  compacting earlier rewrites cached blocks, which costs a cold prefill.
+
 **Re-run after S24 (2026-09-15, `find_entities` stops counting unseen entities, 5 runs):** without 0.624, with 0.708, so
 **0.085 ms/tick**. No per-tick change since S22, but the readings have gone 0.055, 0.070, 0.085: profile per-tick
 script time (`scripts/probes/bench-ticks.ts`) before the next mod change.

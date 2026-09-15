@@ -164,6 +164,7 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `COMPANION_REPLAY_DIGEST=data/captures/digest.json bun run start` uses a captured digest while the
   game is closed, so offline answers see a realistic prompt.
 - `bun scripts/eval-ratios.ts` (server running) checks production-plan answers against an independent reference.
+- `bun scripts/e2e-wake.ts` (server and dev save running, resets the conversation) A/B-tests keeping the model awake while the player talks (FC-158).
 - `bun scripts/eval-grounding.ts` (server running) runs the 10-question grounding check. Run it
   after any change to retrieval, prompt wording or sampling; results land in `data/eval/`.
 

@@ -14,6 +14,7 @@ import { USER_DIR } from "./factorio";
 import { SHOT_NAME } from "./screenshots";
 import { ElevenLabs, elevenLabsKey } from "./tts";
 import { SOUND_NAMES, type SoundName } from "./sfx";
+import { ModelWaker } from "./wake";
 import { existsSync } from "node:fs";
 
 export type { ClientMessage, ServerMessage } from "./messages";
@@ -25,6 +26,8 @@ const game = new GameLink({ pollMs: 2000, historySize: 1800, cacheDir: new URL("
 const model = new OmlxClient({ baseUrl: "http://127.0.0.1:8888", apiKey: await readOmlxApiKey(), model: MODEL });
 let modelState: { state: "loading" | "ready" | "error"; error?: string } = { state: "loading" };
 let busy: Promise<void> = Promise.resolve();
+let asking = 0;
+const waker = new ModelWaker(() => model.stream([{ role: "user", content: "hi" }], { maxTokens: 1 }), () => asking > 0);
 let system = systemPrompt(null);
 let alignedBase: string | null = null; // the base prompt `system` was last aligned from
 let retriever: RecipeRetriever | null = null;
@@ -119,7 +122,15 @@ const server = Bun.serve({
     },
     message(_ws, raw) {
       const msg = JSON.parse(String(raw)) as ClientMessage;
-      if (msg.type === "ask" && msg.text.trim()) busy = busy.then(() => agent.ask(msg.text.trim(), msg.thinking ?? false));
+      if (msg.type === "ask" && msg.text.trim()) busy = busy.then(async () => {
+        asking++;
+        try {
+          await agent.ask(msg.text.trim(), msg.thinking ?? false);
+        } finally {
+          asking--;
+        }
+      });
+      if (msg.type === "wake") waker.wake();
       if (msg.type === "reset") busy = busy.then(() => agent.reset());
       // Approvals don't wait for the model: the player is waiting on them.
       if (msg.type === "approve") void agent.approve(msg.id);

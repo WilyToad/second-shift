@@ -28,9 +28,10 @@
 - [ ] FC-157 One position, one direction
   - Notes: the silo was "14 tiles west", then "roughly (-5, 0)" (invented), then "14 tiles north-west at (-4, -5)": two lookups rounded the character position differently and the silo sits on a compass boundary
   - Acceptance: surroundings and find results measure from the same rounded character position; the nearest position of each thing listed goes in the surroundings line so the model doesn't guess coordinates; unit test
-- [ ] FC-158 Long conversations lose the prompt cache
+- [x] FC-158 Long conversations lose the prompt cache
   - Notes: in the session, first words took 5–7.6 s (server first token 2.2–5.1 s) against ~1.2–2 s before. Prompts were 5,000–6,100 tokens: past the cached 4,096-token system block but short of the next full 2,048-token block, so 1,000–2,000 tokens of history were read again on every turn
   - Acceptance: measured cause and a fix (compact earlier, align history to blocks, or a smaller tail), with first-token times before and after on a replayed long conversation recorded in PLAN §5
+  - Done: two causes measured (PLAN §5). The bigger one wasn't the cache: oMLX idles ~3 s after a request and then waits 1.5–2.7 s before the next one starts. The console keeps it awake while the player talks or types (a 1-token ping every 1.2 s, never during a turn): server first token median 1.1 s vs 2.7 s on 12 alternating turns (`scripts/e2e-wake.ts`). History past the last cached block costs ~1 ms a token and resets each 2,048-token block; history stays append-only (compacting earlier would cost a cold prefill). Typing checked in the browser (wake messages sent, pings in the oMLX log); the talking path is unit-tested and gets checked in the player's next voice session
 - [ ] FC-159 Highlight boxes outlive what they mark
   - Notes: player (2026-09-15): after approving a deconstruction, "the marks stayed on the screen after the deconstruction for about 30 seconds". The boxes are drawn at fixed positions with a 30–60 s time to live, so they stay after the robots remove the entities
   - Acceptance: highlight boxes are tied to their entities, so a box disappears when its entity is removed (the rendering API destroys objects whose entity target is gone), still expiring on their timer otherwise; in-game test: highlight, destroy the entity, the box is gone

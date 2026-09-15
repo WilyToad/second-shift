@@ -1,9 +1,11 @@
 import { render } from "preact";
 import { Composer, Thread } from "./chat";
 import { AlertFeed, LivePanel } from "./console";
-import { connect, connected, status } from "./store";
+import { connect, connected, send, status } from "./store";
 import { loadElevenVoices, probeRecognition } from "./voice";
 import { loadSounds } from "./sounds";
+import { composing, keepWarm, lastTypedAt } from "./warm";
+import { heard, listenState } from "./voice";
 
 /** The Second Shift mark (brand/logo/mark.svg), drawn from the tokens so it follows the theme. */
 function Mark() {
@@ -56,4 +58,6 @@ connect();
 void probeRecognition();
 void loadElevenVoices();
 void loadSounds();
+// The model idles within ~3 s; keep it awake while a question is being spoken or typed (FC-158).
+keepWarm((now) => composing({ listening: listenState.peek() === "listening", heard: heard.peek(), lastTypedAt: lastTypedAt.peek() }, now), () => send({ type: "wake" }));
 render(<App />, document.getElementById("app")!);

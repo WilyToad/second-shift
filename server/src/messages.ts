@@ -37,4 +37,6 @@ export type ClientMessage =
   | { type: "ask"; text: string; thinking?: boolean }
   | { type: "approve"; id: string }
   | { type: "decline"; id: string }
-  | { type: "reset" };
+  | { type: "reset" }
+  // The player is talking or typing a question: keep the model awake (FC-158).
+  | { type: "wake" };

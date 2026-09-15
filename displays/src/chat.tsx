@@ -1,5 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { lastTypedAt } from "./warm";
 import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
 import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
@@ -123,6 +124,7 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
     stopSpeaking();
     onAsk(value, thinking.value);
     text.value = "";
+    lastTypedAt.value = 0;
   };
   const on = talking.value;
   const listening = on && listenState.value === "listening";
@@ -153,7 +155,7 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
       <label for="ask" class="visually-hidden">Ask the companion</label>
       <textarea
         id="ask" rows={2} value={listening && heard.value ? heard.value : text.value} placeholder={listening ? "Listening…" : waiting ? "Waiting for the answer, then listening again…" : "Ask about your factory, e.g. “how many rails are near me on the right?”"}
-        onInput={(e) => (text.value = e.currentTarget.value)}
+        onInput={(e) => { text.value = e.currentTarget.value; lastTypedAt.value = Date.now(); }}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
       />
       <div class="bar">
