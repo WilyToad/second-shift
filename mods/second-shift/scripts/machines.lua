@@ -139,47 +139,44 @@ local function poll(entry)
 end
 
 -- Initial registry for a save that already has machines: a few chunks per tick, never a full sweep.
--- Scan progress lives entirely in storage. A chunk iterator kept in a local would survive on the
--- host but not on a peer that just loaded the map, and their registries would drift apart (desync).
--- Each surface's chunk positions are listed once as two flat number arrays: cheap to build and store.
+-- Scan progress lives entirely in storage, including the surface's chunk iterator (a LuaObject, which
+-- storage can hold). A local iterator would survive on the host but not on a peer that just loaded the
+-- map, and their registries would drift apart (desync). Listing a big surface's chunks up front cost one
+-- 6–8 ms tick (FC-104); walking the stored iterator spreads that over the scan.
 local function scan_step(s)
   local scan = s.scan
+  if scan and scan.xs then scan = nil end -- a scan saved before FC-104: start over with the iterator
   if not scan then
     local names = {}
     for _, surface in pairs(game.surfaces) do names[#names + 1] = surface.name end
-    scan = { surfaces = names, surface_i = 0, chunk_i = 1, xs = {}, ys = {} }
+    scan = { surfaces = names, surface_i = 0 }
     s.scan = scan
   end
   local done, found = 0, 0
   while done < SCAN_CHUNKS_PER_TICK and found < SCAN_ENTITIES_PER_TICK do
     local surface = scan.surface_i > 0 and game.get_surface(scan.surfaces[scan.surface_i]) or nil
-    if not surface or scan.chunk_i > #scan.xs then
+    if not (surface and scan.chunks and scan.chunks.valid) then
       scan.surface_i = scan.surface_i + 1
       local name = scan.surfaces[scan.surface_i]
       if not name then
         s.scan, s.scanned = nil, true
         return
       end
-      local xs, ys, n = {}, {}, 0
       local next_surface = game.get_surface(name)
-      if next_surface then
-        for chunk in next_surface.get_chunks() do
-          n = n + 1
-          xs[n], ys[n] = chunk.x, chunk.y
+      scan.chunks = next_surface and next_surface.get_chunks() or nil
+    else
+      local chunk = scan.chunks()
+      if not chunk then
+        scan.chunks = nil
+      else
+        done = done + 1
+        local entities = surface.find_entities_filtered({ area = chunk.area, type = TYPES })
+        found = found + #entities
+        for _, entity in pairs(entities) do
+          -- An entity overlapping two chunks is found twice; add() ignores the repeat.
+          add(entity)
         end
       end
-      scan.xs, scan.ys, scan.chunk_i = xs, ys, 1
-      return -- listing a big surface is this tick's work
-    end
-    local i = scan.chunk_i
-    scan.chunk_i = i + 1
-    done = done + 1
-    local x, y = scan.xs[i] * 32, scan.ys[i] * 32
-    local entities = surface.find_entities_filtered({ area = { { x, y }, { x + 32, y + 32 } }, type = TYPES })
-    found = found + #entities
-    for _, entity in pairs(entities) do
-      -- An entity overlapping two chunks is found twice; add() ignores the repeat.
-      add(entity)
     end
   end
 end

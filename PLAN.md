@@ -385,6 +385,11 @@ with an empty inventory and 1.7 ms with plates (asking `get_craftable_count` for
 6.8 ms, so it's only asked for recipes the inventory can reach); `surroundings` 1.5 ms at radius 32 (the server's
 default) and 7.6 ms at the 64 cap on a dense Gleba base.
 
+**Registry scan spread out (S25, FC-104):** per-tick script time over 6,000 ticks: with the mod 0.047 ms in the last 600
+ticks vs 0.013 without, so **0.034 ms/tick** steady state; the benchmark's rising 0.055–0.085 readings were base-game
+noise. The chunk-listing ticks (8.1, 6.2, 3.2 ms) are gone: the scan walks a `LuaChunkIterator` kept in `storage` (it
+survives save and load mid-scan, checked in-game), slowest scan tick 0.88 ms.
+
 **Re-run after S24 (2026-09-15, `find_entities` stops counting unseen entities, 5 runs):** without 0.624, with 0.708, so
 **0.085 ms/tick**. No per-tick change since S22, but the readings have gone 0.055, 0.070, 0.085: profile per-tick
 script time (`scripts/probes/bench-ticks.ts`) before the next mod change.
