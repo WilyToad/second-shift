@@ -178,7 +178,7 @@
             <li><strong>Bun 1.3</strong> or newer.</li>
             <li><strong>oMLX</strong> serving a model with tool calling. Tested with Qwen3.8 Flash-Next, which needs about 70 GB of memory. Other providers are planned.</li>
           </ul>
-          <p class="note"><strong>Back up your save first.</strong> The launcher hosts your save as a private one-player game, and a hosted game autosaves.</p>
+          <p class="note"><strong>Host the game.</strong> The companion connects to multiplayer-hosted games only: start a new one from <em>Multiplayer → Host new game</em>, or host a save with the launcher. Back up existing saves first; hosted games autosave.</p>
         </div>
         <div class="code" aria-label="Setup commands">
 <pre><code><span class="c"># 1. get the code</span>
@@ -191,7 +191,8 @@ bun run link-mod
 
 <span class="c"># 3. start oMLX with your model</span>
 
-<span class="c"># 4. host your save</span>
+<span class="c"># 4. host a game: Multiplayer → Host new game,</span>
+<span class="c">#    or an existing save:</span>
 bun run launch -- "path/to/your-save.zip"
 
 <span class="c"># 5. open http://127.0.0.1:5170</span>

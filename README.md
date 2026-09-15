@@ -99,23 +99,35 @@ Other model providers (OpenAI-compatible servers, hosted APIs) are planned but n
    bun install
    ```
 
-2. **Close Factorio,** then turn on local RCON and link the mod. Factorio rewrites its config when it exits, so these
-   only stick while the game is closed.
+2. **Close Factorio,** then turn on local RCON and install the mod. Factorio rewrites its config when it exits, so
+   these only stick while the game is closed.
 
    ```sh
-   bun run setup-rcon   # adds local-rcon-socket and a random password to config.ini (backup in data/backups)
-   bun run link-mod     # links mods/second-shift into your Factorio mods folder and enables it
+   bun run setup-rcon   # lets the server talk to the game: adds a local RCON port and random password to config.ini
+   bun run link-mod     # installs the mod: links mods/second-shift into Factorio's mods folder and enables it
    ```
+
+   Second Shift isn't on the Factorio mod portal yet, so `link-mod` is how it gets installed. It adds a `second-shift`
+   link in `~/Library/Application Support/factorio/mods/` that points at this repo, so a `git pull` updates the mod too
+   (Factorio loads the new code the next time it starts). In-game it shows up under **Mods** like any other mod.
+   Both commands back up the file they change in `data/backups/`.
 
 3. **Start oMLX** with your model loaded. The server reads the API key from `~/.omlx/settings.json` (`auth.api_key`).
    If your model isn't named `Qwen3.8-Flash-Next-oQ4e-mtp`, set `COMPANION_MODEL`.
 
-4. **Host your save.** RCON only works in a hosted game, so the launcher starts your save as a private
-   one-player multiplayer game and checks that the mod answers.
+4. **Start a game, hosted.** The mod runs in any game once it's enabled, but the server can only reach a game that's
+   hosted as multiplayer (that's where RCON runs). A normal single-player game won't connect.
+
+   **A new game:** start Factorio from Steam, choose **Multiplayer → Host new game**, set up your map as usual, and
+   keep it private: untick public and LAN visibility and set a password. It saves and autosaves like any hosted game.
+
+   **A save you already have:** let the launcher host it privately and check that the mod answers:
 
    ```sh
    bun run launch -- "$HOME/Library/Application Support/factorio/saves/my-base.zip"
    ```
+
+   (**Multiplayer → Host saved game** in the menu works too.)
 
    > **Back up your save first.** A hosted game autosaves (every 10 minutes, 5 slots) and may overwrite your
    > `_autosave` files. To try it without touching anything, copy the save into `data/saves/` and host the copy
@@ -170,7 +182,7 @@ The full design, measurements and decisions are in [`PLAN.md`](PLAN.md).
 | `RCON never opened` | The game is still loading, or `config.ini` was reverted: close the game and run `bun run setup-rcon` |
 | `RCON is up but the mod didn't answer` | Close the game, run `bun run link-mod`, and check **Mods** in-game for Second Shift |
 | Steam asks to "launch with custom arguments" | Make sure Steam is running; always start the game through `bun run launch` |
-| `game: not connected` in the console | The game isn't hosted or is still loading. Wait for the launcher's "Ready", or restart it |
+| `game: not connected` in the console | The game isn't hosted, or is still loading. A single-player game can't connect: use **Multiplayer → Host new game** or `bun run launch`. The server keeps retrying, so there's no need to restart it |
 | `model: error` | Check that oMLX is running on port 8888, the model name matches `COMPANION_MODEL`, and `~/.omlx/settings.json` has an API key |
 | The first answer is very slow | The model is loading or its cache is cold. Later answers are faster |
 
