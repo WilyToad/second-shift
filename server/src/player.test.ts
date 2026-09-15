@@ -7,6 +7,7 @@ test("a short yes takes up the question the last answer offered", () => {
   expect(acceptedOffer("yeah", last)).toBe("Want me to look around to see what you built?");
   expect(acceptedOffer("yes please", last)).not.toBeNull();
   expect(acceptedOffer("sure, go ahead", last)).not.toBeNull();
+  expect(acceptedOffer("yeah", "Do you want me to look around for ore? Wider, say 64 tiles?\n\nThe wreckage holds plates.")).toBe("Do you want me to look around for ore? Wider, say 64 tiles?");
   expect(acceptedOffer("yeah", "You're on nauvis.")).toBeNull(); // nothing was offered
   expect(acceptedOffer("what can I craft right now?", last)).toBeNull(); // a new question, not a yes
   expect(acceptedOffer("yeah", undefined)).toBeNull();
@@ -71,5 +72,5 @@ test("surroundings lines name resources with amounts and where the nearest is", 
   expect(text).toContain("iron-ore 300 tiles, 245k total (nearest 20 tiles north)");
   expect(text).toContain("crash-site-spaceship-wreck-big-1 1 (nearest 10 tiles west)");
   expect(text).toContain("trees 120, rocks 3, water tiles 0, enemies 0");
-  expect(text).toContain("inside 1 of those containers (mining one by hand takes what's inside): iron-plate 8");
+  expect(text).toContain("wreckage and other containers here hold only: iron-plate 8 (in 1; mining one by hand takes those items and nothing else)");
 });

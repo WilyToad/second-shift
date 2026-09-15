@@ -144,6 +144,7 @@ Other model providers (OpenAI-compatible servers, hosted APIs) are planned but n
 
 ### First questions to try
 
+- On a new map: "What should I do first?" or "What can I craft right now?"
 - "How much iron plate am I making? Chart it."
 - "How many assemblers do I need for 60 advanced circuits a minute?"
 - "How many express belts are near me?"
@@ -151,7 +152,7 @@ Other model providers (OpenAI-compatible servers, hosted APIs) are planned but n
 - "What should I research next?"
 
 Tick **Think it through** for harder planning questions (slower, more careful). **New conversation** clears the
-thread.
+thread. Each map keeps its own conversation, so loading another save picks up where you left off on that one.
 
 ## How it works
 

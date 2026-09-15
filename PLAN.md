@@ -368,6 +368,14 @@ average (polling alone profiles at 0.055 ms/tick). FC-104 tracks the listing tic
 the benchmark's ~0.05 ms run-to-run noise of the earlier result, so public copy says "under 0.1 ms per tick" and
 names the one-time registry scan rather than quoting either number as exact.
 
+**Re-run after S22 (2026-09-15, mod 0.2.0: build record, player status, surroundings, map id; 1,800 ticks × 5 runs):**
+without 0.627 ms/tick, with 0.682 ms/tick, so **0.055 ms/tick** (an earlier 3-run pass read 0.102, inside the noise; a
+second 5-run pass 0.054). Nothing new runs per tick; the player's own builds now reach one shared, unfiltered
+`on_built_entity` handler. On-demand costs on the dev save (981 recipes, 1,405 force recipes): `player_status` 1.5 ms
+with an empty inventory and 1.7 ms with plates (asking `get_craftable_count` for all 233 hand recipes measured
+6.8 ms, so it's only asked for recipes the inventory can reach); `surroundings` 1.5 ms at radius 32 (the server's
+default) and 7.6 ms at the 64 cap on a dense Gleba base.
+
 **Measure every mod change** with `factorio --benchmark <save copy> --benchmark-ticks N`,
 with and without the companion mod, and watch the in-game time-usage debug view (F4 →
 show-time-usage). Proposed budget: under 0.1 ms per tick on average, no single tick over 1 ms.

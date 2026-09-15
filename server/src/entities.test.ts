@@ -31,3 +31,10 @@ test("the player's own words pick the entity: nicknames first, then groups", () 
   expect(resolveEntityFilterInText("How many belts are near me?", withBelts)?.names).toBeUndefined();
   expect(resolveEntityFilterInText("how many rails are near me", null)?.types).toContain("straight-rail");
 });
+
+test("S22: ore searches: 'ore' is every resource tile, a named ore is that resource", () => {
+  const ores = PrototypesSchema.parse({ recipes: {}, items: { "iron-ore": { type: "item", stack_size: 50 } }, fluids: {}, technologies: {}, machines: {}, raw_resources: ["iron-ore"] });
+  expect(resolveEntityFilter("ore", ores)).toEqual({ label: "ore", types: ["resource"] });
+  expect(resolveEntityFilter("ore patches", null)?.types).toEqual(["resource"]);
+  expect(resolveEntityFilter("iron ore", ores)?.names).toEqual(["iron-ore"]);
+});

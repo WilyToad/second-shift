@@ -21,8 +21,12 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Tech debt and risks
 
+- [ ] FC-139 First-hour answers still invent details
+  - Notes: S22 new-game eval, answers that passed the checks: "You placed an assembling-machine-1" (the build was a stone furnace, and the build record said so); "place your burner-mining-drill on the iron patch near the wreck" with no iron within 32 tiles; burner-inserter and belt ingredients stated from memory without recipe lines
+  - Acceptance: the new-game eval checks named builds against the build record and ore claims against surroundings, and recipe claims on player-data turns come with recipe lines; passes 3 runs in a row
 - [ ] FC-126 Blueprint requests sometimes come with an unasked-for paste card
   - Notes: seen while recording: "Give me a blueprint for 300 electronic circuits a minute" answered with the card, "Say the word and I'll paste it", and a paste approval card in the same turn (S14 guidance says no tool call until asked). With "and paste it here" in the question, the answer still said "Want it pasted as ghosts at your position? Just say so" next to the card. A 600/min request was refused correctly (1,800 cable/min is over one lane) but said "That approval card wasn't needed" when none was shown
+  - Notes (S22): same pattern outside blueprints: "help me... what do I do?" and "I just built something" on a new map each produced an add-map-tag card ("I've dropped a 'Start base here' tag, confirm it in the app"). The code correctly made it a card; the model shouldn't have offered it unasked
   - Acceptance: an eval over blueprint requests shows no paste card unless the player asked to paste
 - [ ] FC-130 The model sometimes writes its whole answer twice
   - Notes: selection review of a 22-entity build (2026-09-14, recording): the answer (507 characters) came out twice back to back, 271 tokens out, and the page and saved history both show it twice. The model repeated itself; the server passed it through

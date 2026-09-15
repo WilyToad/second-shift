@@ -38,9 +38,10 @@ No Vite. UI: Preact + signals in `displays/src` (PLAN §4).
   report (PLAN §6). Anything
   volatile placed earlier breaks the prefix cache: ~2 s warm vs ~42 s cold (PLAN §5). Don't
   put timestamps, tick counts or other changing values in the system prompt.
-- **Ground recipes on `prototypes.json`, not on what the model remembers.** The save is heavily
-  modded (Space Age, maraxsis, Cerys, factorissimo-2, PlanetsLib). Vanilla recipe knowledge is
-  wrong here, so a recipe or tech claim that can't be cited from the dump is a bug.
+- **Ground recipes on `prototypes.json`, not on what the model remembers.** The dev save is heavily
+  modded (Space Age, maraxsis, Cerys, factorissimo-2, PlanetsLib) and players' saves differ, so vanilla recipe
+  knowledge is wrong here: a recipe or tech claim that can't be cited from the dump is a bug. The system prompt
+  lists the connected save's own mods (FC-131).
 - **Keep the stable prompt prefix block-aligned.** oMLX caches whole 2,048-token blocks; the server pads the system
   prompt past the next boundary at startup (`alignToCacheBlock`). Changing rules or tools re-aligns automatically,
   but check `scripts/latency-report.ts` after prompt changes.
@@ -142,6 +143,11 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun scripts/test-machines.ts` (dev save hosted) checks the machine registry and polling cost.
 - `bun scripts/megabase.ts` (dev save hosted) scales the running game to 25,000 machines on a temporary surface and profiles every mod path (PLAN §5).
 - `bun scripts/test-research.ts` and `bun scripts/test-inserters.ts` (dev save hosted) check the research patch and inserter geometry.
+- `bun scripts/test-player.ts` (dev save hosted) checks the player's own data: map id, inventory, hand crafting, recent
+  builds, surroundings and trigger research. Run it after changes to `scripts/player.lua`.
+- `bun scripts/eval-new-game.ts [--switch-back]` (server running, game closed) creates a fresh map (~2 s), hosts it
+  and runs the first-hour questions against the game's own data; `--switch-back` then hosts the dev save and checks
+  its conversation returns. Run it after changes to player-data retrieval or turn guidance.
 - `bun scripts/test-helmet.ts` (dev save hosted) runs the in-game helmet-rule tests. Run it after any change
   to mod actions or `scripts/helmet.lua`.
 - Captures for offline work go in `data/captures/` (gitignored).

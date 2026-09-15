@@ -89,8 +89,9 @@ const send = async (text: string) => {
 let offerChecked = false;
 const ask = async (text: string) => {
   const reply = await send(text);
-  const offer = reply.text.trim().split("\n").at(-1)!;
-  if (!offerChecked && /\b(want|should|shall) (me|i)\b[^?]*\b(look|scan|search|check|find)\b[^?]*\?\s*$/i.test(offer)) {
+  // The server takes the last question in the answer as the offer; so does this check.
+  const offer = (reply.text.match(/[^.!?\n]*\?/g) ?? []).join(" ");
+  if (!offerChecked && /\b(want|should|shall) (me|i)\b[^?]*\b(look|scan|search|check|find)\b/i.test(offer)) {
     offerChecked = true;
     const yes = await send("yeah");
     check("yeah after an offer to look: looked or used the player's data", (yes.turn.chars.player ?? 0) > 0 || yes.turn.rounds.some((r: any) => r.toolCalls > 0), offer.slice(-100));
@@ -101,7 +102,8 @@ const ask = async (text: string) => {
 const norm = (s: string) => s.toLowerCase().replace(/[*_`]/g, "").replace(/-/g, " ");
 const mentions = (text: string, names: string[]) => names.filter((n) => norm(text).includes(norm(n)));
 const LEAKS = /\b(tool call|no tools?|the data provided|data (you|i was) (gave|given|provided)|without a tool|can'?t see what)\b/i;
-const MEMORY = /\b(pickaxe|axe|scrap)\b/i;
+// Advice to get a mining tool (none exist in 2.0), or wreckage "scrap" (a Fulgora item). "No pickaxe needed" is fine.
+const MEMORY = /\b(craft|make|get|build|use|with) (a |an |your |the )?(stone |iron )?(pick ?axe|axe)\b|\bscrap\b/i;
 const RESEARCH = /\bresearch/i;
 
 // 3. The walkthrough.
@@ -170,7 +172,7 @@ const all = Object.entries(answers);
 const leaks = all.filter(([, a]) => LEAKS.test(a));
 check("no answer talks about tools, tool calls or 'the data provided'", leaks.length === 0, leaks.map(([q]) => q).join(" | "));
 const memory = all.filter(([, a]) => MEMORY.test(a));
-check("no answer repeats vanilla-memory mistakes (pickaxe, axe, scrap)", memory.length === 0, memory.map(([q]) => q).join(" | "));
+check("no answer repeats vanilla-memory mistakes (craft a pickaxe or axe, scrap)", memory.length === 0, memory.map(([q]) => q).join(" | "));
 const nags = all.filter(([q, a]) => !RESEARCH.test(q) && /nothing is research|not research|no research/i.test(a));
 check("no answer nags about research on a map without labs", nags.length === 0, nags.map(([q]) => q).join(" | "));
 

@@ -19,10 +19,12 @@ const GROUPS: Record<string, string[]> = {
   turret: ["ammo-turret", "electric-turret", "fluid-turret", "artillery-turret"], wall: ["wall"], gate: ["gate"],
   "solar panel": ["solar-panel"], accumulator: ["accumulator"], radar: ["radar"], roboport: ["roboport"],
   lamp: ["lamp"], beacon: ["beacon"], lab: ["lab"], combinator: ["arithmetic-combinator", "decider-combinator", "constant-combinator", "selector-combinator"],
+  // Resource tiles (S22: "yeah" to "search wider for ore?" got "ore isn't recognized").
+  ore: ["resource"], "ore patch": ["resource"], resource: ["resource"],
   "train stop": ["train-stop"], station: ["train-stop"], locomotive: ["locomotive"], wagon: ["cargo-wagon", "fluid-wagon"],
 };
 
-const singular = (w: string) => (w.endsWith("ies") ? w.slice(0, -3) + "y" : w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
+const singular = (w: string) => (w.endsWith("ies") ? w.slice(0, -3) + "y" : /(ch|sh|x|ss)es$/.test(w) ? w.slice(0, -2) : w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
 
 /**
  * The thing a whole question refers to ("how many yellow belts are near me?"), using the player's own
@@ -32,7 +34,7 @@ export function resolveEntityFilterInText(text: string, prototypes: Prototypes |
   if (prototypes) {
     const names = new Set<string>();
     for (const e of new RecipeRetriever(prototypes).match(text)) {
-      if (prototypes.entities[e.name] || prototypes.machines[e.name]) names.add(e.name);
+      if (prototypes.entities[e.name] || prototypes.machines[e.name] || prototypes.raw_resources.includes(e.name)) names.add(e.name);
       const placed = prototypes.items[e.name]?.place_result;
       if (placed) names.add(placed);
     }
@@ -52,7 +54,8 @@ export function resolveEntityFilter(what: string, prototypes: Prototypes | null)
   // Otherwise a specific thing: an entity name (machines) or an item that places one.
   const names = new Set<string>();
   for (const e of new RecipeRetriever(prototypes).match(what)) {
-    if (prototypes.machines[e.name]) names.add(e.name);
+    // Mined resources: the resource entity has the item's name (iron-ore, coal, stone).
+    if (prototypes.machines[e.name] || prototypes.raw_resources.includes(e.name)) names.add(e.name);
     const placed = prototypes.items[e.name]?.place_result;
     if (placed) names.add(placed);
   }

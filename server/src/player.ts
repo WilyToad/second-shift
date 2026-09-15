@@ -6,14 +6,15 @@ import type { PlayerStatus, Surroundings } from "@companion/interfaces";
 const AFFIRMATIVE = /^\s*(y|yes|yeah|yea|yep|yup|sure|ok|okay|please|go ahead|do it|go for it|sounds good|absolutely|definitely|why not)\b[\s\w,.!']{0,30}$/i;
 
 /**
- * "yeah" after "Want me to look around?" means "look around". Returns the question the last answer
- * offered, so the reply can be classified as that question. Null when the reply isn't a short yes or
+ * "yeah" after "Want me to look around?" means "look around". Returns the questions the last answer
+ * asked, so the reply can be classified as what they offered. Null when the reply isn't a short yes or
  * the last answer offered nothing.
  */
 export function acceptedOffer(question: string, lastAnswer: string | undefined): string | null {
   if (!lastAnswer || !AFFIRMATIVE.test(question)) return null;
+  // Every question in the answer: offers come split ("Want me to look around for ore? Wider, say 64 tiles?").
   const offers = lastAnswer.match(/[^.!?\n]*\?/g);
-  return offers?.at(-1)?.trim() ?? null;
+  return offers ? offers.map((o) => o.trim()).join(" ") : null;
 }
 
 const START = /\b(what (should|do|can) i do|help me|i need help|get(ting)? started|where (do|should) i (start|begin)|what now|what next|what'?s next|next steps?|first steps?|just (started|landed|crashed|spawned)|new (game|map)|how do i (start|begin))\b|^\s*help\b/i;
@@ -75,7 +76,8 @@ export function formatSurroundings(s: Surroundings): string[] {
   lines.push(`- the player's own (built or owned): ${s.mine.length ? named(s.mine) : "nothing"}`);
   lines.push(`- resources: ${s.resources.length ? s.resources.map((r) => `${r.name} ${r.count} tiles, ${thousands(r.amount)} total (nearest ${bearing(here, r)})`).join(", ") : "none"}`);
   if (s.other.length) lines.push(`- other: ${named(s.other)}`);
-  if (s.salvage.length) lines.push(`- inside ${s.salvage_containers} of those containers (mining one by hand takes what's inside): ${s.salvage.map((i) => `${i.name} ${i.count}`).join(", ")}`);
+  // Answers said wreckage gives "scrap" (a Fulgora item) until the contents were listed as the only loot (S22 eval).
+  if (s.salvage.length) lines.push(`- wreckage and other containers here hold only: ${s.salvage.map((i) => `${i.name} ${i.count}`).join(", ")} (in ${s.salvage_containers}; mining one by hand takes those items and nothing else)`);
   lines.push(`- trees ${s.trees}, rocks ${s.rocks}, water tiles ${s.water_tiles}, enemies ${s.enemies}`);
   return lines;
 }
