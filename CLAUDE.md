@@ -137,6 +137,7 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
   on its own and warms the model at startup. The e2e and eval scripts talk to this running server, so
   **restart it after any server change** before trusting their results (it doesn't reload code).
 - `bun test`, `bun run typecheck`, `bun run check` (all of it), `bun run board` (sprint progress).
+- Website: `bun run site:dev` / `site:build` / `site:serve` locally; `bun run site:deploy` publishes to https://second-shift.wilytoad.com (outward-facing: only when the player asks).
 - `bun scripts/test-planning.ts` (dev save hosted) runs the helmet tests for planning actions (research, tags, camera, upgrade, blueprint paste).
 - `bun scripts/test-machines.ts` (dev save hosted) checks the machine registry and polling cost.
 - `bun scripts/megabase.ts` (dev save hosted) scales the running game to 25,000 machines on a temporary surface and profiles every mod path (PLAN §5).

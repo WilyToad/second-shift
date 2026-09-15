@@ -54,8 +54,9 @@
   - Acceptance: a static site in `website/` built with Bun, following the brand guide, with Codex-generated artwork and real captures; checked at desktop and phone widths in the browser
   - `website/`: one page (hero with the night-floor artwork behind a live console clip, features with 2× clips, the helmet rule, how it works with an HTML diagram and measured numbers, setup, footer with the Wube trademark note). Built with `Bun.build` from HTML (hashed assets, 7.3 MB); `site:dev`, `site:build`, `site:serve` scripts; typechecked. Artwork by Codex CLI image generation (`night-shift-floor`, `visor-reflection`, prompts in `art/PROMPTS.md`). Social card rendered from HTML to `og.png` (1200 × 630) and `docs/media/social-preview.png` (1280 × 640) for the GitHub repo settings
   - Checked in headless Chromium: 1440 px and 390 px full pages, no horizontal overflow; one polish pass (tighter hero, brighter art, the hero clip opens on the finished answer instead of an empty thread)
-- [ ] FC-124 Deploy the website to Cloudflare
+- [x] FC-124 Deploy the website to Cloudflare
   - Notes: needs the player's go and the address on wilytoad.com
+  - **Decided by the player: second-shift.wilytoad.com**, deployed on their go. Cloudflare Worker `second-shift-website` with static assets, custom domain (Cloudflare created the DNS record and certificate), `site:deploy` script, absolute `og:image`/`og:url`/canonical. Checked live: page and all 18 assets 200 with correct types, missing paths 404. Static assets answered video Range requests with the whole file (200), which Safari and iOS won't play from; a small Worker (`website/worker.ts`, unit test) now answers them with 206 slices. Live in headless Chromium: fonts, favicon, hero and blueprint clips playing. README and repo About link to the site. The repo was pushed by the player to github.com/WilyToad/second-shift
 
 ## Notes
 

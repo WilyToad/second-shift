@@ -14,6 +14,7 @@ bun run site:serve    # serve the build as a static host would, on http://127.0.
 | `src/media/` | Web versions of the captures (2× clips and stills from `scripts/capture/`) and artwork |
 | `src/og.png` | Link-preview image, copied to the build root unhashed |
 | `art/` | Original Codex artwork and the prompts that made it ([PROMPTS.md](art/PROMPTS.md)) |
+| `wrangler.jsonc`, `worker.ts` | Cloudflare deployment config and the byte-range Worker |
 | `social/` | The social card (`card.html`) and `render.ts`, which writes `src/og.png` and `docs/media/social-preview.png` |
 
 ## Updating media
@@ -24,6 +25,14 @@ bun run site:serve    # serve the build as a static host would, on http://127.0.
 
 ## Deploying
 
-Not deployed yet. `website/dist` is a plain static folder, so it can go to Cloudflare as static assets. Before
-deploying, set `og:image` in `src/index.html` to the absolute URL on the final domain; link previews ignore relative
-image paths.
+Live at **https://second-shift.wilytoad.com**, a Cloudflare Worker with static assets (`wrangler.jsonc`) on the
+wilytoad.com zone. Cloudflare manages the DNS record and certificate for the custom domain.
+
+```sh
+npx wrangler login     # once, with the Cloudflare account that holds wilytoad.com
+bun run site:deploy    # builds, then deploys website/dist
+```
+
+`worker.ts` runs in front of the assets only to answer byte-range requests with 206, which Safari and iOS need to
+play the clips; static assets alone return the whole file. It has a unit test (`worker.test.ts`). Roll back with
+`npx wrangler rollback --config website/wrangler.jsonc`.

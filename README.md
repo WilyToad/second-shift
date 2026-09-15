@@ -9,6 +9,8 @@
 
 <p align="center">A local AI companion for Factorio 2.0 that answers from your own save and can only do what you could.</p>
 
+<p align="center"><a href="https://second-shift.wilytoad.com">second-shift.wilytoad.com</a></p>
+
 <p align="center">
   <img src="docs/media/ask-chart.gif" alt="Asking the console how much jelly Gleba makes: the answer arrives in about three seconds with a live chart" width="880">
 </p>

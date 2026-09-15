@@ -1,0 +1,16 @@
+// Cloudflare Worker with static assets: serves the built site (website/dist) at second-shift.wilytoad.com.
+// worker.ts runs first only to answer video byte-range requests. Deploy with `bun run site:deploy` (builds first).
+{
+  "name": "second-shift-website",
+  "main": "./worker.ts",
+  "compatibility_date": "2026-09-14",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "routes": [
+    { "pattern": "second-shift.wilytoad.com", "custom_domain": true }
+  ],
+  "workers_dev": false
+}
