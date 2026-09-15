@@ -111,6 +111,42 @@ await Bun.sleep(2500);
 const expired = JSON.parse(await sc(`rcon.print(#rendering.get_all_objects("second-shift"))`));
 check("the marks expire", expired === 0, `${expired} left after 2.5 s`);
 
+// What the player points at (FC-151), what's inside (FC-152), highlights tied to their entities (FC-159). Test chests are
+// placed with /sc and removed after.
+const placeChest = async (force: string, far = false) => JSON.parse(await sc(`
+  local p = game.connected_players[1] local s = p.character.surface
+  local at = p.character.position
+  ${far ? `at = { x = at.x + 6000, y = at.y } s.request_to_generate_chunks(at, 0) s.force_generate_chunk_requests()` : ""}
+  local pos = s.find_non_colliding_position("iron-chest", { x = at.x + 3, y = at.y + 3 }, 20, 1)
+  local e = pos and s.create_entity({ name = "iron-chest", position = pos, force = "${force}" })
+  if e then e.insert({ name = "iron-plate", count = 50 }) e.insert({ name = "copper-plate", count = 3 }) end
+  rcon.print(helpers.table_to_json(e and { name = e.name, x = e.position.x, y = e.position.y, visible = p.force.is_chunk_visible(s, { x = math.floor(e.position.x / 32), y = math.floor(e.position.y / 32) }) } or {}))`));
+const testChest = await placeChest("player");
+const selectedNow = await call("debug_select_entity", testChest);
+const pointedAt = await call("pointed_at");
+check("pointed_at reports the entity under the mouse", pointedAt.ok && pointedAt.data.selected?.name === "iron-chest" && pointedAt.data.selected.x === Math.floor(testChest.x), `selected set: ${selectedNow.data?.selected}; ${pointedAt.profile}`);
+await call("debug_select_entity", {});
+const afterMove = await call("pointed_at");
+check("after the mouse moves on, the last hovered entity stays with how long ago", afterMove.ok && !afterMove.data.selected && afterMove.data.last_hovered?.name === "iron-chest" && afterMove.data.last_hovered.still_there === true, JSON.stringify(afterMove.data.last_hovered));
+const inside = await call("container_contents", { name: "iron-chest", x: Math.floor(testChest.x), y: Math.floor(testChest.y) });
+const got = Object.fromEntries(((inside.data?.items ?? []) as { name: string; count: number }[]).map((i) => [i.name, i.count]));
+check("container_contents lists what's inside, from a whole-tile position", inside.ok && got["iron-plate"] === 50 && got["copper-plate"] === 3, `${JSON.stringify(got)}; ${inside.profile}`);
+const enemyChest = await placeChest("enemy");
+const theirs = await call("container_contents", { name: "iron-chest", x: enemyChest.x, y: enemyChest.y });
+check("container_contents refuses another force's chest", !theirs.ok && theirs.error?.code === "not_yours", theirs.error?.code ?? "");
+const farChest = await placeChest("player", true);
+const unseen = await call("container_contents", { name: "iron-chest", x: farChest.x, y: farChest.y });
+check("container_contents refuses a chest the player can't see", farChest.visible === false && !unseen.ok && unseen.error?.code === "not_visible", `${unseen.error?.code ?? "ok"}; visible ${farChest.visible}`);
+const nothing = await call("container_contents", { name: "iron-chest", x: testChest.x + 50, y: testChest.y + 50 });
+check("container_contents refuses a spot with nothing there", !nothing.ok && nothing.error?.code === "gone", nothing.error?.code ?? "");
+await call("highlight", { entities: [testChest], seconds: 60 });
+const boxes = Number(await sc(`rcon.print(#rendering.get_all_objects("second-shift"))`));
+await game.destroy([testChest]);
+await Bun.sleep(200);
+const boxesAfter = Number(await sc(`rcon.print(#rendering.get_all_objects("second-shift"))`));
+check("a highlight box goes when its entity is removed", boxes === 1 && boxesAfter === 0, `${boxes} before, ${boxesAfter} after`);
+await game.destroy([enemyChest, farChest].filter((c) => c.name));
+
 // Trigger research: listed techs aren't researched and their prerequisites are.
 const research = await call("research_options");
 const triggers = research.data.triggers as { name: string; trigger: string }[];

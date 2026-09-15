@@ -650,3 +650,27 @@ test("FC-154: a correction carries the request into the turn", () => {
   const intent = `${correctedRequest("I meant the rocket silo", "Where is the rocket salad can you point it out to me")} I meant the rocket silo`;
   expect(askedFor("show_the_way", intent)).toBe(true);
 });
+
+test("FC-151 FC-152: 'what's in this chest' looks at what's under the mouse and inside it", async () => {
+  const calls: { action: ActionName; args: any }[] = [];
+  const chest = { name: "iron-chest", ghost: false, type: "container", surface: "nauvis", x: 4, y: -2, own: true };
+  const game: GameActions = {
+    latest: () => undefined,
+    async call(action: ActionName, args?: any): Promise<any> {
+      calls.push({ action, args });
+      if (action === "pointed_at") return { selected: chest, hand: { name: "transport-belt", count: 50 } };
+      if (action === "container_contents") return { entity: chest, items: [{ name: "iron-plate", count: 400 }], total_kinds: 1, fluids: [] };
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  const model = fakeModel([{ text: "400 iron plates." }, { text: "Nothing." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask("what's in this chest?");
+  expect(calls.find((c) => c.action === "container_contents")?.args).toEqual({ name: "iron-chest", x: 4, y: -2 });
+  const turn = model.seen[0]!.at(-1)!.content;
+  expect(turn).toContain("under the mouse now: iron-chest at (4, -2)");
+  expect(turn).toContain("inside the iron-chest at (4, -2): iron-plate 400");
+  calls.length = 0;
+  await agent.ask("what do I have in my inventory?");
+  expect(calls.map((c) => c.action)).not.toContain("container_contents");
+});

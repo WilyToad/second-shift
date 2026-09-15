@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PlayerStatusSchema, SurroundingsSchema } from "@companion/interfaces";
-import { acceptedOffer, correctedRequest, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, formatContents, formatPointedAt, wantsContents, wantsPointedAt, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 test("a short yes takes up the question the last answer offered", () => {
   const last = "Start by mining iron.\n\nWant me to look around to see what you built?";
@@ -145,4 +145,42 @@ test("FC-157: the same thing gets the same direction whether positions come floo
   expect(bearing(character, silo)).toBe(floored);
   const lines = formatSurroundings(SurroundingsSchema.parse({ surface: "nauvis", x: 8, y: -3, radius: 32, mine: [{ name: "rocket-silo", count: 1, x: -5, y: -8 }], resources: [], other: [], trees: 0, rocks: 0, water_tiles: 0, enemies: 0, salvage: [], salvage_containers: 0 }));
   expect(lines[1]).toBe(`- the player's own (built or owned): rocket-silo 1 (nearest ${floored} at (-5, -8))`);
+});
+
+test("FC-151: questions about what the player points at, holds or has open", () => {
+  for (const q of ["Can you see what I have highlighted what is this", "No I have something I have something else highlighted now", "what am I pointing at?", "what's this I'm holding?", "what is this building", "what do I have open?"]) {
+    expect(wantsPointedAt(q)).toBe(true);
+  }
+  for (const q of ["What do I have in my inventory", "How many radars are near me", "where is the rocket silo?"]) expect(wantsPointedAt(q)).toBe(false);
+});
+
+test("FC-151: pointed-at lines say what's under the mouse, last hovered, in hand and open, and 'nothing' when nothing is", () => {
+  const chest = { name: "iron-chest", ghost: false, type: "container", surface: "nauvis", x: 4, y: -2, own: true };
+  expect(formatPointedAt({ selected: chest, hand: { name: "transport-belt", count: 50 }, opened: { kind: "controller" } })).toEqual([
+    "under the mouse now: iron-chest at (4, -2)",
+    "in hand: transport-belt 50",
+    "open window: the player's inventory screen",
+  ]);
+  const lines = formatPointedAt({ last_hovered: { ...chest, still_there: true, ago_ticks: 180 } });
+  expect(lines).toContain("under the mouse now: nothing");
+  expect(lines).toContain("last hovered: iron-chest at (4, -2), 3 s ago");
+  expect(lines.join("\n")).not.toContain("nothing is pointed at");
+  const none = formatPointedAt({});
+  expect(none.at(-1)).toContain("nothing is pointed at: if they ask what \"this\" is, say you can't tell");
+  expect(formatPointedAt({ last_hovered: { still_there: false, ago_ticks: 60 } })).toContain("last hovered: something that's gone now, 1 s ago");
+});
+
+test("FC-152: contents questions, the entity they mean, and the contents line", () => {
+  for (const q of ["There's a chest right here in front of me what is in this red chest", "what's inside that wagon?", "what does the chest hold", "how many plates are in it?"]) expect(wantsContents(q)).toBe(true);
+  for (const q of ["What do I have in my inventory", "what is this?"]) expect(wantsContents(q)).toBe(false);
+  const chest = { name: "red-chest", ghost: false, type: "logistic-container", surface: "nauvis", x: 1, y: 2, own: true };
+  expect(contentsTarget({ selected: chest })).toEqual(chest);
+  expect(contentsTarget({ opened: { kind: "entity", entity: chest } })).toEqual(chest);
+  expect(contentsTarget({ last_hovered: { ...chest, still_there: true, ago_ticks: 30 * 60 } })).toEqual({ name: "red-chest", x: 1, y: 2 });
+  expect(contentsTarget({ last_hovered: { ...chest, still_there: true, ago_ticks: 5 * 60 * 60 } })).toBeNull();
+  expect(contentsTarget(null, { name: "wooden-chest", x: 0, y: 0 })).toEqual({ name: "wooden-chest", x: 0, y: 0 });
+  expect(formatContents({ entity: chest, items: [{ name: "iron-plate", count: 400 }, { name: "gear", count: 7, quality: "rare" }], total_kinds: 3, fluids: [] }))
+    .toBe("inside the red-chest at (1, 2): iron-plate 400, gear (rare) 7 and 1 more kinds");
+  expect(formatContents({ entity: { ...chest, name: "storage-tank", type: "storage-tank" }, items: [], total_kinds: 0, fluids: [{ name: "water", amount: 25000 }] }))
+    .toBe("inside the storage-tank at (1, 2): no items; fluids: water 25000");
 });

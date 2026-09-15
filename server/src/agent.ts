@@ -18,7 +18,7 @@ import type { ChatMessage, ChatModel, StreamResult, ToolCall, ToolSpec } from ".
 import { buildMessages, formatSnapshot, userTurn } from "./prompt";
 import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
-import { acceptedOffer, correctedRequest, bearing, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatPointedAt, wantsContents, wantsPointedAt, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -505,11 +505,22 @@ export class Agent {
     const searchAgain = world && /\b(how many|find|where (are|is)|count|search|look for|any \w+ (here|near))\b/i.test(question);
     // The player's own situation, fetched only when the question is about it (S22).
     const start = !pasted.summaries.length && wantsStartAdvice(intent);
-    const [status, around] = pasted.summaries.length ? [null, null] : await Promise.all([
+    const [status, around, pointed] = pasted.summaries.length ? [null, null, null] : await Promise.all([
       wantsPlayerStatus(intent) ? this.lookup("player_status") : null,
       wantsSurroundings(intent) ? this.lookup("surroundings", { resource_radius: 96 }) : null,
+      wantsPointedAt(question) ? this.lookup("pointed_at") : null,
     ]);
-    const playerLines = [...(status ? formatPlayerStatus(status, { builds: start || /\b(buil\w*|plac\w*|made)\b/i.test(intent) }) : []), ...(around ? formatSurroundings(around) : [])];
+    // "What's in this chest?": what the player points at, has open or just hovered, else a single thing just found (FC-152).
+    const lastOne = this.lastResult && this.lastResult.count === 1 && this.now() - this.lastResult.at <= RESULT_TTL_MS ? this.lastResult.refs[0] : null;
+    const askedContents = !pasted.summaries.length && wantsContents(question);
+    const target = askedContents ? contentsTarget(pointed, lastOne) : null;
+    const contentsLine = target ? await this.contentsOf(target) : askedContents ? "no container is under the mouse, open or just hovered, so its contents weren't looked at: ask the player to hover over it" : null;
+    const playerLines = [
+      ...(status ? formatPlayerStatus(status, { builds: start || /\b(buil\w*|plac\w*|made)\b/i.test(intent) }) : []),
+      ...(around ? formatSurroundings(around) : []),
+      ...(pointed ? formatPointedAt(pointed) : []),
+      ...(contentsLine ? [contentsLine] : []),
+    ];
     // Tools are ruled out only when the retrieved data answers the question; a question nothing matched
     // gets no note, so "I just built something" is free to look (S22).
     const answeredFromData = Boolean(found?.lines.length || playerLines.length);
@@ -551,7 +562,9 @@ export class Agent {
     const researchLines = start || /\b(research\w*|tech\w*|unlock\w*|queue)\b/i.test(question) ? await this.researchOptions() : [];
     const planLines = plan ? [formatPlan(plan)] : requested ? [requested.line] : [];
     // What the player can hand-craft comes with its recipes: answers stated ingredients from memory (FC-139).
-    const craftLines = this.deps.retriever()?.recipeLines(craftableRecipes(status)) ?? [];
+    // What's pointed at or held comes with its recipe, so "what is this, what's it for?" has save data (FC-151).
+    const pointedNames = pointed ? [pointed.selected?.name, pointed.hand?.name, pointed.opened?.entity?.name, pointed.last_hovered?.name].filter((n): n is string => Boolean(n)) : [];
+    const craftLines = this.deps.retriever()?.recipeLines([...new Set([...pointedNames, ...craftableRecipes(status)])]) ?? [];
     const unknown = pasted.summaries.length ? null : this.deps.retriever()?.unknownName(question);
     const unknownLines = unknown ? [`[save data: no item, fluid, recipe or building in this save is named "${unknown}"; if it's a nickname, ask which item they mean]`] : [];
     const recipeBlock = [...unknownLines, ...planLines, ...researchLines, ...(found?.lines ?? []), ...craftLines.filter((l) => !found?.lines.includes(l))];
@@ -742,7 +755,15 @@ export class Agent {
   }
 
   /** A look the player could make themselves; null when the game can't answer (not connected, older mod). */
-  private async lookup<A extends "player_status" | "surroundings">(action: A, args?: ActionArgs<A>): Promise<ActionData<A> | null> {
+  private async contentsOf(target: { name: string; x: number; y: number }): Promise<string> {
+    try {
+      return formatContents(await this.deps.game.call("container_contents", { name: target.name, x: target.x, y: target.y }));
+    } catch (e) {
+      return `couldn't look inside the ${target.name} at (${Math.floor(target.x)}, ${Math.floor(target.y)}): ${(e as Error).message}`;
+    }
+  }
+
+  private async lookup<A extends "player_status" | "surroundings" | "pointed_at">(action: A, args?: ActionArgs<A>): Promise<ActionData<A> | null> {
     try {
       return await this.deps.game.call(action, args);
     } catch {

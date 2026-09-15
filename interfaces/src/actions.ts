@@ -57,6 +57,30 @@ export const SurroundingsSchema = z.object({
 });
 export type Surroundings = z.infer<typeof SurroundingsSchema>;
 
+/** An entity as the player sees it: ghosts by what they'll become, whole-tile positions (FC-151). */
+export const SeenEntitySchema = z.object({ name: z.string(), ghost: z.boolean(), type: z.string(), surface: z.string(), x: z.number(), y: z.number(), own: z.boolean() });
+export type SeenEntity = z.infer<typeof SeenEntitySchema>;
+
+/** What the player points at, last hovered, holds and has open (FC-151). */
+export const PointedAtSchema = z.object({
+  selected: SeenEntitySchema.optional(),
+  // Gone entities come back with only still_there and ago_ticks.
+  last_hovered: SeenEntitySchema.partial().extend({ still_there: z.boolean(), ago_ticks: z.number() }).optional(),
+  hand: NameCount.optional(),
+  hand_ghost: z.string().optional(),
+  opened: z.object({ kind: z.string(), entity: SeenEntitySchema.optional(), item: z.string().optional() }).optional(),
+});
+export type PointedAt = z.infer<typeof PointedAtSchema>;
+
+/** What's inside a container or machine the player can see (FC-152). */
+export const ContainerContentsSchema = z.object({
+  entity: SeenEntitySchema,
+  items: luaArray(NameCount.extend({ quality: z.string().optional() })),
+  total_kinds: z.number(),
+  fluids: luaArray(z.object({ name: z.string(), amount: z.number() })),
+});
+export type ContainerContents = z.infer<typeof ContainerContentsSchema>;
+
 /** An entity on the companion player's surface, identified the way a player would point at it. */
 export const EntityRefSchema = z.object({ name: z.string(), x: z.number(), y: z.number() });
 export type EntityRef = z.infer<typeof EntityRefSchema>;
@@ -161,6 +185,9 @@ export const actions = {
     kind: "look",
   },
   player_status: { args: z.object({}), data: PlayerStatusSchema, kind: "look" },
+  pointed_at: { args: z.object({}), data: PointedAtSchema, kind: "look" },
+  container_contents: { args: z.object({ name: z.string(), x: z.number(), y: z.number() }), data: ContainerContentsSchema, kind: "look" },
+  debug_select_entity: { args: z.object({ name: z.string().optional(), x: z.number().optional(), y: z.number().optional() }), data: z.object({ selected: z.boolean() }), kind: "look" },
   map_id: { args: z.object({}), data: z.object({ map_id: z.string().optional() }), kind: "look" },
   surroundings: { args: z.object({ radius: z.number().positive().max(64).optional(), resource_radius: z.number().positive().max(96).optional() }), data: SurroundingsSchema, kind: "look" },
   queue_research: { args: z.object({ technology: z.string() }), data: z.object({ queued: z.string(), queue: luaArray(z.string()) }), kind: "small_request" },

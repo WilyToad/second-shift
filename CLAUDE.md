@@ -145,7 +145,7 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun scripts/megabase.ts` (dev save hosted) scales the running game to 25,000 machines on a temporary surface and profiles every mod path (PLAN §5).
 - `bun scripts/test-research.ts` and `bun scripts/test-inserters.ts` (dev save hosted) check the research patch and inserter geometry.
 - `bun scripts/test-player.ts` (dev save hosted) checks the player's own data: map id, inventory, hand crafting, recent
-  builds, surroundings and trigger research. Run it after changes to `scripts/player.lua`.
+  builds, surroundings, what the player points at, container contents, highlight boxes and trigger research. Run it after changes to `scripts/player.lua`.
 - `bun scripts/eval-new-game.ts [--switch-back]` (server running, game closed) creates a fresh map (~2 s), hosts it
   and runs the first-hour questions against the game's own data; `--switch-back` then hosts the dev save and checks
   its conversation returns. Run it after changes to player-data retrieval or turn guidance.
@@ -164,6 +164,7 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `COMPANION_REPLAY_DIGEST=data/captures/digest.json bun run start` uses a captured digest while the
   game is closed, so offline answers see a realistic prompt.
 - `bun scripts/eval-ratios.ts` (server running) checks production-plan answers against an independent reference.
+- `bun scripts/e2e-pointing.ts` (server and dev save running, resets the conversation) asks "what is this?" and "what's in this chest?" with the mouse on a test chest (FC-151, FC-152).
 - `bun scripts/e2e-wake.ts` (server and dev save running, resets the conversation) A/B-tests keeping the model awake while the player talks (FC-158).
 - `bun scripts/eval-grounding.ts` (server running) runs the 10-question grounding check. Run it
   after any change to retrieval, prompt wording or sampling; results land in `data/eval/`.

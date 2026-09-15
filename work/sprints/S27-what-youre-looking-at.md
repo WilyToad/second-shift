@@ -7,12 +7,14 @@
 
 ## Items
 
-- [ ] FC-151 What the player is pointing at, holding or has open
+- [x] FC-151 What the player is pointing at, holding or has open
   - Notes: player test (2026-09-15, voice): hovering over something and asking "Can you see what I have highlighted, what is this?" got an invented "storage tank 22 tiles north at (16, -24)"; after selecting another thing, "I can't see your cursor highlight directly". Factorio exposes the entity under the cursor (`LuaControl.selected`, and `on_selected_entity_changed`), the item in hand (`cursor_stack`) and the open window (`opened`); an inventory slot merely hovered isn't exposed to mods. With voice, the question arrives ~2 s after speaking, so the mouse may have moved: remember the last hovered entity and when
   - Acceptance: "what is this / what am I pointing at / what's this I'm holding / this building" questions get what's under the cursor now, the last thing hovered (with how long ago), the item in hand and the open window; with nothing there, the answer says so instead of guessing; the hover record is cheap (one event per hover change, benchmarked); helmet: only the companion's player; in-game test with `selected` set by test tooling
-- [ ] FC-152 What's inside a container the player can see
+  - Done: `pointed_at` look returns what's under the mouse, the last hovered entity with how long ago (kept from `on_selected_entity_changed` in a module-local, since it only feeds replies), the item or ghost in hand and the open window; "what is this / highlighted / holding / open" questions get those lines, "nothing" where nothing is, and the recipe for what's pointed at. In-game tests (selection set by test tooling, the event path checked by `scripts/probes/hover-cost.ts`); ≤18 µs per selection change; e2e through the server (`scripts/e2e-pointing.ts`) 3/3: the chest named, its contents, and the last hovered after the mouse moved. Real mouse hovering is for the player to confirm
+- [x] FC-152 What's inside a container the player can see
   - Notes: "what is in this red chest" got "I can't read chest contents from the data I have". Hovering a chest shows its contents in the game
   - Acceptance: a look action returns the contents of a container (chests, wagons, machines' input and output) the player can see, capped; used for "what's in this/that chest" with the pointed-at entity (FC-151) or the last search; refuses what the player can't see; helmet test
+  - Done: `container_contents` look: every inventory of a container, wagon or machine plus fluids, merged by item and quality, capped at 40 kinds; accepts whole-tile positions; refuses what the player can't see (not_visible), another force's (not_yours), nothing there (gone) or no inventory. "What's in this/that chest" uses what's under the mouse, open, hovered in the last minute or the single thing just found, and otherwise says to hover it. In-game tests including the helmet refusals
 - [ ] FC-153 Numbers in answers: a calculator and follow-up references
   - Notes: "What do I use these for" (storage tanks) answered "25,000 units each… 1,250,000 capacity total" (7 × 25,000 is 175,000, and neither number came from the save): "these" matched nothing, so nothing was retrieved. Player: "Maybe we need to have some type of small calculator or something it can use to do math"
   - Acceptance: follow-ups with "these/them/it/that" retrieve for what the previous turn was about; a way for the model to get arithmetic right is chosen by measurement (a `calculate` tool vs checking arithmetic in the answer in code vs computing the facts up front), with latency recorded; the replayed question gives the right total from save data or says the capacity isn't in the data
@@ -36,9 +38,10 @@
   - Notes: in the session, first words took 5–7.6 s (server first token 2.2–5.1 s) against ~1.2–2 s before. Prompts were 5,000–6,100 tokens: past the cached 4,096-token system block but short of the next full 2,048-token block, so 1,000–2,000 tokens of history were read again on every turn
   - Acceptance: measured cause and a fix (compact earlier, align history to blocks, or a smaller tail), with first-token times before and after on a replayed long conversation recorded in PLAN §5
   - Done: two causes measured (PLAN §5). The bigger one wasn't the cache: oMLX idles ~3 s after a request and then waits 1.5–2.7 s before the next one starts. The console keeps it awake while the player talks or types (a 1-token ping every 1.2 s, never during a turn): server first token median 1.1 s vs 2.7 s on 12 alternating turns (`scripts/e2e-wake.ts`). History past the last cached block costs ~1 ms a token and resets each 2,048-token block; history stays append-only (compacting earlier would cost a cold prefill). Typing checked in the browser (wake messages sent, pings in the oMLX log); the talking path is unit-tested and gets checked in the player's next voice session
-- [ ] FC-159 Highlight boxes outlive what they mark
+- [x] FC-159 Highlight boxes outlive what they mark
   - Notes: player (2026-09-15): after approving a deconstruction, "the marks stayed on the screen after the deconstruction for about 30 seconds". The boxes are drawn at fixed positions with a 30–60 s time to live, so they stay after the robots remove the entities
   - Acceptance: highlight boxes are tied to their entities, so a box disappears when its entity is removed (the rendering API destroys objects whose entity target is gone), still expiring on their timer otherwise; in-game test: highlight, destroy the entity, the box is gone
+  - Done: highlight boxes use entity targets with offsets, so the game removes a box with its entity. In-game test: highlight a chest, remove it, the box is gone (1 before, 0 after)
 
 ## Notes
 

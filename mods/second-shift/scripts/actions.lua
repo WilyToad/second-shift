@@ -91,10 +91,12 @@ return function(handlers)
       if i > MAX_TARGETS then break end
       local e = resolve(player, ref)
       if e then
-        local box = e.selection_box
+        -- Tied to the entity: the game removes the box when the entity goes (FC-159), e.g. after deconstruction.
+        local box, at = e.selection_box, e.position
         local obj = rendering.draw_rectangle({
           color = HIGHLIGHT_COLOR, width = 3, filled = false,
-          left_top = box.left_top, right_bottom = box.right_bottom,
+          left_top = { entity = e, offset = { box.left_top.x - at.x, box.left_top.y - at.y } },
+          right_bottom = { entity = e, offset = { box.right_bottom.x - at.x, box.right_bottom.y - at.y } },
           surface = e.surface, players = { player }, time_to_live = ttl,
         })
         ids[#ids + 1] = obj.id

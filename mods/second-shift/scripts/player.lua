@@ -10,6 +10,7 @@ local MAX_CRAFTABLE = 40
 local MAX_RADIUS = 64
 local MAX_NAMES = 25
 local MAX_RESOURCE_RADIUS = 96
+local MAX_CONTENTS = 40
 -- Effects that aren't things in the world: the crash site's fires are on the enemy force and read as 34 enemies (S22 eval).
 local TRANSIENT = { explosion = true, fire = true, ["smoke-with-trigger"] = true, sticker = true, projectile = true, beam = true, stream = true, ["particle-source"] = true, corpse = true }
 local ENEMY_TYPES = { unit = true, ["unit-spawner"] = true, turret = true, ["spider-unit"] = true, ["segmented-unit"] = true }
@@ -75,12 +76,42 @@ local function hand_recipe_list(character)
   return list
 end
 
+-- The last entity each player hovered, and when (FC-151): a spoken question arrives ~2 s after the words, when the mouse
+-- may have moved on. Module-local, not storage: it only feeds RCON replies, so a peer without it can't desync.
+local last_hover = {}
+local function on_selected_changed(e)
+  local player = game.get_player(e.player_index)
+  local selected = player and player.selected
+  if selected then last_hover[e.player_index] = { entity = selected, tick = e.tick } end
+end
+
+-- An entity the way the player sees it: ghosts by what they'll become, whole-tile positions.
+local function describe(player, entity)
+  local ghost = entity.type == "entity-ghost"
+  return {
+    name = ghost and entity.ghost_name or entity.name,
+    ghost = ghost,
+    type = ghost and entity.ghost_type or entity.type,
+    surface = entity.surface.name,
+    x = math.floor(entity.position.x), y = math.floor(entity.position.y),
+    own = entity.force == player.force,
+  }
+end
+
+local function gui_type_name(t)
+  for name, value in pairs(defines.gui_type) do
+    if value == t then return name end
+  end
+  return "unknown"
+end
+
 local M = {}
 
 function M.register(handlers)
   script.on_init(ensure_map_id)
   script.on_configuration_changed(ensure_map_id)
   util.on_event(defines.events.on_built_entity, on_player_built)
+  util.on_event(defines.events.on_selected_entity_changed, on_selected_changed)
 
   handlers.map_id = function()
     return { map_id = storage.map_id }
@@ -264,6 +295,105 @@ function M.register(handlers)
       salvage_containers = salvage_containers,
     }
   end
+
+  -- Look (FC-151): what the player is pointing at, last hovered, holds and has open. All on their own screen.
+  handlers.pointed_at = function()
+    local player = require_player()
+    local selected = player.selected
+    local hover = last_hover[player.index]
+    local last = nil
+    if hover then
+      if hover.entity.valid then
+        last = describe(player, hover.entity)
+        last.still_there = true
+      else
+        last = { still_there = false }
+      end
+      last.ago_ticks = game.tick - hover.tick
+    end
+    local cursor = player.cursor_stack
+    local hand = nil
+    if cursor and cursor.valid_for_read then hand = { name = cursor.name, count = cursor.count } end
+    local hand_ghost = nil
+    local ghost = player.cursor_ghost
+    if ghost and not hand then
+      local n = ghost.name
+      hand_ghost = type(n) == "string" and n or n.name
+    end
+    local opened = nil
+    local t = player.opened_gui_type
+    if t and t ~= defines.gui_type.none then
+      opened = { kind = gui_type_name(t) }
+      local o = player.opened
+      if t == defines.gui_type.entity and o and o.object_name == "LuaEntity" and o.valid then
+        opened.entity = describe(player, o)
+      elseif t == defines.gui_type.item and o and o.object_name == "LuaItemStack" and o.valid_for_read then
+        opened.item = o.name
+      end
+    end
+    return {
+      selected = selected and describe(player, selected) or nil,
+      last_hovered = last,
+      hand = hand, hand_ghost = hand_ghost,
+      opened = opened,
+    }
+  end
+
+  -- Look (FC-152): what's inside a container or machine, as hovering it shows. Only where the player's force can see,
+  -- and only their own, an ally's or neutral ones (the crash site's wreckage).
+  handlers.container_contents = function(args)
+    local player = require_player()
+    local x, y = tonumber(args.x), tonumber(args.y)
+    if type(args.name) ~= "string" or not (x and y) then reject("bad_args", "name, x and y are required") end
+    local entity = player.surface.find_entity(args.name, { x = x, y = y })
+    if not entity then
+      -- Whole-tile positions from other looks: take the named entity covering that tile.
+      local found = player.surface.find_entities_filtered({ name = args.name, area = { { x, y }, { x + 1, y + 1 } }, limit = 1 })
+      entity = found[1]
+    end
+    if not (entity and entity.valid) then reject("gone", "Nothing called " .. args.name .. " is at that spot.") end
+    if not helmet.visible(player.force, entity.surface, entity.position) then reject("not_visible", "The player can't see that spot right now.") end
+    local force = entity.force
+    if not (force == player.force or force.name == "neutral" or player.force.get_friend(force)) then
+      reject("not_yours", "That belongs to another force.")
+    end
+    local by_key, items = {}, {}
+    local inventories = 0
+    for i = 1, entity.get_max_inventory_index() do
+      local inv = entity.get_inventory(i)
+      if inv then
+        inventories = inventories + 1
+        for _, stack in pairs(inv.get_contents()) do
+          local key = stack.name .. "/" .. (stack.quality or "normal")
+          local entry = by_key[key]
+          if not entry then
+            entry = { name = stack.name, count = 0, quality = stack.quality ~= "normal" and stack.quality or nil }
+            by_key[key] = entry
+            items[#items + 1] = entry
+          end
+          entry.count = entry.count + stack.count
+        end
+      end
+    end
+    local fluids = {}
+    for name, amount in pairs(entity.get_fluid_contents()) do fluids[#fluids + 1] = { name = name, amount = math.floor(amount + 0.5) } end
+    if inventories == 0 and #fluids == 0 then reject("no_inventory", "That has no inventory to look into.") end
+    table.sort(items, function(a, b) return a.count > b.count end)
+    local kinds = #items
+    for i = #items, MAX_CONTENTS + 1, -1 do items[i] = nil end
+    return { entity = describe(player, entity), items = items, total_kinds = kinds, fluids = fluids }
+  end
+
+  -- Test tooling: point the mouse at an entity (nil clears), as hovering does, and record it as the event would.
+  handlers.debug_select_entity = function(args)
+    local player = require_player()
+    local entity = nil
+    if type(args.name) == "string" then entity = player.surface.find_entity(args.name, { x = tonumber(args.x) or 0, y = tonumber(args.y) or 0 }) end
+    player.selected = entity
+    if player.selected then last_hover[player.index] = { entity = player.selected, tick = game.tick } end
+    return { selected = player.selected ~= nil }
+  end
+
 end
 
 return M

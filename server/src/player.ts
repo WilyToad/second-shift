@@ -1,7 +1,7 @@
 // The player's own situation, fetched only when a question needs it (S22): what they carry and can
 // hand-craft, what they built, what they can see around them. Decided and formatted in code, sent in
 // the uncached tail, never in the system prompt.
-import type { PlayerStatus, Surroundings } from "@companion/interfaces";
+import type { ContainerContents, PlayerStatus, PointedAt, SeenEntity, Surroundings } from "@companion/interfaces";
 
 const AFFIRMATIVE = /^\s*(y|yes|yeah|yea|yep|yup|sure|ok|okay|please|go ahead|do it|go for it|sounds good|absolutely|definitely|why not)\b[\s\w,.!']{0,30}$/i;
 
@@ -175,4 +175,54 @@ export function claimCorrections(text: string, status: PlayerStatus, known: Set<
     corrections.push(`Correction: no ${[...new Set(phantom)].map((k) => knownKeys.get(k)).join(" or ")} was built recently${recent.length ? `; your latest builds are ${recent.join(", ")}` : ""}.`);
   }
   return corrections;
+}
+
+// "What is this?", "what am I holding?", "can you see what I have highlighted?" (FC-151).
+const POINTING = /\b(what('?s| is| are) (this|that|these|those|it)\b|what am i (looking at|pointing at|pointing to|hovering( over)?|holding|selecting|carrying in my hand)|(under|at) (my|the) (cursor|mouse)|highlight\w*|hover\w*|selected|select\w* (this|that)|this (thing|building|machine|entity|chest|box|container|one|item)|that (thing|building|machine|entity|chest|box|container|one)|in my hands?|holding|(have|got) open|this (window|screen|menu)|what do i have open)\b/i;
+// "What's in this chest?", "what does that wagon hold?" (FC-152).
+const CONTENTS = /\b(what('?s| is)? in(side)? (it|this|that|there|the)\b|contents?|what does (it|this|that|the [\w -]{1,24}) (have|hold|contain|store)|how (much|many) [\w -]{1,30} (is |are )?in (it|this|that|there|the))/i;
+
+export function wantsPointedAt(text: string): boolean {
+  return POINTING.test(text) || CONTENTS.test(text);
+}
+
+export function wantsContents(text: string): boolean {
+  return CONTENTS.test(text);
+}
+
+const seen = (e: SeenEntity) => `${e.ghost ? `${e.name} ghost` : e.name} at (${e.x}, ${e.y})${e.own ? "" : e.type === "tree" || e.type === "simple-entity" || e.type === "resource" ? "" : " (not the player's)"}`;
+const agoS = (ticks: number) => `${Math.max(1, Math.round(ticks / 60))} s ago`;
+/** Hovers older than this aren't "what the player means" any more. */
+const HOVER_FRESH_TICKS = 120 * 60;
+
+/** Lines for what the player points at, hovered last, holds and has open; each says "nothing" rather than leaving a gap to guess into. */
+export function formatPointedAt(p: PointedAt): string[] {
+  const lines = [`under the mouse now: ${p.selected ? seen(p.selected) : "nothing"}`];
+  const last = p.last_hovered;
+  if (last && last.ago_ticks <= HOVER_FRESH_TICKS && !(p.selected && last.name === p.selected.name && last.x === p.selected.x && last.y === p.selected.y)) {
+    lines.push(last.still_there && last.name ? `last hovered: ${seen(last as SeenEntity)}, ${agoS(last.ago_ticks)}` : `last hovered: something that's gone now, ${agoS(last.ago_ticks)}`);
+  }
+  lines.push(`in hand: ${p.hand ? `${p.hand.name} ${p.hand.count}` : p.hand_ghost ? `${p.hand_ghost} (ghost cursor, none carried)` : "nothing"}`);
+  const o = p.opened;
+  lines.push(`open window: ${!o ? "none" : o.entity ? seen(o.entity) : o.item ? `the ${o.item} item` : o.kind === "controller" ? "the player's inventory screen" : `the ${o.kind.replace(/_/g, " ")} screen`}`);
+  if (!p.selected && !(last && last.still_there && last.ago_ticks <= HOVER_FRESH_TICKS) && !o?.entity) {
+    lines.push("nothing is pointed at: if they ask what \"this\" is, say you can't tell and ask them to hover over it");
+  }
+  return lines;
+}
+
+/** Which entity "this chest" means: under the mouse, then open, then hovered in the last minute. */
+export function contentsTarget(p: PointedAt | null, lastFound?: { name: string; x: number; y: number } | null): { name: string; x: number; y: number } | null {
+  if (p?.selected) return p.selected;
+  if (p?.opened?.entity) return p.opened.entity;
+  const last = p?.last_hovered;
+  if (last?.still_there && last.name && last.x !== undefined && last.y !== undefined && last.ago_ticks <= 60 * 60) return { name: last.name, x: last.x, y: last.y };
+  return lastFound ?? null;
+}
+
+export function formatContents(c: ContainerContents): string {
+  const items = c.items.map((i) => `${i.name}${i.quality ? ` (${i.quality})` : ""} ${i.count}`).join(", ");
+  const more = c.total_kinds > c.items.length ? ` and ${c.total_kinds - c.items.length} more kinds` : "";
+  const fluids = c.fluids.length ? `; fluids: ${c.fluids.map((f) => `${f.name} ${f.amount}`).join(", ")}` : "";
+  return `inside the ${seen(c.entity)}: ${items || "no items"}${more}${fluids}`;
 }

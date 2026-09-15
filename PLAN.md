@@ -414,6 +414,14 @@ token 2.2–7.4 s). Two measured causes:
   drops back each block (the session's turns at 6,144 cached had 376–950 uncached). Keep history append-only:
   compacting earlier rewrites cached blocks, which costs a cold prefill.
 
+**Re-run after S27 mod changes (2026-09-15, hover record, `pointed_at`, `container_contents`, highlight boxes tied to
+entities, 5 runs):** without 0.779, with 0.899, so 0.121 ms/tick whole-tick, while per-tick script time
+(`scripts/probes/bench-ticks.ts`) reads 0.075 ms with the mod vs 0.019 without (last 600 ticks 0.055 vs 0.014), slowest
+script tick 0.88 ms: in line with S25 (nothing new runs per tick in a benchmark; the hover event only fires when a
+player's mouse moves to another entity). A selection change costs ≤18 µs including the engine's own work (5,000
+scripted changes in 90 ms, `scripts/probes/hover-cost.ts`), so a fast mouse sweep over a dense area stays well under
+the budget. On demand: `pointed_at` 0.06 ms, `container_contents` 0.08 ms.
+
 **Re-run after S24 (2026-09-15, `find_entities` stops counting unseen entities, 5 runs):** without 0.624, with 0.708, so
 **0.085 ms/tick**. No per-tick change since S22, but the readings have gone 0.055, 0.070, 0.085: profile per-tick
 script time (`scripts/probes/bench-ticks.ts`) before the next mod change.
