@@ -143,3 +143,14 @@ test("FC-131: the system prompt lists the save's own mods, not the author's", ()
   expect(formatMods(["space-age", "base", "quality", "elevated-rails", "second-shift"])).toBe("[save data: mods]\nelevated-rails, quality, space-age");
   expect(systemPrompt(null, ["base", "space-age"])).toContain("[save data: mods]\nspace-age");
 });
+
+test("S25: a long padding line that overshoots the boundary is swapped for a shorter one", async () => {
+  const measure = async (system: string) => Math.ceil(system.length / 3);
+  const system = "x".repeat(3 * 4080);
+  // The first line is long (~90 tokens): taking it would land ~70 tokens past the goal.
+  const lines = ["technology long-one: " + "y".repeat(250), "short: a", "medium line: machine-a, machine-b, machine-c, machine-d", "tiny"];
+  const aligned = await alignToCacheBlock(system, lines, measure);
+  expect(aligned.tokens).toBeGreaterThanOrEqual(4096 + 24);
+  expect(aligned.tokens).toBeLessThan(4096 + 24 + 12);
+  expect(aligned.system).not.toContain("long-one");
+});

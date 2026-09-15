@@ -177,6 +177,44 @@ export async function alignToCacheBlock(system: string, referenceLines: string[]
     tokens = await measure(candidate);
     if (tokens > before) charsPerToken = added / (tokens - before);
   }
+  // The line that crossed the goal can overshoot it by a long line's worth of tokens, re-read on every turn (S25:
+  // 83 tokens past the boundary instead of ~30 cost ~0.2 s first token). Replace it with shorter unused lines that
+  // still clear the goal, with a few extra measurements at startup.
+  if (tokens >= goal && tokens - goal > 8 && used > 0) {
+    const join = (lines: string[]) => (lines.length ? `${system}\n\n${heading}\n${lines.join("\n")}` : system);
+    const crossing = referenceLines[used - 1]!;
+    const kept = referenceLines.slice(0, used - 1);
+    const without = await measure(join(kept));
+    if (without >= goal) {
+      candidate = join(kept);
+      tokens = without;
+    } else {
+      // Fill the gap with the longest shorter lines first, then top up with the shortest until the goal is cleared.
+      const shorter = referenceLines.slice(used).filter((l) => l.length < crossing.length).sort((x, y) => y.length - x.length);
+      const fill: string[] = [];
+      let estimate = without;
+      for (const line of shorter) {
+        if (estimate >= goal + 2) break;
+        if (estimate + line.length / charsPerToken > goal + 8) continue; // would overshoot again
+        fill.push(line);
+        estimate += (line.length + 1) / charsPerToken;
+      }
+      const spare = shorter.filter((l) => !fill.includes(l)).sort((x, y) => x.length - y.length);
+      for (let tries = 0; tries < 4; tries++) {
+        const trial = await measure(join([...kept, ...fill]));
+        if (trial >= goal) {
+          if (trial < tokens) {
+            candidate = join([...kept, ...fill]);
+            tokens = trial;
+          }
+          break;
+        }
+        const next = spare.shift();
+        if (!next) break;
+        fill.push(next);
+      }
+    }
+  }
   return { system: candidate, tokens, target };
 }
 

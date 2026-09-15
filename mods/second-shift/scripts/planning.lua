@@ -216,6 +216,44 @@ return function(handlers)
     return { done = done, rejected = rejected, to_inventory = to_inventory, spilled = spilled }
   end
 
+  -- Map change (approval in the app, FC-109): what the player can set in a train stop's window: train limit (a
+  -- number, or -1 to turn it off), priority 0-255, name. The limit and priority can't be typed in while a circuit
+  -- signal sets them, so those are refused like the GUI would.
+  handlers.set_train_stop = function(args)
+    local player = require_player()
+    local targets = args.entities or {}
+    if #targets > MAX_TARGETS then reject("too_many", "At most " .. MAX_TARGETS .. " entities per action.") end
+    local limit, priority, name = tonumber(args.limit), tonumber(args.priority), args.name
+    if limit == nil and priority == nil and name == nil then reject("bad_args", "Give a limit, a priority or a name.") end
+    if limit and (limit ~= math.floor(limit) or limit < -1 or limit > 4294967294) then reject("bad_args", "The limit is a whole number, or -1 for no limit.") end
+    if priority and (priority ~= math.floor(priority) or priority < 0 or priority > 255) then reject("bad_args", "Priority is a whole number from 0 to 255.") end
+    if name ~= nil and (type(name) ~= "string" or name == "" or #name > 200) then reject("bad_args", "The name must be 1-200 characters.") end
+    local done, rejected = 0, {}
+    for _, ref in ipairs(targets) do
+      local e = resolve(player, ref)
+      local reason = nil
+      local control = e and e.valid and e.type == "train-stop" and e.get_control_behavior() or nil
+      if not (e and e.valid) then reason = "gone"
+      elseif e.force ~= player.force then reason = "not_yours"
+      elseif e.type ~= "train-stop" then reason = "not_a_train_stop"
+      elseif not helmet.visible(player.force, e.surface, e.position) then reason = "not_visible"
+      elseif limit and control and control.set_trains_limit then reason = "limit_set_by_circuit"
+      elseif priority and control and control.set_priority then reason = "priority_set_by_circuit"
+      end
+      if reason then
+        rejected[reason] = (rejected[reason] or 0) + 1
+      else
+        if limit then
+          if limit < 0 then e.trains_limit = nil else e.trains_limit = limit end
+        end
+        if priority then e.train_stop_priority = priority end
+        if name ~= nil then e.backer_name = name end
+        done = done + 1
+      end
+    end
+    return { done = done, rejected = rejected }
+  end
+
   -- Map change (approval in the app): paste a blueprint as ghosts, like the player would.
   handlers.place_blueprint = function(args)
     local player = require_player()

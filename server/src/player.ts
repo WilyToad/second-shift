@@ -100,3 +100,61 @@ export function formatSurroundings(s: Surroundings): string[] {
   lines.push(`- trees ${s.trees}, rocks ${s.rocks}, water tiles ${s.water_tiles}, enemies ${s.enemies}`);
   return lines;
 }
+
+const NUMBER_WORDS: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+const itemKey = (s: string) => s.toLowerCase().replace(/[*_`]/g, "").replace(/-/g, " ").replace(/\s+/g, " ").trim().replace(/(ch|sh|x)es$/, "$1").replace(/([^s])s$/, "$1");
+
+/**
+ * Corrections for what an answer says the player has or built, checked against their data after the answer
+ * (FC-140). Turn notes cut these down but the model still wrote "Your inventory: … iron-plate 7" with 1 held.
+ * Only sentences about the player's own inventory or builds are checked; `known` are item names in the save.
+ */
+export function claimCorrections(text: string, status: PlayerStatus, known: Set<string>, opts: { inventoryTurn?: boolean } = { inventoryTurn: true }): string[] {
+  const held = new Map(status.items.map((i) => [itemKey(i.name), i]));
+  const knownKeys = new Map([...known].map((n) => [itemKey(n), n]));
+  const plain = text.replace(/[*_`]/g, "");
+  const out = new Map<string, string>();
+  const NAME = "([a-z][a-z-]*(?: (?!and\\b|or\\b|plus\\b|with\\b|from\\b|to\\b)[a-z][a-z-]*){0,3})";
+  const NUM = "(\\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an)";
+  // The longest leading run of words that names an item: "iron plates still inside" -> "iron plate".
+  const resolve = (name: string) => {
+    const words = name.split(/\s+/);
+    for (let j = words.length; j > 0; j--) {
+      const key = itemKey(words.slice(0, j).join(" "));
+      if (held.has(key) || knownKeys.has(key)) return key;
+    }
+    return undefined;
+  };
+  const claim = (n: string, name: string) => {
+    const key = resolve(name);
+    if (!key || out.has(key)) return;
+    const count = /\d/.test(n) ? Number(n) : NUMBER_WORDS[n.toLowerCase()]!;
+    const item = held.get(key);
+    if ((item?.count ?? 0) !== count) out.set(key, `${item?.name ?? knownKeys.get(key)} ${item?.count ?? 0}`);
+  };
+  // Only explicit statements about the player's pockets (FC-140). Suggestions ("craft 1 gear"), loot in the
+  // wreckage and distances ("the coal 73 tiles north") aren't claims. "You have 47 labs" on a big base means the
+  // factory, so plain "you have" counts only on turns about the inventory.
+  if (opts.inventoryTurn) {
+    for (const m of plain.matchAll(new RegExp(`(?<!\\b(?:once|when|if|until|after|before|unless|as soon as) )\\b(?:you(?: now)? have|you'?ve (?:now )?got|you(?:'re| are) (?:now )?(?:carrying|holding)|you hold) (?:only |just |exactly )?${NUM} ${NAME}([^.!?\\n]*)`, "gi"))) {
+      claim(m[1]!, m[2]!);
+      for (const more of m[3]!.matchAll(new RegExp(`(?:,|\\band) ${NUM} ${NAME}`, "gi"))) claim(more[1]!, more[2]!);
+    }
+  }
+  for (const m of plain.matchAll(new RegExp(`\\b${NUM} ${NAME} (?:in|into) your (?:inventory|pack|pockets?)`, "gi"))) claim(m[1]!, m[2]!);
+  for (const m of plain.matchAll(/\binventory(?: has| holds| shows| now has)?:? ((?:[a-z][a-z-]* \d+(?:, | and |,? )?){1,12})/gi)) {
+    for (const pair of m[1]!.matchAll(/([a-z][a-z-]*) (\d+)/gi)) claim(pair[2]!, pair[1]!);
+  }
+  const corrections: string[] = [];
+  if (out.size) corrections.push(`Correction: your inventory has ${[...out.values()].join(", ")}.`);
+  // Builds the answer says the player made must be in their build record.
+  const built = new Set(status.recent_builds.map((b) => itemKey(b.name)));
+  const phantom = [...text.replace(/[*_`]/g, "").matchAll(/\byou(?:'ve| have)? (?:just )?(?:built|placed|put down|set up) (?:a |an |your |the )([a-z][a-z0-9 -]{2,40}?)(?= \d| tiles|,|\.|!| to | at | near | next | on | south| north| east| west| —|$)/gi)]
+    .map((m) => itemKey(m[1]!))
+    .filter((k) => knownKeys.has(k) && !built.has(k));
+  if (phantom.length) {
+    const recent = status.recent_builds.slice(0, 3).map((b) => b.name);
+    corrections.push(`Correction: no ${[...new Set(phantom)].map((k) => knownKeys.get(k)).join(" or ")} was built recently${recent.length ? `; your latest builds are ${recent.join(", ")}` : ""}.`);
+  }
+  return corrections;
+}

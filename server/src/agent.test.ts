@@ -588,3 +588,41 @@ test("FC-142: own stuck machines out of view are counted as elsewhere in the fac
   expect(toolMsg).toContain("30 more elsewhere in their own factory, out of view");
   expect(toolMsg).not.toContain("can't see");
 });
+
+test("FC-143: 'show me the way to copper' points to the nearest one it found, and only when asked", async () => {
+  const calls: { action: string; args: any }[] = [];
+  const game: GameActions = {
+    latest: () => undefined,
+    async call(action: any, args?: any): Promise<any> {
+      calls.push({ action, args });
+      if (action === "find_entities") return { surface: "nauvis", center: { x: 0, y: 0 }, direction: "around", radius: 128, area: { left_top: { x: -128, y: -128 }, right_bottom: { x: 128, y: 128 } }, count: 3, by_name: { "copper-ore": 3 }, entities: [{ name: "copper-ore", x: 60.5, y: -10.5 }, { name: "copper-ore", x: 40.5, y: 0.5 }, { name: "copper-ore", x: 90.5, y: 5.5 }], truncated: false };
+      if (action === "point_to") return { surface: "nauvis", x: args.x, y: args.y, distance: 40, seconds: 30 };
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  const prototypes = PrototypesSchema.parse({ recipes: {}, items: { "copper-ore": { type: "item", stack_size: 50 } }, fluids: {}, technologies: {}, machines: {}, raw_resources: ["copper-ore"] });
+  const model = fakeModel([{ tool: "show_the_way", args: { what: "copper ore" } }, { text: "Head east, 40 tiles." }, { tool: "show_the_way", args: { what: "copper ore" } }, { text: "Copper is east." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => new RecipeRetriever(prototypes), prototypes: () => prototypes, emit: () => {} });
+  await agent.ask("show me the way to the nearest copper ore");
+  expect(calls.find((c) => c.action === "find_entities")!.args).toMatchObject({ names: ["copper-ore"], radius: 128, from: "character" });
+  expect(calls.find((c) => c.action === "point_to")!.args).toEqual({ x: 40.5, y: 0.5, label: "copper-ore", seconds: 30 });
+  expect(model.seen[1]!.at(-1)!.content).toContain("Pointing to the nearest copper-ore: 41 tiles east at (40, 0)");
+  calls.length = 0;
+  await agent.ask("is there copper around?"); // a question, not a request to be pointed: dropped (FC-126)
+  expect(calls.some((c) => c.action === "point_to")).toBe(false);
+});
+
+test("FC-109: train stop limits go through a card on the last search, and only when asked", async () => {
+  const stops = [{ name: "train-stop", x: 10, y: 3 }, { name: "train-stop", x: 30, y: 3 }];
+  const { agent, events, calls } = setup([
+    { tool: "find_entities", args: { what: "train stops" } }, { text: "2 train stops." },
+    { tool: "set_train_stop", args: { limit: 2 } }, { text: "Confirm in the app." },
+  ], fakeGame(stops));
+  await agent.ask("how many train stops are near me?");
+  await agent.ask("set their train limit to 2");
+  const card = events.find((e) => e.type === "approval") as Extract<ServerMessage, { type: "approval" }>;
+  expect(card.title).toBe("Set 2 train stops: train limit 2?");
+  expect(calls.some((c) => c.action === "set_train_stop")).toBe(false);
+  expect(askedFor("set_train_stop", "how many train stops are near me?")).toBe(false);
+  expect(askedFor("set_train_stop", "rename them to Iron Drop")).toBe(true);
+});

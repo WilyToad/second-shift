@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PlayerStatusSchema, SurroundingsSchema } from "@companion/interfaces";
-import { acceptedOffer, bearing, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 test("a short yes takes up the question the last answer offered", () => {
   const last = "Start by mining iron.\n\nWant me to look around to see what you built?";
@@ -96,4 +96,32 @@ test("FC-141: wreckage loot gets a 'not scrap' note, unless the data really has 
   expect(lootNote(null, fulgora)).toBe("");
   expect(lootNote(null, SurroundingsSchema.parse({ ...base, salvage: [], salvage_containers: 0 }))).toBe("");
   expect(wantsSurroundings("I just picked up a bunch of debris from a crashed ship!")).toBe(true);
+});
+
+test("FC-140: counts and builds an answer gets wrong are corrected from the player's data", () => {
+  const status = PlayerStatusSchema.parse({
+    character: true, surface: "nauvis", x: 0, y: 0,
+    items: [{ name: "iron-plate", count: 2 }, { name: "wood", count: 1 }, { name: "burner-mining-drill", count: 1 }], total_items: 3,
+    craftable: [], more_craftable: false, crafting_queue: [],
+    recent_builds: [{ name: "stone-furnace", ghost: false, surface: "nauvis", x: 3, y: 3, age_ticks: 60, still_there: true }],
+  });
+  const known = new Set(["iron-plate", "wood", "burner-mining-drill", "stone-furnace", "iron-gear-wheel", "burner-inserter", "transport-belt", "coal", "iron-ore"]);
+  // Wrong: explicit statements about the pockets.
+  expect(claimCorrections("You picked up 6 iron-plate — you now have 7 total.\n\nYour inventory: burner-mining-drill 1, wood 1, stone-furnace 1, iron-plate 7.", status, known)).toEqual(["Correction: your inventory has stone-furnace 0, iron-plate 2."]);
+  expect(claimCorrections("You now have 5 iron plates and 2 iron gear wheels.", status, known)).toEqual(["Correction: your inventory has iron-plate 2, iron-gear-wheel 0."]);
+  expect(claimCorrections("That leaves 9 wood in your inventory.", status, known)).toEqual(["Correction: your inventory has wood 1."]);
+  expect(claimCorrections("You've built a burner-mining-drill 2 tiles east, right on the copper.", status, known)).toEqual(["Correction: no burner-mining-drill was built recently; your latest builds are stone-furnace."]);
+  // Right, or not claims about the pockets (all seen in S25 eval answers).
+  const fine = [
+    "You have 2 iron plates and 1 wood. You placed a stone-furnace 4 tiles south-east.",
+    "Once you have 50 iron plates, steam power unlocks. The wrecks hold 6 iron-plate.",
+    "Craft your 1 iron-gear-wheel from the 2 iron-plate you have, then mine the wreckage west for the 4 iron-plate still inside.",
+    "Nice haul — that's iron-plate 7 still sitting in the wreckage around you, plus the 1 already in your inventory.",
+    "You have 3 plates, so 1 gear-wheel plus 1 transport-belt or burner-inserter.",
+    "With 1 burner-mining-drill in your inventory, place the drill on the coal 73 tiles north or the iron-ore 97 tiles east.",
+  ];
+  for (const t of fine) expect([t, claimCorrections(t, status, known)]).toEqual([t, []]);
+  // On a turn that isn't about the inventory, "you have 47 labs" is the factory.
+  expect(claimCorrections("You have 47 labs idle on Gleba.", status, new Set([...known, "lab"]), { inventoryTurn: false })).toEqual([]);
+  expect(claimCorrections("Your inventory has wood 9.", status, known, { inventoryTurn: false })).toEqual(["Correction: your inventory has wood 1."]);
 });

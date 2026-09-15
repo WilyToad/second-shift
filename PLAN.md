@@ -390,6 +390,15 @@ ticks vs 0.013 without, so **0.034 ms/tick** steady state; the benchmark's risin
 noise. The chunk-listing ticks (8.1, 6.2, 3.2 ms) are gone: the scan walks a `LuaChunkIterator` kept in `storage` (it
 survives save and load mid-scan, checked in-game), slowest scan tick 0.88 ms.
 
+**Benchmark vs script profile (S25):** the 5-run benchmark read 0.107 ms/tick after S25, while per-tick script time
+(`scripts/probes/bench-ticks.ts`) stays ~0.05 ms with the registry scan running and 0.034 ms after it. Whole-tick
+benchmark readings have ranged 0.043–0.107 ms across runs with no per-tick change, so quote the script profile.
+
+**Stable prefix overshoot (S25):** two new tools left the aligned prompt 83 tokens past its 2,048-token block (usual
+~30); those tokens are re-read every turn: grounding first token 1.59–1.61 s vs 1.31–1.50 s without the tools (A/B,
+same conditions). `alignToCacheBlock` now swaps the overshooting padding line for shorter ones: 4,126 tokens, first
+token 1.14–1.39 s. Check the "aligned" line after adding tools or rules.
+
 **Re-run after S24 (2026-09-15, `find_entities` stops counting unseen entities, 5 runs):** without 0.624, with 0.708, so
 **0.085 ms/tick**. No per-tick change since S22, but the readings have gone 0.055, 0.070, 0.085: profile per-tick
 script time (`scripts/probes/bench-ticks.ts`) before the next mod change.

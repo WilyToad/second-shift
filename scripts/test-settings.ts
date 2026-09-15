@@ -13,6 +13,7 @@ const call = async (action: ActionName, args: Record<string, unknown> = {}) => {
 const results: [string, boolean, string][] = [];
 const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`); };
 const sc = dev.sc;
+const extraCleanup: Ref[] = [];
 
 // Recipes to try: an enabled one an assembling-machine-2 can't craft, a locked one, a hidden one.
 const picks = JSON.parse(await sc(`
@@ -88,10 +89,56 @@ try {
   } else check("refuses a machine the player can't see", false, "couldn't place the far machine");
   const gone = await call("set_recipe", { entities: [{ name: "assembling-machine-2", x: setup.mine[0]!.x + 0.25, y: setup.mine[0]!.y + 777 }], recipe: "iron-gear-wheel" });
   check("refuses a reference to nothing", gone.ok && gone.data.rejected.gone === 1, JSON.stringify(gone.data?.rejected));
+  // --- FC-109: train stop settings
+  const stopsRaw = await sc(`
+    local p = game.connected_players[1] local s = p.surface local f = p.force local out = {}
+    local function stop_at(dx, dy, force)
+      local pos = s.find_non_colliding_position("train-stop", { p.position.x + dx, p.position.y + dy }, 40, 2, true)
+      local e = pos and s.create_entity({ name = "train-stop", position = pos, force = force, direction = defines.direction.north })
+      return e and { name = e.name, x = e.position.x, y = e.position.y } or nil
+    end
+    out.mine = stop_at(-12, 8, f)
+    out.circuit = stop_at(-12, 14, f)
+    out.neutral = stop_at(-12, 20, "neutral")
+    if out.circuit then
+      local e = s.find_entity("train-stop", out.circuit)
+      local cb = e.get_or_create_control_behavior() cb.set_trains_limit = true cb.set_priority = true
+    end
+    local far = { x = p.position.x + 3001, y = p.position.y }
+    s.request_to_generate_chunks(far, 0) s.force_generate_chunk_requests()
+    local fp = s.find_non_colliding_position("train-stop", far, 40, 2, true)
+    local fe = fp and s.create_entity({ name = "train-stop", position = fp, force = f })
+    out.far = fe and { name = fe.name, x = fe.position.x, y = fe.position.y } or nil
+    out.far_visible = fe and f.is_chunk_visible(s, { x = math.floor(fe.position.x / 32), y = math.floor(fe.position.y / 32) }) or false
+    rcon.print(helpers.table_to_json(out))`);
+  const stops = JSON.parse(stopsRaw) as { mine?: Ref; circuit?: Ref; neutral?: Ref; far?: Ref; far_visible: boolean };
+  extraCleanup.push(...[stops.mine, stops.circuit, stops.neutral, stops.far].filter((r): r is Ref => !!r));
+  check("setup: train stops placed", !!(stops.mine && stops.circuit && stops.neutral), stopsRaw.slice(0, 200));
+  const stopState = async (r: Ref) => JSON.parse(await sc(`local e = game.connected_players[1].surface.find_entity("train-stop", { ${r.x}, ${r.y} }) rcon.print(helpers.table_to_json({ limit = e.trains_limit, priority = e.train_stop_priority, name = e.backer_name }))`));
+  const setStop = await call("set_train_stop", { entities: [stops.mine], limit: 2, priority: 80, name: "Companion Test Stop" });
+  const state = await stopState(stops.mine!);
+  check("sets a train stop's limit, priority and name", setStop.ok && setStop.data.done === 1 && state.limit === 2 && state.priority === 80 && state.name === "Companion Test Stop", `${JSON.stringify(setStop.data)}; ${JSON.stringify(state)}; ${setStop.profile}`);
+  const noLimit = await call("set_train_stop", { entities: [stops.mine], limit: -1 });
+  const cleared = await stopState(stops.mine!);
+  check("-1 turns the train limit off", noLimit.ok && noLimit.data.done === 1 && cleared.limit > 1_000_000, JSON.stringify(cleared));
+  const circuit = await call("set_train_stop", { entities: [stops.circuit], limit: 3, priority: 10 });
+  check("refuses a limit or priority a circuit signal sets", circuit.ok && circuit.data.done === 0 && circuit.data.rejected.limit_set_by_circuit === 1, JSON.stringify(circuit.data?.rejected));
+  const circuitName = await call("set_train_stop", { entities: [stops.circuit], name: "Renamed" });
+  check("still renames a circuit-controlled stop (the window allows it)", circuitName.ok && circuitName.data.done === 1, JSON.stringify(circuitName.data));
+  const neutralStop = await call("set_train_stop", { entities: [stops.neutral], limit: 1 });
+  check("refuses a train stop that isn't the player's", neutralStop.ok && neutralStop.data.rejected.not_yours === 1, JSON.stringify(neutralStop.data?.rejected));
+  const notStop = await call("set_train_stop", { entities: [setup.mine[0]], limit: 1 });
+  check("refuses something that isn't a train stop", notStop.ok && notStop.data.rejected.not_a_train_stop === 1, JSON.stringify(notStop.data?.rejected));
+  if (stops.far && !stops.far_visible) {
+    const farStop = await call("set_train_stop", { entities: [stops.far], limit: 1 });
+    check("refuses a train stop the player can't see", farStop.ok && farStop.data.rejected.not_visible === 1, JSON.stringify(farStop.data?.rejected));
+  } else check("refuses a train stop the player can't see", false, "couldn't place an unseen stop");
+  const badArgs = await call("set_train_stop", { entities: [stops.mine], priority: 300 });
+  check("refuses a priority outside 0-255", !badArgs.ok && badArgs.error?.code === "bad_args", badArgs.error?.code ?? "");
 } finally {
   await sc(`
     local p = game.connected_players[1] local s = p.surface
-    for _, r in pairs(helpers.json_to_table([=[${JSON.stringify([...setup.mine, setup.furnace, setup.neutral, ...(setup.far ? [setup.far] : [])])}]=])) do local e = s.find_entity(r.name, r) if e then e.destroy() end end
+    for _, r in pairs(helpers.json_to_table([=[${JSON.stringify([...setup.mine, setup.furnace, setup.neutral, ...(setup.far ? [setup.far] : []), ...extraCleanup])}]=])) do local e = s.find_entity(r.name, r) if e then e.destroy() end end
     for _, item in pairs(s.find_entities_filtered({ type = "item-entity", position = p.position, radius = 60 })) do if item.stack.name == "iron-plate" then item.destroy() end end
     local extra = p.get_item_count("iron-plate") - ${setup.plates}
     if extra > 0 then p.remove_item({ name = "iron-plate", count = extra }) end

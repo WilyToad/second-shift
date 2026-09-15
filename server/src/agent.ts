@@ -18,7 +18,7 @@ import type { ChatMessage, ChatModel, StreamResult, ToolCall, ToolSpec } from ".
 import { buildMessages, formatSnapshot, userTurn } from "./prompt";
 import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
-import { acceptedOffer, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, bearing, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -38,6 +38,8 @@ export type TurnRecord = {
   chars: { system: number; history: number; question: number; retrieved: number; player?: number; snapshot: number };
   rounds: { promptTokens?: number; cachedTokens?: number; serverTtftS?: number; completionTokens?: number; ms: number; toolCalls: number; tools?: string[] }[];
   visibleTtftMs?: number;
+  /** Corrections added for counts or builds the answer got wrong (FC-140). */
+  corrected?: number;
   /** The answer started over and was cut to one copy (FC-130). */
   repeated?: boolean;
   /** Tool calls dropped because the player didn't ask for them (FC-126). */
@@ -211,6 +213,22 @@ export const TOOLS: ToolSpec[] = [
   {
     type: "function",
     function: {
+      name: "set_train_stop",
+      description: "Ask the player to approve setting the train stops in the last result: train limit (-1 for none), priority 0-255, or name. Nothing happens until they confirm.",
+      parameters: { type: "object", properties: { limit: { type: "number" }, priority: { type: "number" }, name: { type: "string" } } },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "show_the_way",
+      description: "Point the player toward the nearest thing they can see (within 128 tiles): an arrow at their character and a mark on their map, for 30 s.",
+      parameters: { type: "object", properties: { what: { type: "string", description: "What to point to, as the player said it: copper ore, the nearest lab, ..." }, at: { type: "string", enum: ["nearest", "last_result"] } }, required: ["what"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "place_blueprint",
       description: "Ask the player to approve pasting the last blueprint they pasted into chat or you built for them, as ghosts at their position.",
       parameters: { type: "object", properties: {} },
@@ -235,6 +253,7 @@ export function needsWorldTools(question: string, hasLastResult: boolean): boole
   const q = question.toLowerCase();
   if (/\b(near|nearby|around me|next to me|close to me|here|to my|on my|of me|in view|on screen|visible)\b/.test(q)) return true;
   // Looking around and the player's own builds are world questions too (S22: "yeah, look around" got "I can't see").
+  if (/\b(show me the way|which way|point me|guide me|how do i get to)\b/.test(q)) return true;
   if (/\b(look around|look at (this|here|that)|what'?s around|what do you see|what can you see|surroundings|explore|scan\w*|search wider|look (further|wider|farther))\b/.test(q)) return true;
   if (/\b(i (just |have |'ve )?(built|placed|put down)|what (did|have) i (just )?(build|built|place|placed|make|made))\b/.test(q)) return true;
   if (/\b(find|search|look for|highlight|show me|where are|count|which)\b/.test(q)) return true;
@@ -264,6 +283,8 @@ export const ASKS_FOR: Record<string, RegExp> = {
   // "What do I need before I can research X?" is a question, not a request to queue it.
   queue_research: /\b(queue|start research\w*|begin research\w*|research (it|that|this|them)\b|go research)|^\s*(please |ok,? |okay,? |yes,? )?research\b/i,
   map_action: /\b(tag|pin|label|mark (it )?on (the )?map|camera|jump|take me|go to|show me where|look at)\b/i,
+  set_train_stop: /\b(limit|priority|prioriti[sz]e|rename|name (it|them|those|these|the stops?)|call (it|them))\b/i,
+  show_the_way: /\b(show me the way|point (me|the way|it out)|which way|what direction|guide me|lead me|ping|arrow|how do i get to|direct me|way to)\b/i,
 };
 
 /** Is this tool call something the player asked for? Tools not listed in ASKS_FOR always are. */
@@ -626,6 +647,14 @@ export class Agent {
             const block = fallbackChart(question, found?.items ?? [], snap?.digest);
             if (block) { text += block; this.deps.emit({ type: "token", text: block }); }
           }
+          // What the answer says the player has or built, checked against their data (FC-140).
+          const corrections = await this.checkClaims(text, status);
+          if (corrections.length) {
+            const add = `\n\n${corrections.join(" ")}`;
+            text += add;
+            this.deps.emit({ type: "token", text: add });
+            record.corrected = corrections.length;
+          }
           working.push({ role: "assistant", content: text });
           // Store the question without its bulky retrieved lines and snapshot: the next turn re-reads the
           // previous turn anyway (it sits past the last cache block), so a short version is much cheaper (S08).
@@ -694,6 +723,22 @@ export class Agent {
     return plan.steps.length ? plan : null;
   }
 
+  /** Corrections for counts and builds the answer got wrong; fetches the player's data only when the answer makes such a claim. */
+  private async checkClaims(text: string, status: ActionData<"player_status"> | null): Promise<string[]> {
+    if (!/\b(you|your inventory|inventory:)\b/i.test(text) || !/\d|\b(built|placed)\b/.test(text)) return [];
+    const protos = this.deps.prototypes();
+    const known = new Set([...Object.keys(protos?.items ?? {}), ...(status?.items.map((i) => i.name) ?? [])]);
+    const quick = status ?? { character: true, surface: "", x: 0, y: 0, items: [], total_items: 0, craftable: [], more_craftable: false, crafting_queue: [], recent_builds: [] };
+    // Without this turn's data, fetch it only if the answer would need correcting against an empty inventory.
+    const inventoryTurn = Boolean(status);
+    if (!status && !claimCorrections(text, quick, known, { inventoryTurn }).length) return [];
+    const data = status ?? (await this.lookup("player_status"));
+    if (!data?.character) return [];
+    for (const i of data.items) known.add(i.name);
+    for (const b of data.recent_builds) known.add(b.name);
+    return claimCorrections(text, data, known, { inventoryTurn });
+  }
+
   /** A look the player could make themselves; null when the game can't answer (not connected, older mod). */
   private async lookup<A extends "player_status" | "surroundings">(action: A, args?: ActionArgs<A>): Promise<ActionData<A> | null> {
     try {
@@ -760,6 +805,10 @@ export class Agent {
           return await this.mapAction(args);
         case "place_blueprint":
           return this.proposeBlueprint();
+        case "set_train_stop":
+          return this.proposeTrainStop(args);
+        case "show_the_way":
+          return await this.showTheWay(String(args.what ?? ""), args.at === "last_result");
         default:
           return `Error: there is no tool named ${call.function.name}. You can only use: ${TOOLS.map((t) => t.function.name).join(", ")}.`;
       }
@@ -794,6 +843,37 @@ export class Agent {
       // After "0 found" an answer still placed "the big patch 82 tiles south-west" (FC-139).
       r.count ? "" : "None are there, so don't say where one is; only lines that list it can place it.",
     ].filter(Boolean).join(" ");
+  }
+
+  /** FC-143: an arrow toward the nearest thing the player can see. A look they asked for, so it runs now. */
+  private async showTheWay(what: string, atLast: boolean): Promise<string> {
+    let refs: EntityRef[] = [];
+    let center: { x: number; y: number } | null = null;
+    let label = what;
+    const last = this.lastResult;
+    if (atLast && last && this.now() - last.at <= RESULT_TTL_MS) {
+      refs = last.refs;
+      label = last.label;
+      const p = this.deps.game.latest()?.digest.player;
+      center = p ? (p.character_position ?? p.position) : null;
+    } else {
+      const filter = resolveEntityFilterInText(this.currentQuestion, this.deps.prototypes()) ?? resolveEntityFilter(what, this.deps.prototypes());
+      if (!filter) return `I don't know what "${what}" refers to in this save, so nothing was pointed at.`;
+      const r = await this.deps.game.call("find_entities", { types: filter.types, names: filter.names, direction: "around", radius: 128, from: "character" });
+      refs = r.entities;
+      center = r.center;
+    }
+    if (!refs.length || !center) return `No ${label} within 128 tiles where the player can see, so nothing was pointed at. Say so; don't guess a direction.`;
+    const c = center;
+    const nearest = refs.reduce((best, e) => (Math.hypot(e.x - c.x, e.y - c.y) < Math.hypot(best.x - c.x, best.y - c.y) ? e : best));
+    try {
+      const r = await this.deps.game.call("point_to", { x: nearest.x, y: nearest.y, label: nearest.name, seconds: 30 });
+      const message = `Pointing to the nearest ${nearest.name}: ${bearing(c, nearest)} at (${Math.floor(r.x)}, ${Math.floor(r.y)}). An arrow at the player's character faces it and it's circled on their map for ${r.seconds} s.`;
+      this.deps.emit({ type: "tool", summary: message });
+      return message;
+    } catch (e) {
+      return `Couldn't point to it: ${(e as Error).message}`;
+    }
   }
 
   private async findStuck(args: Record<string, unknown>): Promise<string> {
@@ -897,6 +977,26 @@ export class Agent {
       const parts = [r.to_inventory ? `${r.to_inventory} leftover ingredients to your inventory` : "", r.spilled ? `${r.spilled} spilled next to the machines for your robots to collect` : ""].filter(Boolean);
       const items = parts.length ? `; ${parts.join(", ")}` : "";
       return `Set ${plural(r.done, "machine")} to ${recipe}${items}${refused ? `; refused: ${refused}` : ""}.`;
+    });
+  }
+
+  /** FC-109: train stop settings on the last search, through a card like a recipe change. */
+  private proposeTrainStop(args: Record<string, unknown>): string {
+    const last = this.lastResult;
+    if (!last || this.now() - last.at > RESULT_TTL_MS) return "Error: there is no recent search result to act on. Use find_entities first.";
+    const entities = last.refs.filter((r) => r.name.includes("train-stop") || r.name.includes("station"));
+    if (entities.length === 0) return `Error: the last search found no train stops, so there's nothing to set. Search for train stops first.`;
+    const limit = args.limit === undefined || args.limit === null ? undefined : Math.round(Number(args.limit));
+    const priority = args.priority === undefined || args.priority === null ? undefined : Math.round(Number(args.priority));
+    const name = typeof args.name === "string" && args.name.trim() ? args.name.trim().slice(0, 200) : undefined;
+    if (limit === undefined && priority === undefined && name === undefined) return "Error: say what to set: a train limit, a priority or a name.";
+    if (limit !== undefined && (!Number.isFinite(limit) || limit < -1)) return "Error: the train limit is a whole number, or -1 for no limit.";
+    if (priority !== undefined && (!Number.isFinite(priority) || priority < 0 || priority > 255)) return "Error: priority is a whole number from 0 to 255.";
+    const what = [limit !== undefined ? (limit < 0 ? "no train limit" : `train limit ${limit}`) : "", priority !== undefined ? `priority ${priority}` : "", name ? `name "${name}"` : ""].filter(Boolean).join(", ");
+    return this.card(`Set ${plural(entities.length, "train stop")}: ${what}?`, `The train stops found ${last.where}, highlighted in-game. Stops whose limit or priority a circuit signal sets are left alone.`, async () => {
+      const r = await this.deps.game.call("set_train_stop", { entities, ...(limit !== undefined ? { limit } : {}), ...(priority !== undefined ? { priority } : {}), ...(name ? { name } : {}) });
+      const refused = Object.entries(r.rejected).map(([reason, count]) => `${count} ${reason.replace(/_/g, " ")}`).join(", ");
+      return `Set ${plural(r.done, "train stop")} (${what})${refused ? `; refused: ${refused}` : ""}.`;
     });
   }
 

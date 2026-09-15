@@ -104,6 +104,46 @@ return function(handlers)
     return { drawn = #ids, seconds = ttl / 60 }
   end
 
+  -- Look (FC-143): point the way to a spot the player can find on their map. An arrow circles the character and
+  -- faces the spot (the engine turns it as they walk: no script per tick), and a marker shows on the map. Only
+  -- this player sees them; they expire. Refused off the character's surface or where the map isn't charted.
+  handlers.point_to = function(args)
+    local player = require_player()
+    local character = player.character
+    if not character then reject("no_character", "The player has no character to point from.") end
+    local surface = character.surface
+    local x, y = tonumber(args.x), tonumber(args.y)
+    if not (x and y) then reject("bad_args", "x and y are required") end
+    if args.surface and args.surface ~= surface.name then reject("other_surface", "That spot is on " .. tostring(args.surface) .. ", not where the player's character is.") end
+    if not player.force.is_chunk_charted(surface, { x = math.floor(x / 32), y = math.floor(y / 32) }) then
+      reject("not_charted", "That spot isn't on the player's map.")
+    end
+    storage.pointers = storage.pointers or {}
+    for _, id in pairs(storage.pointers[player.index] or {}) do
+      local obj = rendering.get_object_by_id(id)
+      if obj then obj.destroy() end
+    end
+    local ttl = math.floor(math.min(tonumber(args.seconds) or 30, 120) * 60)
+    local spot = { x = x, y = y }
+    local label = tostring(args.label or "")
+    local ids = {}
+    local function keep(obj) ids[#ids + 1] = obj.id end
+    keep(rendering.draw_sprite({
+      sprite = "utility/pin_arrow", surface = surface, target = character, orientation_target = spot,
+      oriented_offset = { 0, -3 }, x_scale = 2, y_scale = 2,
+      players = { player }, time_to_live = ttl,
+    }))
+    keep(rendering.draw_circle({ color = HIGHLIGHT_COLOR, radius = 1.5, width = 4, filled = false, target = spot, surface = surface, players = { player }, time_to_live = ttl }))
+    keep(rendering.draw_circle({ color = HIGHLIGHT_COLOR, radius = 6, width = 6, filled = false, target = spot, surface = surface, players = { player }, time_to_live = ttl, render_mode = "chart" }))
+    if label ~= "" then
+      keep(rendering.draw_text({ text = label, color = HIGHLIGHT_COLOR, scale = 3, alignment = "center", target = { x = x, y = y - 3 }, surface = surface, players = { player }, time_to_live = ttl }))
+      keep(rendering.draw_text({ text = label, color = HIGHLIGHT_COLOR, scale = 3, alignment = "center", target = { x = x, y = y - 10 }, surface = surface, players = { player }, time_to_live = ttl, render_mode = "chart" }))
+    end
+    storage.pointers[player.index] = ids
+    local c = character.position
+    return { surface = surface.name, x = x, y = y, distance = math.floor(math.sqrt((x - c.x) ^ 2 + (y - c.y) ^ 2)), seconds = ttl / 60 }
+  end
+
   handlers.clear_highlight = function()
     local player = require_player()
     local cleared = 0

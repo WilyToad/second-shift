@@ -139,6 +139,12 @@ export const actions = {
   find_entities: { args: FindEntitiesArgsSchema, data: FindEntitiesSchema, kind: "look" },
   highlight: { args: TargetsSchema.extend({ seconds: z.number().positive().max(300).default(30) }), data: z.object({ drawn: z.number(), seconds: z.number() }), kind: "look" },
   clear_highlight: { args: z.object({}), data: z.object({ cleared: z.number() }), kind: "look" },
+  // FC-143: an arrow at the character facing a charted spot, plus a map marker; player-only, expires.
+  point_to: {
+    args: z.object({ x: z.number(), y: z.number(), surface: z.string().optional(), label: z.string().max(60).optional(), seconds: z.number().positive().max(120).optional() }),
+    data: z.object({ surface: z.string(), x: z.number(), y: z.number(), distance: z.number(), seconds: z.number() }),
+    kind: "look",
+  },
   mark_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
   cancel_deconstruction: { args: TargetsSchema, data: ApplyResultSchema, kind: "map_change" },
   events: { args: z.object({ since: z.number().default(0) }), data: EventsSchema, kind: "look" },
@@ -164,6 +170,11 @@ export const actions = {
     args: z.object({ x: z.number().optional(), y: z.number().optional(), size: z.number().optional(), zoom: z.number().optional(), from: z.enum(["character", "view"]).optional() }),
     data: z.object({ path: z.string(), surface: z.string(), x: z.number(), y: z.number(), size: z.number(), zoom: z.number(), tiles: z.number() }),
     kind: "look",
+  },
+  set_train_stop: {
+    args: TargetsSchema.extend({ limit: z.number().int().min(-1).optional(), priority: z.number().int().min(0).max(255).optional(), name: z.string().min(1).max(200).optional() }),
+    data: z.object({ done: z.number(), rejected: z.preprocess((v) => (Array.isArray(v) ? {} : v), z.record(z.string(), z.number())) }),
+    kind: "map_change",
   },
   set_recipe: {
     args: TargetsSchema.extend({ recipe: z.string() }),

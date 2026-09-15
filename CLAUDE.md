@@ -149,6 +149,8 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun scripts/eval-new-game.ts [--switch-back]` (server running, game closed) creates a fresh map (~2 s), hosts it
   and runs the first-hour questions against the game's own data; `--switch-back` then hosts the dev save and checks
   its conversation returns. Run it after changes to player-data retrieval or turn guidance.
+- `bun scripts/e2e-train-stops.ts` (server running, dev save hosted) finds train stops, sets their limit through a card
+  and checks the game.
 - `bun scripts/eval-requests.ts [--runs N]` (server running, dev save hosted) checks that cards and actions happen only
   when asked (blueprint requests with and without "paste", research questions, marking). Run it after changes to
   tool guards or turn guidance.

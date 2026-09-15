@@ -119,7 +119,7 @@ const RESEARCH = /\bresearch/i;
 const visibleOres = async () => {
   const names = JSON.parse(await game.sc(`
     local p = game.connected_players[1] local s = p.physical_surface local names = {} local seen = {}
-    for _, e in pairs(s.find_entities_filtered({ position = p.physical_position, radius = 128, type = "resource" })) do
+    for _, e in pairs(s.find_entities_filtered({ area = { { p.physical_position.x - 128, p.physical_position.y - 128 }, { p.physical_position.x + 128, p.physical_position.y + 128 } }, type = "resource" })) do
       local key = math.floor(e.position.x / 32) .. ":" .. math.floor(e.position.y / 32)
       if seen[key] == nil then seen[key] = p.force.is_chunk_visible(s, { x = math.floor(e.position.x / 32), y = math.floor(e.position.y / 32) }) end
       if seen[key] then names[e.name] = true end
@@ -128,6 +128,9 @@ const visibleOres = async () => {
   return Array.isArray(names) ? (names as string[]) : [];
 };
 const startOres = await visibleOres();
+// Resources the companion can point to: visible, within 128 tiles, as found at the start (refreshed below).
+let latestOres = startOres;
+const truthOresNow = () => latestOres;
 
 // 3. The walkthrough.
 const status = await call("player_status");
@@ -172,6 +175,15 @@ check("look around: doesn't invent enemies", around.enemies > 0 || !/\b\d+ enem/
 const ore = await ask("I think I found some ore");
 check("found ore: names the resources that are really nearby, or says there are none", mentions(ore.text, resourceNames).length > 0 || /\b(no|don'?t see any|can'?t see any|not seeing any)\b[^.]*\bore\b/i.test(ore.text), mentions(ore.text, resourceNames).join(", ") || "none nearby");
 
+// FC-143: point the way. The nearest visible resource gets an arrow at the character; with none in view, nothing is drawn.
+const wayFrom = got.length;
+latestOres = await visibleOres();
+const way = await ask("show me the way to the nearest ore");
+const pointedMsg = got.slice(wayFrom).find((m): m is Extract<ServerMessage, { type: "tool" }> => m.type === "tool" && m.summary.startsWith("Pointing to the nearest"));
+const marks = Number(await game.sc(`rcon.print(#rendering.get_all_objects("second-shift"))`));
+const anyOre = truthOresNow().length > 0;
+check("show me the way: points to a visible resource (arrow drawn), or says none is in view", anyOre ? Boolean(pointedMsg) && marks >= 3 : !pointedMsg && /\b(no|none|don'?t see|can'?t see any)\b/i.test(way.text), `${pointedMsg?.summary ?? "no pointer"}; ${marks} marks`);
+
 // Build a stone furnace from the inventory, the way the player would.
 const built = await game.sc(`
   local p = game.connected_players[1] local inv = p.get_main_inventory() local s = p.physical_surface
@@ -200,7 +212,8 @@ check("no answer repeats vanilla-memory mistakes (craft a pickaxe or axe, scrap)
 // FC-139: details the data contradicts.
 // A build the answer says the player made must be in the build record.
 const builtClaims = all.flatMap(([q, a]) => [...a.matchAll(/\byou(?:'ve| have)? (?:just )?(?:placed|built|put down|set up) (?:a |an |your |the )([a-z][a-z0-9 -]{2,40}?)(?= \d| tiles|,|\.|!| to | at | near | next | south| north| east| west| —|$)/gi)].map((m) => ({ q, said: m[1]! })));
-const wrongBuilds = builtClaims.filter((c) => !buildNames.some((n) => norm(c.said).includes(norm(n))));
+const correctedBuild = (q: string, said: string) => new RegExp(`Correction: no [^.]*${said.replace(/[^a-z0-9]+/gi, ".")}`, "i").test(answers[q] ?? "");
+const wrongBuilds = builtClaims.filter((c) => !buildNames.some((n) => norm(c.said).includes(norm(n))) && !correctedBuild(c.q, c.said));
 check("named builds match the build record", wrongBuilds.length === 0, wrongBuilds.map((c) => `"${c.said}" in: ${c.q}`).join(" | ") || `${builtClaims.length} claims, record: ${buildNames.join(", ")}`);
 // An ore the answer places near the player must be among the resources the player can see (out to 96 tiles).
 const ORES = ["iron ore", "copper ore", "coal", "stone", "uranium ore", "crude oil"];
@@ -230,10 +243,22 @@ const countClaims = turnsByQuestion.flatMap((t) => {
     const n = /\d/.test(m[1]!) ? Number(m[1]) : WORDS[m[1]!.toLowerCase()]!;
     const said = singularName(m[2]!.replace(/\b(scrap|more|new|of)\b/gi, ""));
     const item = Object.keys(inv).find((name) => singularName(name) === said || said.endsWith(singularName(name)));
-    return item && inv[item] !== n ? [`${t.q}: said ${n} ${m[2]}, inventory ${inv[item]}`] : [];
+    // A correction the server added (FC-140) puts the right number in front of the player.
+    if (!item) return [];
+    const corrected = new RegExp(`Correction: your inventory has [^.]*\\b${item}\\s+${inv[item]}\\b`).test(t.text);
+    return inv[item] !== n && !corrected ? [`${t.q}: said ${n} ${m[2]}, inventory ${inv[item]}`] : [];
   });
 });
 check("counts of what the player has match the inventory", countClaims.length === 0, countClaims.join(" | "));
+// A correction the server adds must itself be right: a wrong one is worse than none.
+const badCorrections = turnsByQuestion.flatMap((t) => {
+  const inv = inventoryAt[t.q] ?? {};
+  const line = /Correction: your inventory has ([^.]*)\./.exec(t.text)?.[1];
+  if (!line) return [];
+  return line.split(", ").map((pair) => /^(.+) (\d+)$/.exec(pair)).filter((m): m is RegExpExecArray => !!m).filter((m) => (inv[m[1]!] ?? 0) !== Number(m[2])).map((m) => `${t.q}: corrected to ${m[1]} ${m[2]}, inventory ${inv[m[1]!] ?? 0}`);
+});
+const correctedTurns = turnsByQuestion.filter((t) => /Correction:/.test(t.text)).length;
+check("corrections the server adds are right", badCorrections.length === 0, badCorrections.join(" | ") || `${correctedTurns} corrected answers`);
 const unaskedCards = got.filter((m) => m.type === "approval");
 check("no approval cards (nothing was asked for)", unaskedCards.length === 0, unaskedCards.map((m: any) => m.title).join(" | "));
 

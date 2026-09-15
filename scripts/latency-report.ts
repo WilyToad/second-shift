@@ -30,4 +30,4 @@ console.log(`median gap visible − server ttft (single-round): ${fmt(median(sin
 // Model misses cut in code (FC-126, FC-130): how often they happen.
 const repeats = turns.filter((t) => t.repeated).length;
 const droppedTurns = turns.filter((t) => t.dropped).length;
-console.log(`answers cut for repeating: ${repeats} of ${turns.length} · turns with unasked actions dropped: ${droppedTurns} (${turns.reduce((n, t) => n + (t.dropped ?? 0), 0)} calls)`);
+console.log(`answers cut for repeating: ${repeats} of ${turns.length} · turns with unasked actions dropped: ${droppedTurns} (${turns.reduce((n, t) => n + (t.dropped ?? 0), 0)} calls) · answers corrected: ${turns.filter((t) => t.corrected).length}`);
