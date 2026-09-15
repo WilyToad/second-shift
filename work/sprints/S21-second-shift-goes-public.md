@@ -1,9 +1,10 @@
 # S21 — Second Shift goes public
 
-- **Status:** active
+- **Status:** done
 - **Goal:** The project has a name, a brand, and the front door a new player needs: a README and a website that show what it does with real captures from the game.
 - **Acceptance:** A brand and style guide exists and the app, README and website follow it; the README gets a new player from clone to first question; the website runs locally with real screenshots and animations of the features; nothing is pushed or deployed without the player's go.
 - **Started:** 2026-09-14
+- **Finished:** 2026-09-15
 
 ## Items
 
@@ -21,14 +22,6 @@
   - Acceptance: `**bold**` and `` `code` `` in answers render as bold and code, not raw marks
   - Found while recording the first capture ("Gleba produces jelly at **1,493/min**"). `Emphasis` in `chat.tsx`; an unclosed `**` stays as typed; display test
 
-- [ ] FC-126 Blueprint requests sometimes come with an unasked-for paste card
-  - Notes: seen while recording: "Give me a blueprint for 300 electronic circuits a minute" answered with the card, "Say the word and I'll paste it", and a paste approval card in the same turn (S14 guidance says no tool call until asked). With "and paste it here" in the question, the answer still said "Want it pasted as ghosts at your position? Just say so" next to the card. A 600/min request was refused correctly (1,800 cable/min is over one lane) but said "That approval card wasn't needed" when none was shown
-  - Acceptance: an eval over blueprint requests shows no paste card unless the player asked to paste
-
-- [ ] FC-127 A chart request took an unasked-for screenshot
-  - Notes: fresh conversation, player in map view on Nauvis: "How much jelly is Gleba making? Chart it." answered with numbers and a chart, then called `screenshot` (at last_result), then said "the screenshot shows your nauvis spot, not Gleba" and repeated the chart. The saved transcript kept only the second part of the answer. The same question earlier the same day (player on Gleba, not in map view) was clean
-  - Acceptance: an eval of chart questions in and out of map view shows no screenshot call unless asked; the transcript keeps every text part of a turn
-
 - [x] FC-128 Recipe graph cuts off the final product
   - Acceptance: the final product of a plan graph is in view when the card appears, at 1440 px
   - Found while recording: "60 advanced circuits a minute" drew six columns (1,250 px) in an 820 px message, so the advanced-circuit node was cut off behind a scrollbar. Columns are narrower (150 px, 28 px gaps), the graph shrinks to fit down to 80 % of full size, and when it still overflows it opens scrolled to the final product. Display test
@@ -36,10 +29,6 @@
 - [x] FC-129 Paste card and sketch polish
   - Acceptance: in map view a paste card names the map view, not "your position"; a small blueprint's sketch is big enough to read
   - Found while recording: the card said "Paste the blueprint at your position (55, 40)?" while the player was in map view 12 tiles from their character, and a 10-tile blueprint drew at 14 px a tile (~150 px wide). The card now says "at the map view" in map view; small sketches draw at up to 24 px a tile. Agent unit test
-
-- [ ] FC-130 The model sometimes writes its whole answer twice
-  - Notes: selection review of a 22-entity build (2026-09-14, recording): the answer (507 characters) came out twice back to back, 271 tokens out, and the page and saved history both show it twice. The model repeated itself; the server passed it through
-  - Acceptance: a guard drops an exact repeat of the answer (streamed text stops once the repeat is certain, history keeps one copy), with a unit test; eval runs log how often it happens
 
 - [x] FC-121 Feature captures
   - Acceptance: screenshots of the console, answers with charts, the blueprint card, the approval flow, a screenshot card and a selection review, plus at least one animation, taken from the dev save and saved in the repo for the README and website
@@ -61,3 +50,14 @@
 ## Notes
 
 Activated by Claude on the player's request in chat (they asked for the work directly rather than approving a plan). The player asked for this work in chat on 2026-09-14 ("beef up the README", a website folder, Codex for images, captures from the game, then a brand and style guide consistent across GitHub, the app and the website). Decisions from the player: name Second Shift, MIT license, real captures from the dev save are fine to publish as they are, repo under github.com/WilyToad.
+
+## Review
+
+Second Shift is public: brand and style guide (`brand/`), renamed mod and branded console, README and MIT license, feature captures and the tooling that re-records them, and the website live at https://second-shift.wilytoad.com (Cloudflare Worker with static assets and a byte-range Worker for video). The player pushed the repo to github.com/WilyToad/second-shift.
+
+- Measured: mod cost re-benchmarked before publishing, 0.043 ms/tick (PLAN §5).
+- Found and fixed along the way: FC-125, FC-128, FC-129 (display), the unreadable graph and sketch sizes, video range requests on the live site.
+- Moved to the backlog: FC-126, FC-127, FC-130 (model misses seen while recording).
+- Still open: the GitHub social preview upload (player, repo settings). FC-131 (system prompt names this save's mods) stays in the backlog.
+- The player's first-run walkthrough right after release found critical new-game problems; they are S22.
+
