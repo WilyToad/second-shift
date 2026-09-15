@@ -20,7 +20,7 @@ reads the answer from the running game and your save's own recipe data. When you
 shows you exactly what will happen and waits for your OK. It never plays the game for you.
 
 Everything runs on your machine: the game, a small mod, a local server and a local language model. Nothing is sent to
-the cloud, unless you talk to it with voice input and your browser uses its online speech service (see [Talk to it](#talk-to-it)).
+the cloud unless you use voice features that rely on an online service (see [Talk to it](#talk-to-it)).
 
 > **Status: early.** It works end to end on the author's macOS machine with a heavily modded Space Age save. It
 > hasn't been tried on Windows or Linux yet, and it only talks to a local oMLX model for now. See [Requirements](#requirements) before you start.
@@ -55,30 +55,42 @@ it: what's there, whether the belts and inserters keep up, and anything that loo
 
 ### Talk to it
 
-Click **Talk** in the console, or press **Alt+V** in the console or in the game, and ask out loud. It keeps listening:
-each pause (2 seconds by default; pick 1–5 s next to the button) sends what you said, the mic waits while the answer
-arrives and is read aloud, then listens again. Click **Talk** again to stop (anything not yet sent goes out first);
-**Escape** stops without sending. Tick **Read answers aloud** to hear each answer as it arrives.
+<img src="docs/media/talk.png" alt="The console with an answer, and the composer's voice controls: Sounds, Read answers aloud with an ElevenLabs voice picked, send after 2 s, and the Talk button" width="880">
+
+Click **Talk** in the console, or press **Alt+V** there or in the game, and ask out loud. It stays on like a radio
+channel: each pause (2 seconds by default, 1–5 s in the picker next to the button) sends what you said, the mic waits
+while the answer arrives and is read aloud, then listens again. Click **Talk** again to stop (anything not yet sent
+goes out first), or press **Escape** to stop without sending. The in-game key is **Talk to Second Shift** under
+**Settings → Controls → Mods**.
+
+Tick **Read answers aloud** to hear each answer sentence by sentence as it streams. Pick the voice next to it: this
+Mac's own voice (download a Premium or Enhanced one in System Settings → Accessibility → Spoken Content for better
+sound), or an [ElevenLabs](https://elevenlabs.io) voice if you add a key.
+
+Short sound cues play when the mic opens, a question is sent, an alert or finished research arrives, and a card needs
+you or is done. The **Sounds** switch turns them off.
 
 Voice uses the browser's [Web Speech API](https://webaudio.github.io/web-speech-api/), so it needs Chrome (it doesn't
-work in Brave). By default Chrome sends your voice to its online speech service to turn it into text. Click
-**Recognize on this device instead** under the composer for a one-time download, and after that recognition stays on
-your Mac. Answers are read with a voice on your Mac; for better ones, download a Premium or Enhanced voice in System Settings →
-Accessibility → Spoken Content. The in-game key is **Talk to Second Shift** under **Settings → Controls → Mods**.
+work in Brave). What stays on your machine:
 
-**ElevenLabs voices (optional, online).** Put your key in a `.env` file at the top of the repo (git ignores it):
+| Part | Where it runs |
+|---|---|
+| Turning your voice into text | Chrome's online speech service by default. Click **Recognize on this device instead** under the composer for a one-time download, and after that it stays on your Mac |
+| Reading answers aloud | On your Mac with a Mac voice. With an ElevenLabs voice, each answer's text goes to ElevenLabs |
+| Sound effects | On your Mac |
+| Everything else | On your Mac, as always |
+
+**Adding ElevenLabs (optional).** Put your key in a `.env` file at the top of the repo; git ignores it:
 
 ```sh
 ELEVENLABS_API_KEY=your-key
 ```
 
-Restart `bun run start`, tick **Read answers aloud**, and pick a voice from the list next to it. The server holds the key
-and sends each answer's text to ElevenLabs (flash model, lowest latency); if a sentence fails, the Mac voice reads it.
-**Sound effects.** Short cues play when listening starts, a question is sent, an alert or finished research arrives,
-and a card needs you or is done (the **Sounds** switch turns them off). With an ElevenLabs key, `bun run sounds`
-generates proper ones into `data/sounds/` (they stay local, not in git); otherwise the console plays simple built-in tones.
-
-`ELEVEN_LABS_KEY` works as the name too. Optional: `ELEVENLABS_VOICE_ID` sets a default voice and `ELEVENLABS_MODEL` another model.
+Restart `bun run start`. Your voices appear in the picker once **Read answers aloud** is on. The server holds the key
+and uses ElevenLabs' fastest model; if a sentence fails, the Mac voice reads it. `bun run sounds` generates proper
+sound effects with the same key into `data/sounds/` (they stay local, not in git); without them the console plays
+simple built-in tones. `ELEVEN_LABS_KEY` works as the variable name too, `ELEVENLABS_VOICE_ID` sets a default voice
+and `ELEVENLABS_MODEL` another model.
 
 ### Also
 
@@ -112,6 +124,7 @@ So it can't place real buildings, delete things, teleport, spawn items, finish r
 | **OS** | macOS on Apple Silicon. Paths assume the Steam install; Windows and Linux aren't supported yet |
 | **Factorio** | 2.0 from Steam, with Steam running. Tested with Space Age and extra mods |
 | **Bun** | 1.3 or newer ([bun.sh](https://bun.sh)) |
+| **Browser** | Any modern browser for the console; Chrome for voice |
 | **Model** | oMLX (a local MLX model server) on `127.0.0.1:8888` serving a model with tool calling. Tested with Qwen3.8 Flash-Next (4-bit), which needs about 70 GB of memory. Smaller models haven't been tested |
 
 Other model providers (OpenAI-compatible servers, hosted APIs) are planned but not built yet.
@@ -177,6 +190,7 @@ Other model providers (OpenAI-compatible servers, hosted APIs) are planned but n
 - "How many express belts are near me?"
 - "Give me a blueprint for 120 gears a minute."
 - "What should I research next?"
+- Click **Talk** and ask any of these out loud.
 
 Tick **Think it through** for harder planning questions (slower, more careful). **New conversation** clears the
 thread. Each map keeps its own conversation, so loading another save picks up where you left off on that one.

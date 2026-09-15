@@ -66,11 +66,15 @@ button, textarea { font: inherit; color: inherit; }
 
 #composer { border-top: 1px solid var(--seam); padding: 12px 16px; }
 #composer textarea { width: 100%; max-width: 820px; display: block; margin: 0 auto; background: var(--inset); border: 1px solid var(--seam); border-radius: var(--radius); padding: 8px 12px; resize: vertical; }
-.bar { max-width: 820px; margin: 8px auto 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); }
+.bar { max-width: 820px; margin: 8px auto 0; display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; color: var(--muted); }
+/* The buttons stay right-aligned and in one row even when the settings wrap above them. */
+.bar > span:last-child { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.bar button { line-height: 1.6; }
 button { background: var(--agent); color: var(--on-agent); border: 0; border-radius: var(--radius-sm); padding: 4px 14px; font-weight: 700; cursor: pointer; }
 button.cancel { background: transparent; color: var(--muted); border: 1px solid var(--seam); }
 /* Voice (FC-062): the mic is a quiet outline until it listens, then it takes the companion's cyan and pulses. */
-.voice { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.voice { display: inline-flex; gap: 6px 14px; flex-wrap: wrap; align-items: center; }
+.voice select { max-width: 16em; text-overflow: ellipsis; }
 button.mic { display: inline-flex; align-items: center; gap: 6px; background: transparent; color: var(--text); border: 1px solid var(--seam); }
 button.mic.listening { background: var(--agent); color: var(--on-agent); border-color: var(--agent); animation: mic-pulse 1.2s ease-in-out infinite; }
 @keyframes mic-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--agent) 55%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--agent) 0%, transparent); } }

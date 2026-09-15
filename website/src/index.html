@@ -44,7 +44,7 @@
             <a class="btn primary" href="https://github.com/WilyToad/second-shift">Get it on GitHub</a>
             <a class="btn" href="#build">Watch it build</a>
           </div>
-          <p class="fine">Runs on your Mac with a local model. Nothing leaves your machine.</p>
+          <p class="fine">Runs on your Mac with a local model. Online voices are opt-in.</p>
         </div>
         <figure class="capture hero-capture">
           <video autoplay muted loop playsinline preload="metadata" poster="./media/ask-chart.jpg" aria-label="The console answering how much jelly Gleba makes, with a live chart">
@@ -114,6 +114,23 @@
         </figure>
       </article>
 
+      <article class="feature" id="talk">
+        <div class="feature-copy">
+          <h3>Talk to it, hands-free</h3>
+          <p>Click <strong>Talk</strong> or press <strong>Alt+V</strong>, even from inside the game, and ask out loud. It stays on like a radio channel until you click Talk again.</p>
+          <ol class="steps">
+            <li><span class="step-n mono">1</span>Ask: “where’s the nearest coal?”</li>
+            <li><span class="step-n mono">2</span>Pause for 2 seconds and it sends (pick 1–5 s)</li>
+            <li><span class="step-n mono">3</span>The answer is read aloud as it arrives, then the mic opens again</li>
+          </ol>
+          <p>Answers are read with your Mac’s voice or an ElevenLabs voice if you add a key, and short sounds mark alerts, research and cards. Voice input uses Chrome’s speech recognition, on your Mac after a one-time download.</p>
+        </div>
+        <figure class="capture">
+          <img src="./media/talk.png" alt="The console with an answer about automation science packs, and the composer’s voice controls: Sounds, Read answers aloud with an ElevenLabs voice picked, send after 2 s, and the Talk button" width="879" height="411" loading="lazy">
+          <figcaption>Voice needs Chrome. Online voice services are opt-in: see the <a href="https://github.com/WilyToad/second-shift#talk-to-it">README</a> for what stays on your Mac.</figcaption>
+        </figure>
+      </article>
+
       <ul class="also" aria-label="More it can do">
         <li><h4>Finds things</h4><p>“How many express belts are near me?” It counts them and highlights them in-game.</p></li>
         <li><h4>Takes screenshots</h4><p>“Take a screenshot of this spot.” The picture shows up in the console.</p></li>
@@ -162,7 +179,7 @@
       <dl class="stats">
         <div><dt class="mono">&lt;&thinsp;0.1 ms</dt><dd>added per game tick on a large Space Age base (0.043 ms in the latest benchmark). No map scans on a timer, only a one-time scan when a save first loads.</dd></div>
         <div><dt class="mono">~2 s</dt><dd>to the first words of a follow-up, with the model's prompt cache kept warm.</dd></div>
-        <div><dt class="mono">0</dt><dd>calls to the cloud. The game, the mod, the server and the model all run locally.</dd></div>
+        <div><dt class="mono">0</dt><dd>calls to the cloud needed. The game, the mod, the server and the model all run locally; voice can use online services if you turn them on.</dd></div>
       </dl>
     </section>
 
@@ -176,6 +193,7 @@
             <li><strong>macOS on Apple Silicon.</strong> Windows and Linux aren't supported yet.</li>
             <li><strong>Factorio 2.0 from Steam.</strong> Tested with Space Age and extra mods.</li>
             <li><strong>Bun 1.3</strong> or newer.</li>
+            <li><strong>Chrome</strong> to talk to it (the console itself works in any modern browser).</li>
             <li><strong>oMLX</strong> serving a model with tool calling. Tested with Qwen3.8 Flash-Next, which needs about 70 GB of memory. Other providers are planned.</li>
           </ul>
           <p class="note"><strong>Host the game.</strong> The companion connects to multiplayer-hosted games only: start a new one from <em>Multiplayer → Host new game</em>, or host a save with the launcher. Back up existing saves first; hosted games autosave.</p>
