@@ -569,15 +569,25 @@ judge by time to first token.
 - Tool calling: let the agent pull detail on demand rather than stuffing everything in context
 - Optional: screenshots for layout/blueprint questions (model is multimodal)
 
-**Phase 3b — character control**
-- `walk_to`, `mine_by_hand`, `craft`, `transfer_items`, driving
-- Stop hotkey; decide how agent control and the player's own inputs interact (§8 Q11)
+Phase order decided by the player 2026-09-15: voice and the other console extras come before character control,
+and car driving is last, split into a spike and an implementation.
 
-**Phase 4 — optional**
+**Phase 4 — voice and extras**
+- Voice in/out in the web console, using the browser's own speech features (Chrome, Safari) first
 - In-game UI (mod GUI chat panel / hotkey popup)
 - Background Factorio test instance for measuring blueprints
-- Voice in/out
-- Session memory across play sessions
+- ~~Session memory across play sessions~~ done in S18 (FC-063) and per map in S22 (FC-137)
+
+**Phase 5 — character control** (was Phase 3b)
+- Stop hotkey first; decide how agent control and the player's own inputs interact (§8 Q11)
+- `mine_by_hand`, `craft`, `transfer_items`, each with a confirm
+- Spidertron autopilot on request
+- No `walk_to`: walking stays the player's (decided by the player 2026-09-15)
+
+**Phase 6 — car and tank driving**
+- Spike first: steering approach (the engine has no pathfinder for player-driven cars), obstacle handling, per-tick
+  cost while driving, how the stop hotkey takes over
+- Then the implementation the spike recommends, or a recorded decision not to build it
 
 ---
 
