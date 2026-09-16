@@ -164,6 +164,8 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `COMPANION_REPLAY_DIGEST=data/captures/digest.json bun run start` uses a captured digest while the
   game is closed, so offline answers see a realistic prompt.
 - `bun scripts/eval-ratios.ts` (server running) checks production-plan answers against an independent reference.
+- `bun scripts/test-spidertron.ts` (dev save hosted) checks sending the player's spidertron and taking it back, with the helmet refusals (FC-144, FC-051). It makes a test spidertron and removes it after.
+- `bun scripts/e2e-spidertron.ts` (server and dev save running, resets the conversation) checks the card, the confirm and "stop" through the server.
 - `bun scripts/eval-pointing.ts` (server and dev save running, resets the conversation) asks "what is this?" about test entities and checks answers stick to the save's own facts (FC-160).
 - `bun scripts/e2e-measure.ts` (server and dev save running, resets the conversation) checks "what rate are they really hitting?" measures the machines in the game (FC-162).
 - `bun scripts/eval-voice-session.ts` (server and dev save running, resets the conversation) replays the first voice session and checks its odd replies stay gone (S27).

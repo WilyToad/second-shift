@@ -38,12 +38,14 @@ end
 --- script.on_event(e, f) replaces any earlier handler for the same event too, so modules that share an
 -- event register here. Shared handlers get no event filter: each one checks the entity itself.
 local event_handlers = {}
-function util.on_event(event, fn)
+--- Shared dispatcher, because script.on_event replaces any earlier handler for the same event.
+--- `filters` are passed to the engine on the first registration for that event (hot events must be filtered).
+function util.on_event(event, fn, filters)
   if not event_handlers[event] then
     event_handlers[event] = {}
     script.on_event(event, function(e)
       for _, handler in ipairs(event_handlers[event]) do handler(e) end
-    end)
+    end, filters)
   end
   table.insert(event_handlers[event], fn)
 end

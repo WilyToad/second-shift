@@ -17,6 +17,9 @@ function ago(tick: number, now: number | undefined): string {
 function describe(e: GameEvent): string {
   if (e.kind === "research_finished") return `Research complete: ${words(e.research ?? "")}`;
   if (e.kind === "selection") return e.count ? `Build selected for review (${e.count} entities)` : "Selection had nothing to review";
+  // What the companion was moving (FC-051, FC-144).
+  if (e.kind === "control_arrived") return `${words(e.entity ?? "it")} arrived${e.position ? ` at (${e.position.x}, ${e.position.y})` : ""}`;
+  if (e.kind === "control_stopped") return `Stopped ${words(e.entity ?? e.control ?? "it")}${e.reason ? ` (${words(e.reason)})` : ""}`;
   const what = e.entity ? `${words(e.entity)}: ` : "";
   return `${what}${words(e.type ?? "alert")}${e.count && e.count > 1 ? ` (${e.count})` : ""}`;
 }

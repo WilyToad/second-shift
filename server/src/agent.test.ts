@@ -688,3 +688,37 @@ test("FC-153: 'what do I use these for?' retrieves what the last answer was abou
   expect(turn).toContain('"these" means iron-gear-wheel from the last answer');
   expect(agent.transcript().at(-1)!.text).toContain("Correction: 7 × 2 = 14, not 12.");
 });
+
+test("FC-144 FC-051: sending a spidertron waits for a card, and 'stop' takes it back at once", async () => {
+  const calls: { action: ActionName; args: any }[] = [];
+  const game: GameActions = {
+    latest: () => ({ receivedAt: 0, digest: DigestSchema.parse({ tick: 1, research: { progress: 0, queue: {} }, surfaces: {}, alerts: {},
+      player: { name: "p", surface: "gleba", position: { x: 0, y: 0 } } }) }),
+    async call(action: ActionName, args?: any): Promise<any> {
+      calls.push({ action, args });
+      if (action === "spidertrons") return { spidertrons: [{ name: "spidertron", unit_number: 7, x: 4, y: 0, distance: 4, driver: false }], total: 1, has_remote: true, surface: "gleba" };
+      if (action === "find_entities") return { surface: "gleba", count: 2, by_name: { "copper-ore": 2 }, entities: [{ name: "copper-ore", x: 40, y: 0 }, { name: "copper-ore", x: 60, y: 0 }], center: { x: 0, y: 0 }, truncated: false };
+      if (action === "highlight") return { drawn: 2, seconds: 60 };
+      if (action === "send_spidertron") return { name: "spidertron", unit_number: 7, x: args.x, y: args.y, distance: 36, surface: "gleba" };
+      if (action === "stop_control") return { stopped: true, control: "spidertron", entity: "spidertron", surface: "gleba" };
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  const events: ServerMessage[] = [];
+  const prototypes = PrototypesSchema.parse({ ...rowPrototypes, items: { "copper-ore": { type: "item", stack_size: 50 } } });
+  const model = fakeModel([{ text: "Card is up." }, { text: "Stopped." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => prototypes, emit: (m) => events.push(m) });
+
+  await agent.ask("send my spidertron to the nearest copper ore");
+  const card = events.find((e) => e.type === "approval") as any;
+  expect(card.title).toBe("Send the spidertron to the nearest copper-ore at (40, 0)?");
+  expect(card.detail).toContain("its own autopilot");
+  expect(calls.map((c) => c.action)).not.toContain("send_spidertron"); // nothing moves before the confirm
+  expect(model.seen[0]!.at(-1)!.content).toContain("the player's spidertrons on gleba");
+  await agent.approve(card.id);
+  expect(calls.find((c) => c.action === "send_spidertron")?.args).toEqual({ x: 40, y: 0, unit_number: 7 });
+
+  await agent.ask("stop");
+  expect(calls.map((c) => c.action)).toContain("stop_control");
+  expect(model.seen[1]!.at(-1)!.content).toContain("stopped the spidertron in the game, as asked");
+});

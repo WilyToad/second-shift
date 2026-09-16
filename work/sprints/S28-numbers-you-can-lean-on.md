@@ -1,7 +1,8 @@
 # S28 — Numbers and facts you can lean on
 
-- **Status:** active
+- **Status:** done
 - **Started:** 2026-09-15
+- **Finished:** 2026-09-15
 - **Goal:** When the companion gives a rate it's roughly right and names the real bottleneck, when the exact rate matters it measures it in the player's own game, and it stops adding game mechanics from memory that a modded save may not follow.
 - **Acceptance:** A blueprint-estimate suite over the builds already measured in the dev game: every estimate within 10% and naming the same limit, stated as a rounded range; "is this hitting 150 a minute?" answers from machines' own craft counts on a build in the dev game, with the measurement window said out loud and a refusal where the player can't see; a pointing eval shows answers no longer add mechanics nobody asked about; existing suites still pass (grounding, diagnosis, new-game, voice session replay, helmet, player).
 
@@ -33,4 +34,4 @@ Rates are roughly right and name the real limit, the exact rate comes from the p
 - Evals: test-generated-builds 13/13, eval-pointing 9/9, e2e-measure 3/3, test-machines 11/11, test-player 27/27, test-helmet 13/13, voice session replay 8/8, throughput e2e 8/8, blueprint review 9/9, blueprint request 6/6, inserter geometry 5/5, 167 unit tests.
 - Not met as written: FC-162's "500 machines under 1 ms". A read is ~6 µs a machine, so 500 took 2.7 ms; the action caps at 200 machines (1.03 ms) instead. Recorded in the item.
 
-**For the player to check:** ask about a build you care about ("what rate is this really hitting?" — ask twice, a minute apart), and hover something modded and ask what it is, to see whether the save's facts are enough.
+**Still for the player to check** (closed on their word to start the next sprint, so these stay open): ask about a build you care about ("what rate is this really hitting?" — ask twice, a minute apart), and hover something modded and ask what it is, to see whether the save's facts are enough.

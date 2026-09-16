@@ -72,6 +72,19 @@ export const PointedAtSchema = z.object({
 });
 export type PointedAt = z.infer<typeof PointedAtSchema>;
 
+/** The player's spidertrons on their surface, nearest first (FC-144). */
+export const SpidertronsSchema = z.object({
+  spidertrons: luaArray(z.object({
+    name: z.string(), unit_number: z.number(), x: z.number(), y: z.number(), distance: z.number(),
+    driver: z.boolean(), walking_to: z.object({ x: z.number(), y: z.number() }).optional(),
+  })),
+  total: z.number(),
+  // Sending one across the map needs the player's own remote.
+  has_remote: z.boolean(),
+  surface: z.string(),
+});
+export type Spidertrons = z.infer<typeof SpidertronsSchema>;
+
 /** Measured output of machines, from their own finished-craft counts (FC-162). */
 export const MachineOutputSchema = z.object({
   tick: z.number(),
@@ -134,7 +147,7 @@ const ApplyResultSchema = z.object({
 export const GameEventSchema = z.object({
   seq: z.number(),
   tick: z.number(),
-  kind: z.enum(["alert", "research_finished", "selection", "talk"]),
+  kind: z.enum(["alert", "research_finished", "selection", "talk", "control_stopped", "control_arrived"]),
   severity: z.enum(["critical", "warning", "info"]),
   type: z.string().optional(),
   count: z.number().optional(),
@@ -142,6 +155,9 @@ export const GameEventSchema = z.object({
   entity: z.string().optional(),
   position: PositionSchema.optional(),
   research: z.string().optional(),
+  // What the companion was moving, and why it stopped (FC-051, FC-144).
+  control: z.string().optional(),
+  reason: z.string().optional(),
 });
 export type GameEvent = z.infer<typeof GameEventSchema>;
 
@@ -198,6 +214,15 @@ export const actions = {
   player_status: { args: z.object({}), data: PlayerStatusSchema, kind: "look" },
   pointed_at: { args: z.object({}), data: PointedAtSchema, kind: "look" },
   // FC-162: what the machines the player asked about have really made, from each machine's own craft count.
+  spidertrons: { args: z.object({}), data: SpidertronsSchema, kind: "look" },
+  // Character control (FC-144): the player confirms it in a card, and the stop key cancels it.
+  send_spidertron: {
+    args: z.object({ x: z.number(), y: z.number(), surface: z.string().optional(), unit_number: z.number().optional() }),
+    data: z.object({ name: z.string(), unit_number: z.number(), x: z.number(), y: z.number(), distance: z.number(), surface: z.string() }),
+    kind: "character_control",
+  },
+  stop_control: { args: z.object({}), data: z.object({ stopped: z.boolean(), control: z.string().optional(), entity: z.string().optional(), surface: z.string() }), kind: "small_request" },
+  debug_press_stop: { args: z.object({}), data: z.object({ stopped: z.boolean() }), kind: "look" },
   machine_output: { args: z.object({ entities: luaArray(EntityRefSchema).optional(), radius: z.number().positive().max(64).optional(), restart: z.boolean().optional() }), data: MachineOutputSchema, kind: "look" },
   container_contents: { args: z.object({ name: z.string(), x: z.number(), y: z.number() }), data: ContainerContentsSchema, kind: "look" },
   debug_select_entity: { args: z.object({ name: z.string().optional(), x: z.number().optional(), y: z.number().optional() }), data: z.object({ selected: z.boolean() }), kind: "look" },

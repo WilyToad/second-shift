@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PlayerStatusSchema, SurroundingsSchema } from "@companion/interfaces";
-import { acceptedOffer, contentsTarget, correctedRequest, formatContents, formatMachineOutput, formatPointedAt, wantsMeasuredOutput, wantsContents, wantsPointedAt, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, wantsMeasuredOutput, wantsSpidertronSent, wantsStop, wantsContents, wantsPointedAt, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 test("a short yes takes up the question the last answer offered", () => {
   const last = "Start by mining iron.\n\nWant me to look around to see what you built?";
@@ -206,4 +206,23 @@ test("FC-162: measuring questions, and what the measured lines say", () => {
   const done = formatMachineOutput({ tick: 3700, window_ticks: 3600, machines: 4, not_visible: 0, recipes: [{ recipe: "iron-gear-wheel", machines: 4, finished: 1500, sampled: 4, per_minute: 149.6 }] }, "the 4 assemblers from the last search");
   expect(done).toBe("measured in the player's game over the last 60 s from the machines' own craft counts: iron-gear-wheel 150/min from 4 machines");
   expect(formatMachineOutput({ tick: 1, window_ticks: 0, machines: 0, not_visible: 3, recipes: [] }, "32 tiles around the player")).toContain("3 are somewhere they can't see");
+});
+
+test("FC-144 FC-051: the words that send a spidertron and the words that stop it", () => {
+  for (const q of ["send my spidertron to the copper patch", "walk the spider over here", "can you send the spidertron to (120, -40)?", "move my spidertron to the iron ore"]) {
+    expect(wantsSpidertronSent(q)).toBe(true);
+  }
+  for (const q of ["where is my spidertron?", "how many spidertrons do I have", "what is this spider thing"]) expect(wantsSpidertronSent(q)).toBe(false);
+  for (const q of ["stop", "stop it", "please stop", "cancel that", "halt", "stop the spidertron"]) expect(wantsStop(q)).toBe(true);
+  for (const q of ["what's stopping my iron production?", "why did the train stop", "stop the deconstruction of every belt I own and then tell me what else is wrong"]) expect(wantsStop(q)).toBe(false);
+});
+
+test("FC-144: spidertron lines come from the game, including the remote the player carries", () => {
+  const lines = formatSpidertrons({ spidertrons: [
+    { name: "spidertron", unit_number: 7, x: 10, y: -4, distance: 11, driver: false },
+    { name: "spidertron", unit_number: 9, x: 90, y: 0, distance: 80, driver: true, walking_to: { x: 100, y: 0 } },
+  ], total: 2, has_remote: true, surface: "gleba" });
+  expect(lines[0]).toBe("the player's spidertrons on gleba, nearest first: spidertron at (10, -4), 11 tiles away; spidertron at (90, 0), 80 tiles away, someone is driving it, already walking to (100, 0)");
+  expect(lines[1]).toContain("carries a spidertron remote");
+  expect(formatSpidertrons({ spidertrons: [], total: 0, has_remote: false, surface: "nauvis" })).toEqual(["the player has no spidertron on nauvis"]);
 });

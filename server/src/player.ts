@@ -1,7 +1,7 @@
 // The player's own situation, fetched only when a question needs it (S22): what they carry and can
 // hand-craft, what they built, what they can see around them. Decided and formatted in code, sent in
 // the uncached tail, never in the system prompt.
-import type { ContainerContents, MachineOutput, PlayerStatus, PointedAt, SeenEntity, Surroundings } from "@companion/interfaces";
+import type { ContainerContents, MachineOutput, PlayerStatus, PointedAt, SeenEntity, Spidertrons, Surroundings } from "@companion/interfaces";
 
 const AFFIRMATIVE = /^\s*(y|yes|yeah|yea|yep|yup|sure|ok|okay|please|go ahead|do it|go for it|sounds good|absolutely|definitely|why not)\b[\s\w,.!']{0,30}$/i;
 
@@ -252,4 +252,27 @@ export function formatMachineOutput(m: MachineOutput, where: string): string {
   }
   const lines = measured.map((r) => `${r.recipe} ${Math.round(r.per_minute!)}/min from ${r.sampled} machine${r.sampled === 1 ? "" : "s"}`);
   return `measured in the player's game over the last ${seconds} s from the machines' own craft counts: ${lines.join(", ")}`;
+}
+
+// "Send my spidertron to the copper patch", "walk the spider over here" (FC-144).
+const SEND_SPIDER = /\b(send|walk|move|drive|take|bring|get)\b[^.?!]{0,40}\b(spidertron|spider)\b|\b(spidertron|spider)\b[^.?!]{0,40}\b(go|head|walk|move|over)\b/i;
+// "Stop", "stop it", "cancel that", "halt" — the words that take it back (FC-051).
+const STOP_CONTROL = /^\s*(please\s+)?(stop|halt|abort|cancel|freeze|hold on|wait)\b[\s\w,.!']{0,24}$|\b(stop|cancel|abort) (it|that|the spidertron|the spider|moving|walking|him|her|them)\b/i;
+
+export function wantsSpidertronSent(text: string): boolean {
+  return SEND_SPIDER.test(text);
+}
+
+export function wantsStop(text: string): boolean {
+  return STOP_CONTROL.test(text);
+}
+
+/** Lines about the player's spidertrons, so answers about them come from the game (FC-144). */
+export function formatSpidertrons(s: Spidertrons): string[] {
+  if (!s.spidertrons.length) return [`the player has no spidertron on ${s.surface}`];
+  const lines = s.spidertrons.map((x) => `${x.name} at (${x.x}, ${x.y}), ${x.distance} tiles away${x.driver ? ", someone is driving it" : ""}${x.walking_to ? `, already walking to (${x.walking_to.x}, ${x.walking_to.y})` : ""}`);
+  return [
+    `the player's spidertrons on ${s.surface}, nearest first: ${lines.join("; ")}${s.total > s.spidertrons.length ? ` (+${s.total - s.spidertrons.length} more)` : ""}`,
+    s.has_remote ? "the player carries a spidertron remote, so they could send it themselves" : "the player carries no spidertron remote, so sending one isn't something they could do right now",
+  ];
 }

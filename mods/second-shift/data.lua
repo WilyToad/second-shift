@@ -11,6 +11,14 @@ data:extend({
     consuming = "none",
     order = "a",
   },
+  -- Stop key (FC-051): cancels anything the companion started moving. Rebindable under Controls → Mods.
+  {
+    type = "custom-input",
+    name = "second-shift-stop",
+    key_sequence = "ALT + X",
+    consuming = "none",
+    order = "b",
+  },
   {
     type = "selection-tool",
     name = "companion-selection-tool",

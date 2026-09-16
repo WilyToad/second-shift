@@ -417,6 +417,15 @@ token 2.2–7.4 s). Two measured causes:
   drops back each block (the session's turns at 6,144 cached had 376–950 uncached). Keep history append-only:
   compacting earlier rewrites cached blocks, which costs a cold prefill.
 
+**Sending the spidertron (S29, 2026-09-15):** the engine's own autopilot does the walking, so the mod only hands
+it a spot after the player confirms a card, and the order lives in `storage` so the stop key can end it. Looking up
+the player's spidertrons costs **0.67 ms** (near the player first; a type-filtered sweep of the whole gleba surface
+was 4.0 ms, so that only runs when nothing is within 256 tiles). Mod benchmark after the module was added
+(5 runs): without 0.644, with 0.725, so **0.080 ms/tick**; per-tick script time 0.070 ms with the mod vs 0.017
+without (last 600 ticks 0.055 vs 0.014) — unchanged, because nothing new runs per tick. In-game 10/10
+(`scripts/test-spidertron.ts`), through the server 4/4 (`scripts/e2e-spidertron.ts`). The request is recognised in
+code and proposed as a card, so the cached prompt is untouched: no new model tool.
+
 **Facts instead of memory (FC-160, 2026-09-15):** the prototype dump (v10) now carries what a modded save can change
 about a thing itself: chest inventory size, logistic job, fluid capacity, and a pole's supply area and wire reach.
 Those go into the pointed-at lines, and the turn asks for the save's facts only. Before: "what is this?" on a passive
@@ -658,7 +667,9 @@ push-to-talk key (custom input `second-shift-talk`, Alt+V) reaches the console i
 never reaches the page; the picker labels them online.
 
 **Phase 5 — character control** (was Phase 3b)
-- Stop hotkey first; decide how agent control and the player's own inputs interact (§8 Q11)
+- ~~Stop hotkey first; decide how agent control and the player's own inputs interact (§8 Q11)~~ done in S29
+  (FC-051), with the spidertron (FC-144): one order at a time, Alt+X or "stop" cancels it, and the player taking
+  over ends it by itself
 - `mine_by_hand`, `craft`, `transfer_items`, each with a confirm
 - Spidertron autopilot on request
 - No `walk_to`: walking stays the player's (decided by the player 2026-09-15)
@@ -803,8 +814,23 @@ never reaches the page; the picker labels them online.
     (player-verified: a hand change next to the machine does the same), otherwise spill next to the machine marked
     for the player's robots.
     Still open: other entity settings remotely (train stop limits, filters).
-11. **Character control vs player input.** Does the player's own movement override
-    `walking_state` and `mining_state`? Should any player input cancel an agent action?
+11. **Character control vs player input.** ~~Does the player's own movement override `walking_state` and
+    `mining_state`? Should any player input cancel an agent action?~~ **Decided 2026-09-15 (FC-051), with the
+    first thing the companion moves (the spidertron, FC-144):** the player's input always wins, and the rules are
+    the same for anything the companion moves later.
+    - **One order at a time**, held in `storage`, with the stop key (`second-shift-stop`, Alt+X, rebindable)
+      cancelling it in the tick it's pressed. Saying "stop" does the same.
+    - **The player taking over ends it by itself**, with no key press needed: driving the vehicle
+      (`on_player_driving_changed_state`), sending it with their own remote
+      (`on_player_used_spidertron_remote`), or losing it (`on_entity_died`, filtered to that type).
+    - **Every stop says why**, in the game and in the console feed (`control_stopped`), and arrival is reported
+      once (`control_arrived`).
+    - **Stopping uses the same means the player has:** clearing the order (`autopilot_destination = nil`).
+      Never `stop_spider`, `speed` or `orientation` — a source-level test fails the build if those appear.
+    - For character control later (FC-050, deferred): a `linked_game_control` custom input with
+      `consuming = "none"` fires before the game's own handler, and a guard comparing the last state the mod
+      wrote against the current one catches anything else changing it. Written up in
+      `work/spikes/FC-145-driving.md` §4.
 12. ~~**Prototype data source.**~~ **Decided 2026-09-13: runtime view over RCON.** The mod's
     `dump_prototypes` action on the 22 MB dev save with the full mod list returned 981 recipes,
     402 items, 43 fluids, 342 technologies and 69 machines (incl. 115 maraxsis and 27 Cerys

@@ -20,7 +20,7 @@ import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
 import { entityFacts } from "./grounding";
 import { arithmeticCorrections } from "./numbers";
-import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, wantsContents, wantsMeasuredOutput, wantsPointedAt, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, wantsContents, wantsMeasuredOutput, wantsPointedAt, wantsSpidertronSent, wantsStop, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -519,6 +519,13 @@ export class Agent {
     ]);
     // "What's in this chest?": what the player points at, has open or just hovered, else a single thing just found (FC-152).
     const lastOne = this.lastResult && this.lastResult.count === 1 && this.now() - this.lastResult.at <= RESULT_TTL_MS ? this.lastResult.refs[0] : null;
+    // The player's own spidertron, and sending it: decided in code, confirmed in a card (FC-144).
+    const aboutSpider = !pasted.summaries.length && (wantsSpidertronSent(question) || /\bspider(tron)?\b/i.test(question));
+    const spiders = aboutSpider ? await this.lookup("spidertrons") : null;
+    const spiderLines = spiders ? formatSpidertrons(spiders) : [];
+    const sendLine = wantsSpidertronSent(question) ? await this.proposeSpidertron(spiders, question) : null;
+    // "Stop" takes it back at once: the player asked, so it doesn't wait for a card (FC-051).
+    const stopLine = !pasted.summaries.length && wantsStop(question) ? await this.stopControl() : null;
     const askedContents = !pasted.summaries.length && wantsContents(question);
     const target = askedContents ? contentsTarget(pointed, lastOne) : null;
     const contentsLine = target ? await this.contentsOf(target) : askedContents ? "no container is under the mouse, open or just hovered, so its contents weren't looked at: ask the player to hover over it" : null;
@@ -531,6 +538,9 @@ export class Agent {
       ...(pointed ? formatPointedAt(pointed, (name) => (protos ? entityFacts(name, protos) : null)) : []),
       ...(contentsLine ? [contentsLine] : []),
       ...(measuredLine ? [measuredLine] : []),
+      ...spiderLines,
+      ...(sendLine ? [sendLine] : []),
+      ...(stopLine ? [stopLine] : []),
     ];
     // Tools are ruled out only when the retrieved data answers the question; a question nothing matched
     // gets no note, so "I just built something" is free to look (S22).
@@ -549,6 +559,10 @@ export class Agent {
       // "look around" answered with "burner-inserter (1 iron-plate + 1 gear)" from an earlier turn's memory (S24 eval).
       playerLines.length && !found?.lines.length && !craftableRecipes(status).length ? "give no recipe ingredients or amounts: this turn has no recipe lines" : "",
       // "25,000 units each, 1,250,000 total" for storage tanks: neither number is in the save data (FC-153).
+      // The card is put up in code, so the model has to know it exists: it answered "I can't move it for you"
+      // while the player was looking at the card (FC-144).
+      sendLine?.startsWith("An approval card") ? "the card asking them to confirm sending the spidertron is already up: tell them to confirm or cancel it in the app, and don't say you can't move it" : "",
+      stopLine ? "say what the stop line says happened, in a few words" : "",
       // "Requester chests won't pull from it" about a passive provider chest: wrong, and nobody asked (FC-160).
       pointed ? "name the thing and give only the save's own facts about it; don't explain how it works unless they ask, and if they ask something the facts don't cover, say that part is from the base game and mods can change it" : "",
       referred.length ? `"${REFERENCE.exec(question)![0]}" means ${referred.join(", ")} from the last answer; give no capacities, sizes, totals or other numbers that aren't in the lines, and if one is asked for, say the save data doesn't have it` : "",
@@ -780,6 +794,62 @@ export class Agent {
   }
 
   /** A look the player could make themselves; null when the game can't answer (not connected, older mod). */
+  /**
+   * "Send my spidertron to the copper patch": resolve the spot from the player's own words, then put up a card.
+   * Character control, so it never runs without a confirm, and the stop key cancels it (FC-051, FC-144).
+   */
+  private async proposeSpidertron(spiders: ActionData<"spidertrons"> | null, question: string): Promise<string | null> {
+    if (!spiders) return "the game couldn't say what spidertrons the player has, so nothing was proposed";
+    if (!spiders.spidertrons.length) return `no spidertron of the player's is on ${spiders.surface}, so there's nothing to send`;
+    if (!spiders.has_remote) return "the player carries no spidertron remote, so sending one isn't something they could do: say so instead of offering";
+    const spider = spiders.spidertrons.find((s) => !s.driver) ?? spiders.spidertrons[0]!;
+    if (spider.driver) return `someone is driving the ${spider.name}, so it can't be sent`;
+    const spot = await this.spidertronTarget(question);
+    if (!spot) return "the spot to send it to wasn't clear from the question: ask the player where to send it (a thing to walk to, or \"to me\")";
+    const away = Math.round(Math.hypot(spot.x - spider.x, spot.y - spider.y));
+    return this.card(`Send the ${spider.name} to ${spot.label} at (${Math.floor(spot.x)}, ${Math.floor(spot.y)})?`,
+      `${away} tiles away on ${spiders.surface}. It walks there with its own autopilot; Alt+X, "stop", driving it or using your own remote cancels it.`,
+      async () => {
+        const r = await this.deps.game.call("send_spidertron", { x: spot.x, y: spot.y, unit_number: spider.unit_number });
+        const message = `The ${r.name} is walking to (${r.x}, ${r.y}), ${r.distance} tiles away. Alt+X or "stop" takes it back.`;
+        this.deps.emit({ type: "tool", summary: message });
+        return message;
+      });
+  }
+
+  /** Where the player means: a thing named in the question, or themselves. */
+  private async spidertronTarget(question: string): Promise<{ x: number; y: number; label: string } | null> {
+    const digest = this.deps.game.latest()?.digest;
+    const player = digest?.player;
+    if (/\b(to|over) (me|my (position|spot|place)|here)\b|\bhere\b/i.test(question) && player) {
+      const at = player.character_position ?? player.position;
+      return { x: at.x, y: at.y, label: "the player" };
+    }
+    const coordinates = /\(?\s*(-?\d+)\s*,\s*(-?\d+)\s*\)?/.exec(question.replace(/\b(spidertron|spider)\b/gi, ""));
+    if (coordinates) return { x: Number(coordinates[1]), y: Number(coordinates[2]), label: "that spot" };
+    const filter = resolveEntityFilterInText(question, this.deps.prototypes());
+    if (!filter) return null;
+    try {
+      const r = await this.deps.game.call("find_entities", { types: filter.types, names: filter.names, direction: "around", radius: 128, from: "character" });
+      if (!r.entities.length) return null;
+      const c = r.center;
+      const nearest = r.entities.reduce((best, e) => (Math.hypot(e.x - c.x, e.y - c.y) < Math.hypot(best.x - c.x, best.y - c.y) ? e : best));
+      return { x: nearest.x, y: nearest.y, label: `the nearest ${nearest.name}` };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Takes back whatever the companion set moving, the same as the stop key. */
+  private async stopControl(): Promise<string | null> {
+    try {
+      const r = await this.deps.game.call("stop_control");
+      return r.stopped ? `stopped the ${r.entity ?? r.control ?? "order"} in the game, as asked` : "nothing the companion started was moving, so there was nothing to stop";
+    } catch {
+      return null;
+    }
+  }
+
   /** Measured output of the machines the player just searched for, else the ones around them. */
   private async measuredOutput(): Promise<string | null> {
     const last = this.lastResult && this.now() - this.lastResult.at <= RESULT_TTL_MS ? this.lastResult : null;
@@ -800,7 +870,7 @@ export class Agent {
     }
   }
 
-  private async lookup<A extends "player_status" | "surroundings" | "pointed_at">(action: A, args?: ActionArgs<A>): Promise<ActionData<A> | null> {
+  private async lookup<A extends "player_status" | "surroundings" | "pointed_at" | "spidertrons">(action: A, args?: ActionArgs<A>): Promise<ActionData<A> | null> {
     try {
       return await this.deps.game.call(action, args);
     } catch {
