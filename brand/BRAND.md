@@ -12,7 +12,7 @@ words from your own game, and does only what you could do yourself. It never pla
 Everything in the brand comes from that picture:
 
 - **The helmet.** The companion sees what you see and reaches what you reach. The logo is a helmet with its visor lit.
-- **The shift.** A coworker on the factory floor who has read your whole factory. Warm steel, work lights, and signage type.
+- **The shift.** A coworker on the factory floor who reads your factory for you. Warm steel, work lights, and signage type.
 - **Cyan means the companion.** In the console, on the website and in the logo, cyan marks what the companion says, proposes or does. Nothing else uses it.
 
 ## Name
