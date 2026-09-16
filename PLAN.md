@@ -664,9 +664,16 @@ never reaches the page; the picker labels them online.
 - No `walk_to`: walking stays the player's (decided by the player 2026-09-15)
 
 **Phase 6 — car and tank driving**
-- Spike first: steering approach (the engine has no pathfinder for player-driven cars), obstacle handling, per-tick
-  cost while driving, how the stop hotkey takes over
-- Then the implementation the spike recommends, or a recorded decision not to build it
+- Spike done (FC-145, 2026-09-15): `work/spikes/FC-145-driving.md`. Route-finding for a car-sized box is in the
+  engine after all — `request_path` documents "emulate pathing behavior by script for non-unit entities, such as
+  vehicles" and takes a free-form bounding box and collision mask — while throttle and steering are only
+  `riding_state` (4 acceleration × 3 direction states). So the work is a waypoint follower, not a pathfinder, and
+  `LuaEntity.orientation` / `.speed`, which the existing driving mods write, are cheats under the helmet rule.
+- Recommendation: build a **reduced** version — drive a pre-checked path and stop and say so rather than swerve —
+  **after FC-144**, whose confirm card and stop hotkey it reuses. Dynamic avoidance is the unbounded part and is cut.
+- Estimated 0.02–0.04 ms/tick while driving against ~0.05 ms of headroom, and the whole-tick benchmark can't see a
+  cost that size (its noise band is 0.043–0.107), so FC-146 measures the script profile, a `try_again_later` counter
+  and stop latency, with a go/no-go path-quality gate first.
 
 ---
 
