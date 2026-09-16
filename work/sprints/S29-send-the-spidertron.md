@@ -1,7 +1,8 @@
 # S29 — Send the spidertron
 
-- **Status:** active
+- **Status:** done
 - **Started:** 2026-09-15
+- **Finished:** 2026-09-15
 - **Goal:** The player can ask the companion to send their spidertron somewhere, confirm it in a card, and take it back instantly with a stop key — the first thing the companion moves in the world, with the rules that make that safe.
 - **Acceptance:** "send my spidertron to the nearest copper" puts up a card naming the spidertron and the spot; on confirm the spidertron walks there with its own autopilot and the console says when it arrives; the stop key cancels it within a tick and says so; refusals tested in-game (no spidertron, no remote, another surface, a spot that isn't on the player's map, someone else driving it); nothing the player didn't ask for ever moves; mod benchmark unchanged; existing suites still pass.
 
@@ -30,4 +31,4 @@ The player can say "walk my spidertron over here", confirm the card, and watch i
 - Tests: in-game 10/10 including walking there and reporting arrival, plus every refusal (no spidertron, no remote, someone driving, another surface, off the map); through the server 4/4; 171 unit tests; the earlier suites still pass.
 - Fixed along the way: the first server run answered "I can't move it for you" while the card was up, because the card is created in code and the model didn't know. The turn now says the card is up.
 
-**For the player to check:** you need a spidertron and a remote in the save (the tests make their own and remove them). Then: "walk my spidertron over to me", confirm the card, and try Alt+X mid-walk and "stop" in words. Driving it yourself or using your own remote should also end the order.
+**Still for the player to check** (closed to start S30 on the player's word, so this stays open): you need a spidertron and a remote in the save (the tests make their own and remove them). Then: "walk my spidertron over to me", confirm the card, and try Alt+X mid-walk and "stop" in words. Driving it yourself or using your own remote should also end the order.

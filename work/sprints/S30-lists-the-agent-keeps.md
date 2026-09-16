@@ -1,6 +1,7 @@
 # S30 — Lists the agent keeps
 
-- **Status:** planned
+- **Status:** active
+- **Started:** 2026-09-16
 - **Goal:** The companion keeps lists for the player — the first and best one being a packing list for a build run — shown in the console and on a read-only panel in the game, so nobody gets to the outpost and finds they forgot the belts.
 - **Acceptance:** "I'm building a smelting outpost: 20 ovens, a couple hundred belt, arms to feed them, chests for storage" becomes a list with real numbers and the things the save's data says it also needs (fuel or poles); the list survives a reload and a server restart, per map; the in-game panel shows it with a key and can't be clicked; "am I ready?" answers have / need / missing with what fits in the player's free slots and what's craftable now, and the list ticks itself off as the items arrive in the inventory; the list tool's cost to the cached prompt is measured before and after; the model never edits a list the player didn't ask about; mod per-tick cost unchanged; existing suites still pass.
 
@@ -22,8 +23,14 @@
   - Notes: the forgetting is the real pain, so the list adds what the prototypes prove is needed and nothing else (FC-160's lesson): a burner oven needs fuel, an electric one needs poles and a power source, inserters need power unless they're burners. No "you'll also want" kit until the player has used it and says what they actually forgot
   - Acceptance: from the save's own data only, each addition names its reason ("stone-furnace burns fuel: coal"); a modded save's furnaces and inserters are read from prototypes, not assumed; unit tests over vanilla and modded cases; nothing added that the data doesn't support
 
+- [ ] FC-168 Packing lists filled by your own bots
+  - Notes: phase 2 of the inventory work (player, 2026-09-15: "Phase 1 - before logistic bots & Phase 2 - after logistic bots"). 2.0 requester points hold named *sections* (`LuaLogisticPoint.add_section` / `remove_section`, each with `group`, `active`, `multiplier`, `set_slot`), so the companion can keep its requests in its own section and never touch the player's. The network can be asked first (`can_satisfy_request`, `get_item_count`, `get_supply_counts`), so a promise can be honest about what the bots can actually bring. Decisions with the player (2026-09-15): its own named section; switched off when the list is done and kept for next time; `trash_not_requested` is never written, only read
+  - Acceptance: "fill this list" adds one section named for the companion with the list's shortfall, behind a card naming every slot it will set; the player's own sections and slots are untouched (in-game test reading them before and after); the answer says what the network can supply and what it can't ("120 of the 200 belts; the rest you'll have to make"); when the list is done the section is switched off, not deleted, and the player is told; clearing the list removes it; refuses when the player is outside a logistic network, saying so rather than doing nothing; the companion never sets `trash_not_requested`, and warns when the player's own setting would dump what the bots just brought; helmet test
+
 ## Notes
 
 Planned with the player (2026-09-15) from their idea: inventory management is the biggest pain, and half of it is a to-do list the agent keeps. Decisions they made: several named lists with one shown in the game; automatic ticking only for lists that carry a rule; one model tool for editing, with its prompt cost measured; the panel shows the whole list with done items marked; the list is agent-managed and read-only to the player, who shows or hides it.
 
-Phase 2, after logistic bots, stays in the backlog: personal logistic requests and chest settings set behind a card, so the bots fetch the list instead of the player (FC-168, FC-169).
+FC-168 was pulled into this sprint at the player's request (2026-09-16: "include FC-168 into S30 and begin"), so the list gets handed to the player's own bots in the same stretch of work. FC-169 (sorting chests) was dropped before any work: storage filters only place incoming items, so they can't consolidate what's already in mixed chests.
+
+The player asked for overnight work: "Get as much done as you can… Start a loop, if needed, to keep moving and making progress." Running log in `work/overnight-2026-09-16.md`. Order: FC-163 (the primitive) → FC-165 (stock) → FC-167 (what the save says you need) → FC-166 (the packing list) → FC-164 (in-game panel) → FC-168 (bots).
