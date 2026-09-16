@@ -156,10 +156,23 @@ return function(handlers)
     for name, e in pairs(prototypes.entity) do
       if not e.hidden and e.items_to_place_this and #e.items_to_place_this > 0 then
         local box = e.collision_box
+        -- A few facts the model would otherwise state from memory, which modded saves change (FC-160):
+        -- how much a chest holds, which logistic job it does, how much fluid a tank takes.
+        local inventory = e.get_inventory_size(defines.inventory.chest)
+        local fluid = e.fluid_capacity
+        -- Poles and beacons: how far they reach, so answers don't state base-game numbers on a modded save.
+        local supply = e.type == "electric-pole" or e.type == "beacon"
+        local supply_area = supply and e.get_supply_area_distance() or nil
+        local wire_reach = e.type == "electric-pole" and e.get_max_wire_distance() or nil
         entities[name] = {
           type = e.type,
           size = { e.tile_width, e.tile_height },
           collision = { box.left_top.x, box.left_top.y, box.right_bottom.x, box.right_bottom.y },
+          inventory_size = inventory and inventory > 0 and inventory or nil,
+          logistic_mode = e.logistic_mode,
+          fluid_capacity = fluid and fluid > 0 and math.floor(fluid) or nil,
+          supply_area = supply_area,
+          wire_reach = wire_reach,
         }
       end
     end

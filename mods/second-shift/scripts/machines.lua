@@ -310,6 +310,82 @@ function M.register(handlers)
     return { surface = surface, recipe = args.recipe, count = count, by_status = by_status, not_visible = not_visible, entities = refs, same_surface = same_surface }
   end
 
+  -- Look (FC-162): what the machines the player asked about have really made. Every machine counts its own finished
+  -- crafts, so two reads some seconds apart give the real rate from the player's own game, with no guessing. The
+  -- first read starts the clock; the next one reports. Only machines the player can see, and only their own force's.
+  -- Capped: reading a machine costs ~5 µs (a position lookup), so 200 keeps one read near a millisecond.
+  local MAX_SAMPLE = 200
+  local CRAFTING_TYPES = { "assembling-machine", "furnace", "rocket-silo" }
+  handlers.machine_output = function(args)
+    local player = util.companion_player()
+    if not player then util.reject("no_player", "No player is connected.") end
+    local surface = player.surface
+    local found = {}
+    if args.entities and #args.entities > 0 then
+      for _, ref in pairs(args.entities) do
+        if #found >= MAX_SAMPLE then break end
+        local e = type(ref) == "table" and ref.name and surface.find_entity(ref.name, { x = ref.x, y = ref.y })
+        if e and e.valid then found[#found + 1] = e end
+      end
+    else
+      local radius = math.min(tonumber(args.radius) or 32, 64)
+      local at = player.physical_position
+      found = surface.find_entities_filtered({
+        area = { { at.x - radius, at.y - radius }, { at.x + radius, at.y + radius } },
+        type = CRAFTING_TYPES, force = player.force, limit = MAX_SAMPLE,
+      })
+    end
+    local now = game.tick
+    local sample, groups, machines, not_visible = {}, {}, 0, 0
+    local function crafting(e)
+      return e.type == "assembling-machine" or e.type == "furnace" or e.type == "rocket-silo"
+    end
+    local function recipe_name(e)
+      local recipe = e.get_recipe()
+      if recipe then return recipe.name end
+      return "no recipe set"
+    end
+    for _, e in pairs(found) do
+      if e.valid and crafting(e) and e.force == player.force then
+        if not helmet.visible(player.force, e.surface, e.position) then
+          not_visible = not_visible + 1
+        else
+          machines = machines + 1
+          local key = recipe_name(e)
+          local group = groups[key] or { recipe = key, machines = 0, finished = 0, before = 0, sampled = 0 }
+          groups[key] = group
+          group.machines = group.machines + 1
+          group.finished = group.finished + e.products_finished
+          sample[e.unit_number] = e.products_finished
+        end
+      end
+    end
+    -- Rates against the last read, for the machines in both reads.
+    local previous = not args.restart and (storage.output_samples or {})[player.index] or nil
+    local window = previous and now - previous.tick or 0
+    if previous and window > 0 then
+      for _, e in pairs(found) do
+        local was = e.valid and previous.counts[e.unit_number]
+        if was and sample[e.unit_number] then
+          local group = groups[recipe_name(e)]
+          if group then
+            group.before = group.before + was
+            group.sampled = group.sampled + 1
+          end
+        end
+      end
+    end
+    storage.output_samples = storage.output_samples or {}
+    storage.output_samples[player.index] = { tick = now, counts = sample }
+    local out = {}
+    for _, g in pairs(groups) do
+      local entry = { recipe = g.recipe, machines = g.machines, finished = g.finished, sampled = g.sampled }
+      if g.sampled > 0 and window > 0 then entry.per_minute = (g.finished - g.before) * 3600 / window end
+      out[#out + 1] = entry
+    end
+    return { tick = now, window_ticks = window, machines = machines, not_visible = not_visible, recipes = out }
+  end
+
   -- Test tooling: forget the registry so the initial scan runs again (its cost can then be profiled).
   handlers.debug_reset_machines = function()
     storage.machines = nil

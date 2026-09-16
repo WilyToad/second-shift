@@ -18,8 +18,9 @@ import type { ChatMessage, ChatModel, StreamResult, ToolCall, ToolSpec } from ".
 import { buildMessages, formatSnapshot, userTurn } from "./prompt";
 import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
+import { entityFacts } from "./grounding";
 import { arithmeticCorrections } from "./numbers";
-import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatPointedAt, wantsContents, wantsPointedAt, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, wantsContents, wantsMeasuredOutput, wantsPointedAt, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -521,11 +522,15 @@ export class Agent {
     const askedContents = !pasted.summaries.length && wantsContents(question);
     const target = askedContents ? contentsTarget(pointed, lastOne) : null;
     const contentsLine = target ? await this.contentsOf(target) : askedContents ? "no container is under the mouse, open or just hovered, so its contents weren't looked at: ask the player to hover over it" : null;
+    // "Is this hitting 150 a minute?": measured in the player's own game from the machines' craft counts (FC-162).
+    const protos = this.deps.prototypes();
+    const measuredLine = !pasted.summaries.length && wantsMeasuredOutput(question) ? await this.measuredOutput() : null;
     const playerLines = [
       ...(status ? formatPlayerStatus(status, { builds: start || /\b(buil\w*|plac\w*|made)\b/i.test(intent) }) : []),
       ...(around ? formatSurroundings(around) : []),
-      ...(pointed ? formatPointedAt(pointed) : []),
+      ...(pointed ? formatPointedAt(pointed, (name) => (protos ? entityFacts(name, protos) : null)) : []),
       ...(contentsLine ? [contentsLine] : []),
+      ...(measuredLine ? [measuredLine] : []),
     ];
     // Tools are ruled out only when the retrieved data answers the question; a question nothing matched
     // gets no note, so "I just built something" is free to look (S22).
@@ -544,6 +549,8 @@ export class Agent {
       // "look around" answered with "burner-inserter (1 iron-plate + 1 gear)" from an earlier turn's memory (S24 eval).
       playerLines.length && !found?.lines.length && !craftableRecipes(status).length ? "give no recipe ingredients or amounts: this turn has no recipe lines" : "",
       // "25,000 units each, 1,250,000 total" for storage tanks: neither number is in the save data (FC-153).
+      // "Requester chests won't pull from it" about a passive provider chest: wrong, and nobody asked (FC-160).
+      pointed ? "name the thing and give only the save's own facts about it; don't explain how it works unless they ask, and if they ask something the facts don't cover, say that part is from the base game and mods can change it" : "",
       referred.length ? `"${REFERENCE.exec(question)![0]}" means ${referred.join(", ")} from the last answer; give no capacities, sizes, totals or other numbers that aren't in the lines, and if one is asked for, say the save data doesn't have it` : "",
     ].filter(Boolean);
     // Blueprint requests are built in code; the model only explains the result (S14).
@@ -773,6 +780,18 @@ export class Agent {
   }
 
   /** A look the player could make themselves; null when the game can't answer (not connected, older mod). */
+  /** Measured output of the machines the player just searched for, else the ones around them. */
+  private async measuredOutput(): Promise<string | null> {
+    const last = this.lastResult && this.now() - this.lastResult.at <= RESULT_TTL_MS ? this.lastResult : null;
+    const entities = last?.refs.length ? last.refs.slice(0, 500) : undefined;
+    try {
+      const r = await this.deps.game.call("machine_output", entities ? { entities } : { radius: 32 });
+      return formatMachineOutput(r, entities ? `the ${last!.label} from the last search` : "32 tiles around the player");
+    } catch {
+      return null; // an older mod or no game: the rest of the turn still answers
+    }
+  }
+
   private async contentsOf(target: { name: string; x: number; y: number }): Promise<string> {
     try {
       return formatContents(await this.deps.game.call("container_contents", { name: target.name, x: target.x, y: target.y }));

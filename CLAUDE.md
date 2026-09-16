@@ -141,7 +141,7 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun test`, `bun run typecheck`, `bun run check` (all of it), `bun run board` (sprint progress).
 - Website: `bun run site:dev` / `site:build` / `site:serve` locally; `bun run site:deploy` publishes to https://second-shift.wilytoad.com (outward-facing: only when the player asks).
 - `bun scripts/test-planning.ts` (dev save hosted) runs the helmet tests for planning actions (research, tags, camera, upgrade, blueprint paste).
-- `bun scripts/test-machines.ts` (dev save hosted) checks the machine registry and polling cost.
+- `bun scripts/test-machines.ts` (dev save hosted) checks the machine registry, polling cost and measured machine output (FC-162).
 - `bun scripts/megabase.ts` (dev save hosted) scales the running game to 25,000 machines on a temporary surface and profiles every mod path (PLAN §5).
 - `bun scripts/test-research.ts` and `bun scripts/test-inserters.ts` (dev save hosted) check the research patch and inserter geometry.
 - `bun scripts/test-player.ts` (dev save hosted) checks the player's own data: map id, inventory, hand crafting, recent
@@ -164,6 +164,8 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `COMPANION_REPLAY_DIGEST=data/captures/digest.json bun run start` uses a captured digest while the
   game is closed, so offline answers see a realistic prompt.
 - `bun scripts/eval-ratios.ts` (server running) checks production-plan answers against an independent reference.
+- `bun scripts/eval-pointing.ts` (server and dev save running, resets the conversation) asks "what is this?" about test entities and checks answers stick to the save's own facts (FC-160).
+- `bun scripts/e2e-measure.ts` (server and dev save running, resets the conversation) checks "what rate are they really hitting?" measures the machines in the game (FC-162).
 - `bun scripts/eval-voice-session.ts` (server and dev save running, resets the conversation) replays the first voice session and checks its odd replies stay gone (S27).
 - `bun scripts/e2e-pointing.ts` (server and dev save running, resets the conversation) asks "what is this?" and "what's in this chest?" with the mouse on a test chest (FC-151, FC-152).
 - `bun scripts/e2e-wake.ts` (server and dev save running, resets the conversation) A/B-tests keeping the model awake while the player talks (FC-158).

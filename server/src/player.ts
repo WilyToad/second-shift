@@ -1,7 +1,7 @@
 // The player's own situation, fetched only when a question needs it (S22): what they carry and can
 // hand-craft, what they built, what they can see around them. Decided and formatted in code, sent in
 // the uncached tail, never in the system prompt.
-import type { ContainerContents, PlayerStatus, PointedAt, SeenEntity, Surroundings } from "@companion/interfaces";
+import type { ContainerContents, MachineOutput, PlayerStatus, PointedAt, SeenEntity, Surroundings } from "@companion/interfaces";
 
 const AFFIRMATIVE = /^\s*(y|yes|yeah|yea|yep|yup|sure|ok|okay|please|go ahead|do it|go for it|sounds good|absolutely|definitely|why not)\b[\s\w,.!']{0,30}$/i;
 
@@ -186,6 +186,13 @@ export function wantsPointedAt(text: string): boolean {
   return POINTING.test(text) || CONTENTS.test(text);
 }
 
+// "Is this build hitting 150 a minute?", "what's it really making?" (FC-162).
+const MEASURED = /\b(hitting|really (making|producing|putting out)|actual(ly)? (rate|making|producing|output)|real (rate|output|numbers?)|measure\w*|keeping up|per minute really|how much is (it|this|that) (really )?(making|producing))\b/i;
+
+export function wantsMeasuredOutput(text: string): boolean {
+  return MEASURED.test(text);
+}
+
 export function wantsContents(text: string): boolean {
   return CONTENTS.test(text);
 }
@@ -195,8 +202,12 @@ const agoS = (ticks: number) => `${Math.max(1, Math.round(ticks / 60))} s ago`;
 /** Hovers older than this aren't "what the player means" any more. */
 const HOVER_FRESH_TICKS = 120 * 60;
 
-/** Lines for what the player points at, hovered last, holds and has open; each says "nothing" rather than leaving a gap to guess into. */
-export function formatPointedAt(p: PointedAt): string[] {
+/**
+ * Lines for what the player points at, hovered last, holds and has open; each says "nothing" rather than leaving a
+ * gap to guess into. `facts` adds what the save says about the thing itself (FC-160), so answers about how it
+ * behaves don't come from the model's memory of vanilla.
+ */
+export function formatPointedAt(p: PointedAt, facts?: (name: string) => string | null): string[] {
   const lines = [`under the mouse now: ${p.selected ? seen(p.selected) : "nothing"}`];
   const last = p.last_hovered;
   if (last && last.ago_ticks <= HOVER_FRESH_TICKS && !(p.selected && last.name === p.selected.name && last.x === p.selected.x && last.y === p.selected.y)) {
@@ -207,6 +218,10 @@ export function formatPointedAt(p: PointedAt): string[] {
   lines.push(`open window: ${!o ? "none" : o.entity ? seen(o.entity) : o.item ? `the ${o.item} item` : o.kind === "controller" ? "the player's inventory screen" : `the ${o.kind.replace(/_/g, " ")} screen`}`);
   if (!p.selected && !(last && last.still_there && last.ago_ticks <= HOVER_FRESH_TICKS) && !o?.entity) {
     lines.push("nothing is pointed at: if they ask what \"this\" is, say you can't tell and ask them to hover over it");
+  }
+  if (facts) {
+    const names = [p.selected?.name, last?.still_there ? last.name : undefined, o?.entity?.name, p.hand?.name, p.hand_ghost].filter((n): n is string => Boolean(n));
+    for (const line of new Set(names.map(facts).filter((l): l is string => Boolean(l)))) lines.push(`from the save: ${line}`);
   }
   return lines;
 }
@@ -225,4 +240,16 @@ export function formatContents(c: ContainerContents): string {
   const more = c.total_kinds > c.items.length ? ` and ${c.total_kinds - c.items.length} more kinds` : "";
   const fluids = c.fluids.length ? `; fluids: ${c.fluids.map((f) => `${f.name} ${f.amount}`).join(", ")}` : "";
   return `inside the ${seen(c.entity)}: ${items || "no items"}${more}${fluids}`;
+}
+
+/** Measured output of the machines the player asked about (FC-162), or what to say when the clock just started. */
+export function formatMachineOutput(m: MachineOutput, where: string): string {
+  if (!m.machines) return `no machines of the player's own are in ${where}${m.not_visible ? `, and ${m.not_visible} are somewhere they can't see` : ""}, so nothing was measured`;
+  const seconds = Math.round(m.window_ticks / 60);
+  const measured = m.recipes.filter((r) => r.per_minute !== undefined);
+  if (!measured.length) {
+    return `started measuring ${m.machines} machines in ${where} just now (their own craft counts): ask again in about a minute and the answer will be the real rate`;
+  }
+  const lines = measured.map((r) => `${r.recipe} ${Math.round(r.per_minute!)}/min from ${r.sampled} machine${r.sampled === 1 ? "" : "s"}`);
+  return `measured in the player's game over the last ${seconds} s from the machines' own craft counts: ${lines.join(", ")}`;
 }

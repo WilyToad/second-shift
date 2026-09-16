@@ -4,7 +4,7 @@ import { connectDevGame } from "./lib/devgame";
 
 const dev = await connectDevGame();
 let id = 1;
-const call = async <A extends "machine_stats" | "debug_machine_tick" | "find_machines">(action: A, profile = false, args: Record<string, unknown> = {}) => {
+const call = async <A extends "machine_stats" | "debug_machine_tick" | "find_machines" | "machine_output">(action: A, profile = false, args: Record<string, unknown> = {}) => {
   const { reply, profile: p } = parseReply(await dev.rcon.exec(encodeCommand({ id: id++, action, args, profile })));
   if (!reply.ok) throw new Error(JSON.stringify(reply.error));
   return { data: actions[action].data.parse(reply.data) as any, profile: p };
@@ -67,6 +67,63 @@ await dev.sc(`if storage.test_machine and storage.test_machine.valid then storag
 await Bun.sleep(300);
 const gone = !(await listed("copper-cable"));
 check("a recipe change moves a machine between groups; destroying drops it", at.x !== undefined && inGears && movedOut && movedIn && gone, `listed as gears ${inGears}, left gears ${movedOut}, listed as cable ${movedIn}, gone ${gone}`);
+
+// FC-162: measured output from the machines' own craft counts. The first read starts the clock, the next reports.
+await dev.leaveRemoteView();
+const first = await call("machine_output", true, { radius: 64, restart: true });
+check("machine_output starts the clock on the first read", first.data.window_ticks === 0 && first.data.machines > 0 && first.data.recipes.every((r: any) => r.per_minute === undefined),
+  `${first.data.machines} machines, ${first.data.recipes.length} recipes, ${first.profile}`);
+// Give the idle machines near the player something to craft, so there's a real rate to compare (test tooling).
+const fed = JSON.parse(await dev.sc(`local p = game.connected_players[1] local at = p.physical_position local n = 0
+  for _, e in pairs(p.surface.find_entities_filtered({ area = { { at.x - 64, at.y - 64 }, { at.x + 64, at.y + 64 } }, type = "assembling-machine", force = p.force })) do
+    local r = e.get_recipe()
+    if r then
+      for _, i in pairs(r.ingredients) do if i.type == "item" then e.insert({ name = i.name, count = math.min(200, i.amount * 60) }) end end
+      n = n + 1
+    end
+  end rcon.print(helpers.table_to_json({ fed = n }))`));
+const truth = async () => JSON.parse(await dev.sc(`local p = game.connected_players[1] local at = p.physical_position local out = {}
+  for _, e in pairs(p.surface.find_entities_filtered({ area = { { at.x - 64, at.y - 64 }, { at.x + 64, at.y + 64 } }, type = { "assembling-machine", "furnace", "rocket-silo" }, force = p.force })) do
+    out[tostring(e.unit_number)] = e.products_finished
+  end rcon.print(helpers.table_to_json({ counts = out, tick = game.tick }))`)) as { counts: Record<string, number>; tick: number };
+const truthBefore = await truth();
+await call("machine_output", false, { radius: 64 }); // start the clock next to the truth reading
+await Bun.sleep(10_000);
+const second = await call("machine_output", true, { radius: 64 });
+const truthAfter = await truth();
+const truthCrafts = Object.entries(truthAfter.counts).reduce((n, [unit, count]) => n + (count - (truthBefore.counts[unit] ?? count)), 0);
+const truthPerMinute = (truthCrafts * 3600) / (truthAfter.tick - truthBefore.tick);
+const reported = second.data.recipes.reduce((n: number, r: any) => n + (r.per_minute ?? 0), 0);
+check("the measured rate matches the machines' own craft counts", truthPerMinute > 0 && Math.abs(reported - truthPerMinute) <= Math.max(1, truthPerMinute * 0.1),
+  `reported ${reported.toFixed(1)}/min, from the game ${truthPerMinute.toFixed(1)}/min over ${((truthAfter.tick - truthBefore.tick) / 60).toFixed(0)} s (fed ${fed.fed} machines); ${second.profile}`);
+
+// Cost with many machines: read 500 of them through remote view over the factory floor (test tooling), as a
+// player looking at their base through radar coverage would.
+const many = JSON.parse(await dev.sc(`local p = game.connected_players[1] local s = game.get_surface("nauvis-factory-floor")
+  local refs = {}
+  for _, e in pairs(s.find_entities_filtered({ type = { "assembling-machine", "furnace" }, force = p.force, limit = 200 })) do
+    refs[#refs + 1] = { name = e.name, x = e.position.x, y = e.position.y }
+  end
+  local at = refs[1]
+  p.set_controller({ type = defines.controllers.remote, surface = s, position = { at.x, at.y } })
+  rcon.print(helpers.table_to_json({ refs = refs }))`));
+try {
+  const big = await call("machine_output", true, { entities: many.refs });
+  check("reading a capped batch of machines costs about a millisecond", parseFloat(big.profile ?? "99") < 1.5, `${big.data.machines} machines (${big.data.not_visible} out of sight) in ${big.profile}`);
+} finally {
+  await dev.sc(`game.connected_players[1].exit_remote_view() rcon.print("ok")`);
+}
+// Helmet: machines the player can't see aren't measured.
+const unseen = JSON.parse(await dev.sc(`local p = game.connected_players[1] local s = p.surface local at = p.physical_position
+  local far = { x = at.x + 6000, y = at.y } s.request_to_generate_chunks(far, 0) s.force_generate_chunk_requests()
+  local pos = s.find_non_colliding_position("assembling-machine-2", far, 40, 1)
+  local e = pos and s.create_entity({ name = "assembling-machine-2", position = pos, force = p.force })
+  rcon.print(helpers.table_to_json(e and { name = e.name, x = e.position.x, y = e.position.y, visible = p.force.is_chunk_visible(s, { x = math.floor(e.position.x / 32), y = math.floor(e.position.y / 32) }) } or {}))`));
+if (unseen.name) {
+  const refused = await call("machine_output", false, { entities: [{ name: unseen.name, x: unseen.x, y: unseen.y }] });
+  check("machine_output refuses machines the player can't see", refused.data.machines === 0 && refused.data.not_visible === 1, `machines ${refused.data.machines}, not visible ${refused.data.not_visible}`);
+  await dev.destroy([{ name: unseen.name, x: unseen.x, y: unseen.y }]);
+} else check("machine_output refuses machines the player can't see", false, "couldn't place a test machine out of sight");
 
 // Cost of one tick's work (polling; scan is finished), profiled in Lua.
 const costs: string[] = [];

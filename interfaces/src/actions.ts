@@ -72,6 +72,17 @@ export const PointedAtSchema = z.object({
 });
 export type PointedAt = z.infer<typeof PointedAtSchema>;
 
+/** Measured output of machines, from their own finished-craft counts (FC-162). */
+export const MachineOutputSchema = z.object({
+  tick: z.number(),
+  // Ticks since the last read; 0 when this read starts the clock.
+  window_ticks: z.number(),
+  machines: z.number(),
+  not_visible: z.number(),
+  recipes: luaArray(z.object({ recipe: z.string(), machines: z.number(), finished: z.number(), sampled: z.number(), per_minute: z.number().optional() })),
+});
+export type MachineOutput = z.infer<typeof MachineOutputSchema>;
+
 /** What's inside a container or machine the player can see (FC-152). */
 export const ContainerContentsSchema = z.object({
   entity: SeenEntitySchema,
@@ -186,6 +197,8 @@ export const actions = {
   },
   player_status: { args: z.object({}), data: PlayerStatusSchema, kind: "look" },
   pointed_at: { args: z.object({}), data: PointedAtSchema, kind: "look" },
+  // FC-162: what the machines the player asked about have really made, from each machine's own craft count.
+  machine_output: { args: z.object({ entities: luaArray(EntityRefSchema).optional(), radius: z.number().positive().max(64).optional(), restart: z.boolean().optional() }), data: MachineOutputSchema, kind: "look" },
   container_contents: { args: z.object({ name: z.string(), x: z.number(), y: z.number() }), data: ContainerContentsSchema, kind: "look" },
   debug_select_entity: { args: z.object({ name: z.string().optional(), x: z.number().optional(), y: z.number().optional() }), data: z.object({ selected: z.boolean() }), kind: "look" },
   map_id: { args: z.object({}), data: z.object({ map_id: z.string().optional() }), kind: "look" },

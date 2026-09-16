@@ -417,6 +417,25 @@ token 2.2–7.4 s). Two measured causes:
   drops back each block (the session's turns at 6,144 cached had 376–950 uncached). Keep history append-only:
   compacting earlier rewrites cached blocks, which costs a cold prefill.
 
+**Facts instead of memory (FC-160, 2026-09-15):** the prototype dump (v10) now carries what a modded save can change
+about a thing itself: chest inventory size, logistic job, fluid capacity, and a pole's supply area and wire reach.
+Those go into the pointed-at lines, and the turn asks for the save's facts only. Before: "what is this?" on a passive
+provider chest added "inserters can pull items out of it, but nothing puts items in" (wrong) and two of four answers
+explained mechanics nobody asked about. After (`scripts/eval-pointing.ts`, 9/9): the facts are the save's own
+(48 stacks, 25,000 fluid, 15 items/s, "powers machines within 3.5 tiles"), one sentence still describes what a thing
+does and it matches those facts, and answers add "that part is base game; mods can change it" when asked further.
+
+**Measured output (FC-162, 2026-09-15):** every machine counts its own finished crafts, so `machine_output` reads
+them twice and reports the real rate from the player's own game — no estimate. On demand only, capped at 200
+machines a read (about 6 µs a machine: 200 in 1.03 ms, measured), refusing machines the player can't see. In-game
+the reported rate matched the game's own craft counts (289.9 vs 289.0/min over 10 s), and through the server
+"what rate are they really hitting?" answered 266/min against 263.9/min measured independently
+(`scripts/e2e-measure.ts`).
+
+**Re-run after S28 mod changes (2026-09-15, dump v10 fields and `machine_output`, 5 runs):** without 0.678, with
+0.729, so **0.051 ms/tick**; per-tick script time 0.066 ms with the mod vs 0.016 without (last 600 ticks 0.055 vs
+0.014), slowest script tick 0.32 ms. Nothing new runs per tick.
+
 **Throughput estimates against the game (FC-161, 2026-09-15):** `scripts/test-generated-builds.ts` now feeds each
 generated row through its own belts (the level script tops up the head of the input belt and empties the tail of the
 output belt, one surface per case), so belts, inserters and machines all count. Three healthy rows and two crippled

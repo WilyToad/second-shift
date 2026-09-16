@@ -77,11 +77,21 @@ export const MachineSchema = z.strictObject({
 
 export const InserterBonusesSchema = z.object({ stack: z.number(), bulk: z.number() });
 
-/** A buildable entity's footprint: tile size and collision box [left, top, right, bottom] around its position. */
+/**
+ * A buildable entity's footprint: tile size and collision box [left, top, right, bottom] around its position,
+ * plus the few facts about it a modded save can change (dump v9, FC-160): how much a chest holds, which logistic
+ * job it does, how much fluid it takes.
+ */
 export const EntityFootprintSchema = z.strictObject({
   type: z.string(),
   size: z.tuple([z.number(), z.number()]),
   collision: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  inventory_size: z.number().optional(),
+  logistic_mode: z.string().optional(),
+  fluid_capacity: z.number().optional(),
+  // Electric poles and beacons (dump v10): supply area half-width and wire reach, in tiles.
+  supply_area: z.number().optional(),
+  wire_reach: z.number().optional(),
 });
 
 export const PrototypesSchema = z.strictObject({

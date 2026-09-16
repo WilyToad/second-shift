@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PlayerStatusSchema, SurroundingsSchema } from "@companion/interfaces";
-import { acceptedOffer, contentsTarget, correctedRequest, formatContents, formatPointedAt, wantsContents, wantsPointedAt, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, formatContents, formatMachineOutput, formatPointedAt, wantsMeasuredOutput, wantsContents, wantsPointedAt, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 test("a short yes takes up the question the last answer offered", () => {
   const last = "Start by mining iron.\n\nWant me to look around to see what you built?";
@@ -183,4 +183,27 @@ test("FC-152: contents questions, the entity they mean, and the contents line", 
     .toBe("inside the red-chest at (1, 2): iron-plate 400, gear (rare) 7 and 1 more kinds");
   expect(formatContents({ entity: { ...chest, name: "storage-tank", type: "storage-tank" }, items: [], total_kinds: 0, fluids: [{ name: "water", amount: 25000 }] }))
     .toBe("inside the storage-tank at (1, 2): no items; fluids: water 25000");
+});
+
+test("FC-160: the save's own facts about what's pointed at go in the lines", () => {
+  const chest = { name: "passive-provider-chest", ghost: false, type: "logistic-container", surface: "nauvis", x: 1, y: 2, own: true };
+  const lines = formatPointedAt({ selected: chest, hand: { name: "storage-tank", count: 7 } }, (name) =>
+    name === "passive-provider-chest" ? "passive-provider-chest: logistic container; logistic job: passive provider; holds 48 stacks" : name === "storage-tank" ? "storage-tank: storage tank; holds 25,000 fluid" : null);
+  expect(lines).toContain("from the save: passive-provider-chest: logistic container; logistic job: passive provider; holds 48 stacks");
+  expect(lines).toContain("from the save: storage-tank: storage tank; holds 25,000 fluid");
+  // Nothing invented when the save has no facts for it.
+  expect(formatPointedAt({ selected: chest }, () => null).some((l) => l.startsWith("from the save"))).toBe(false);
+});
+
+test("FC-162: measuring questions, and what the measured lines say", () => {
+  for (const q of ["is this build hitting 150 a minute?", "what's it really making?", "how much is this actually producing", "can you measure it?"]) {
+    expect(wantsMeasuredOutput(q)).toBe(true);
+  }
+  for (const q of ["what's in this chest?", "how many radars are near me"]) expect(wantsMeasuredOutput(q)).toBe(false);
+  const started = formatMachineOutput({ tick: 100, window_ticks: 0, machines: 4, not_visible: 0, recipes: [{ recipe: "iron-gear-wheel", machines: 4, finished: 900, sampled: 0 }] }, "the 4 assemblers from the last search");
+  expect(started).toContain("started measuring 4 machines");
+  expect(started).toContain("ask again in about a minute");
+  const done = formatMachineOutput({ tick: 3700, window_ticks: 3600, machines: 4, not_visible: 0, recipes: [{ recipe: "iron-gear-wheel", machines: 4, finished: 1500, sampled: 4, per_minute: 149.6 }] }, "the 4 assemblers from the last search");
+  expect(done).toBe("measured in the player's game over the last 60 s from the machines' own craft counts: iron-gear-wheel 150/min from 4 machines");
+  expect(formatMachineOutput({ tick: 1, window_ticks: 0, machines: 0, not_visible: 3, recipes: [] }, "32 tiles around the player")).toContain("3 are somewhere they can't see");
 });

@@ -76,6 +76,33 @@ export function machineLine(name: string, m: Machine): string | null {
   }
 }
 
+/**
+ * The facts about one entity that come from this save, for "what is this?" (FC-160): what it is, how much it
+ * holds, which logistic job it does, how fast it runs. Everything else about how it behaves is the model's memory,
+ * which a modded save can contradict, so the turn asks it to say only what's here.
+ */
+export function entityFacts(name: string, p: Prototypes): string | null {
+  const e = p.entities[name];
+  const m = p.machines[name];
+  if (!e && !m) return null;
+  const parts: string[] = [];
+  const type = e?.type ?? m?.type;
+  if (type) parts.push(type.replace(/-/g, " "));
+  if (e?.logistic_mode) parts.push(`logistic job: ${e.logistic_mode.replace(/-/g, " ")}`);
+  if (e?.inventory_size) parts.push(`holds ${e.inventory_size} stacks`);
+  if (e?.fluid_capacity) parts.push(`holds ${e.fluid_capacity.toLocaleString("en-US")} fluid`);
+  if (e?.supply_area) parts.push(`powers machines within ${num(e.supply_area)} tiles`);
+  if (e?.wire_reach) parts.push(`reaches other poles ${num(e.wire_reach)} tiles away`);
+  if (m?.crafting_speed !== undefined) parts.push(`crafting speed ${num(m.crafting_speed)}`);
+  if (m?.mining_speed !== undefined) parts.push(`mining speed ${num(m.mining_speed)}`);
+  if (m?.belt_speed !== undefined) parts.push(`carries ${num(m.belt_speed * 480)} items/s (${num(m.belt_speed * 240)} a lane)`);
+  if (m?.module_slots) parts.push(`${m.module_slots} module slots`);
+  if (m?.crafting_categories?.length) parts.push(`crafts ${m.crafting_categories.join(", ")}`);
+  const recipe = p.recipes[name];
+  if (recipe) parts.push(`built from ${recipe.ingredients.map((i) => `${i.amount} ${i.name}`).join(" + ")}`);
+  return parts.length ? `${name}: ${parts.join("; ")}` : null;
+}
+
 export function formatMachines(p: Prototypes): string {
   return Object.entries(p.machines).sort(([a], [b]) => a.localeCompare(b)).map(([name, m]) => machineLine(name, m)).filter((line) => line !== null).join("\n");
 }
