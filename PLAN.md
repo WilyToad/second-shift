@@ -417,6 +417,14 @@ token 2.2–7.4 s). Two measured causes:
   drops back each block (the session's turns at 6,144 cached had 376–950 uncached). Keep history append-only:
   compacting earlier rewrites cached blocks, which costs a cold prefill.
 
+**The list in the game and the bots filling it (FC-164, FC-168, 2026-09-16):** the panel is drawn only when the
+list changes (mod benchmark **0.031 ms/tick**, per-tick script time unchanged at 0.05 ms), shows the whole list with
+done items ticked and greyed, caps at 25 lines and has nothing clickable — the player shows and hides it with
+Alt+L and asks the companion for any change. Handing the list to the bots keeps the companion's requests in its own
+"Second Shift" section of the player's requester point (0.09 ms to set), so their own sections come back untouched
+(checked in-game); stopping switches the section off and leaves its slots, clearing the list removes it, and
+`trash_not_requested` is read and warned about but never written.
+
 **The packing list (FC-166, FC-167, 2026-09-16):** the player's own example — "20 ovens, a couple hundred belt,
 enough arms to feed the ovens and chests for storage" — becomes a list with counts, and the save's data adds what
 the build can't run without: fuel for burners, poles and a power-source reminder for electric machines, each with

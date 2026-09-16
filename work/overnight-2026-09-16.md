@@ -53,3 +53,33 @@ Order: FC-163 (lists) → FC-165 (stock) → FC-167 (what the save says you need
   resolved to stone furnaces in one run and electric furnaces in another. Both are defensible from the data, but
   worth a glance.
 
+### FC-164 the list on a panel in the game — done
+
+- `scripts/panel.lua`: `gui.left` frame, done count, tick + grey for done items, notes in brackets, 25-line cap
+  with "+N more", nothing clickable. Alt+L toggles; an empty list draws nothing.
+- Benchmark after the module: 0.031 ms/tick whole-tick, script 0.065 vs 0.015 without the mod — unchanged.
+- In-game 7/7 (the test reads the GUI back and counts clickable elements); verified live from a conversation.
+
+### FC-168 packing lists filled by your own bots — done
+
+- `scripts/logistics.lua`: `logistic_network` (in range, robots free, kinds, trash-unrequested) and `set_requests`
+  writing only the companion's own "Second Shift" section; `clear_requests` switches it off or removes it.
+- In-game 9/9: the player's own "player test" section came back with its slot untouched, a second list replaced
+  our slots instead of piling up, and trash-unrequested was read but never written.
+- Through the server: card reads "Ask the bots for 30 stone-furnace, 200 transport-belt, 12 burner-inserter?", and
+  the answer is honest about 0 of 383 robots being free on this base.
+- A finished list switches the section off by itself; clearing the list removes it.
+
+### Fixes found by running it
+
+- The packing rule ran a turn late; it now runs the moment the list changes.
+- `set` added to the list tool after the model wrote a count change as a second line.
+- Items sharing one word were treated as the same item ("50 iron gear wheel" overwrote "5 iron chest"); matching
+  is now exact, then unambiguous subset, then a single unambiguous shared word.
+- `reset` clears lists: a stale list outlived its conversation and confused both answers and the eval.
+
+### Regressions after all of it
+
+- 188 unit tests; in-game player 30/30, panel 7/7, requests 9/9; server-side packing 5/5, measure 3/3,
+  pointing 9/9, voice replay 8/8, grounding 10/10 (first token median 1.32 s).
+

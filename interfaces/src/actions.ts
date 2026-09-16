@@ -72,6 +72,29 @@ export const PointedAtSchema = z.object({
 });
 export type PointedAt = z.infer<typeof PointedAtSchema>;
 
+/** The player's own logistic network, and whether they're in range of it (FC-168). */
+export const LogisticNetworkSchema = z.object({
+  in_range: z.boolean(),
+  network_id: z.number().optional(),
+  robots: z.number(),
+  available_robots: z.number(),
+  items: luaArray(z.object({ name: z.string(), count: z.number(), quality: z.string().optional() })),
+  total_kinds: z.number(),
+  // Read, never written: the player's own choice (FC-168).
+  trash_unrequested: z.boolean(),
+});
+export type LogisticNetwork = z.infer<typeof LogisticNetworkSchema>;
+
+/** What the companion asked the bots for, in its own section of the player's requests (FC-168). */
+export const SetRequestsSchema = z.object({
+  group: z.string(),
+  set: luaArray(z.object({ name: z.string(), count: z.number(), in_network: z.number() })),
+  short: luaArray(z.object({ name: z.string(), reason: z.string() })),
+  robots: z.number(),
+  sections: z.number(),
+  trash_unrequested: z.boolean(),
+});
+
 /** What the player can reach without walking far: what they carry plus the containers they can see (FC-165). */
 export const StockSchema = z.object({
   surface: z.string(),
@@ -239,7 +262,12 @@ export const actions = {
     data: z.object({ shown: z.number(), name: z.string() }),
     kind: "look",
   },
+  logistic_network: { args: z.object({}), data: LogisticNetworkSchema, kind: "look" },
+  // Character control (FC-168): the player confirms it in a card, and it only ever touches the companion's section.
+  set_requests: { args: z.object({ items: luaArray(z.object({ name: z.string(), count: z.number() })) }), data: SetRequestsSchema, kind: "character_control" },
+  clear_requests: { args: z.object({ remove: z.boolean().optional() }), data: z.object({ found: z.boolean(), removed: z.boolean(), active: z.boolean(), slots: z.number().optional() }), kind: "small_request" },
   stock: { args: z.object({ radius: z.number().positive().max(64).optional() }), data: StockSchema, kind: "look" },
+  debug_toggle_list: { args: z.object({}), data: z.object({ shown: z.boolean() }), kind: "look" },
   spidertrons: { args: z.object({}), data: SpidertronsSchema, kind: "look" },
   // Character control (FC-144): the player confirms it in a card, and the stop key cancels it.
   send_spidertron: {

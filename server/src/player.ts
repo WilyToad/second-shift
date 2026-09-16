@@ -1,7 +1,7 @@
 // The player's own situation, fetched only when a question needs it (S22): what they carry and can
 // hand-craft, what they built, what they can see around them. Decided and formatted in code, sent in
 // the uncached tail, never in the system prompt.
-import type { ContainerContents, MachineOutput, PlayerStatus, PointedAt, SeenEntity, Spidertrons, Stock, Surroundings } from "@companion/interfaces";
+import type { ContainerContents, LogisticNetwork, MachineOutput, PlayerStatus, PointedAt, SeenEntity, Spidertrons, Stock, Surroundings } from "@companion/interfaces";
 
 const AFFIRMATIVE = /^\s*(y|yes|yeah|yea|yep|yup|sure|ok|okay|please|go ahead|do it|go for it|sounds good|absolutely|definitely|why not)\b[\s\w,.!']{0,30}$/i;
 
@@ -321,4 +321,26 @@ const BUILD_PLAN = /\b(building|build|set(ting)? up|putting up|outpost|new base|
 
 export function wantsPackingList(text: string): boolean {
   return BUILD_PLAN.test(text) && /\b(need|bring|take|pack|list|gather|grab)\b/i.test(text);
+}
+
+// "Fill the list", "get the bots to bring it", "ask the bots for the rest" (FC-168).
+const FILL = /\b(fill (it|this|the list|my inventory)|get the (bots|robots)|(have|ask) the (bots|robots)|request (it|them|the list|these|the (missing|rest|remaining)[\w ]{0,12})|bots? (bring|fetch|deliver)|logistic requests?)\b/i;
+// "Stop requesting", "clear the requests", "cancel the request" (FC-168).
+const UNFILL = /\b(stop (requesting|the requests?)|clear (the )?requests?|cancel (the )?requests?|don'?t request|remove (the )?requests?)\b/i;
+
+export function wantsBotsToFill(text: string): boolean {
+  return FILL.test(text) && !UNFILL.test(text);
+}
+
+export function wantsRequestsCleared(text: string): boolean {
+  return UNFILL.test(text);
+}
+
+/** What the player's own network can do about the list, so a promise is honest (FC-168). */
+export function formatNetwork(n: LogisticNetwork): string[] {
+  if (!n.in_range) return ["the player isn't in range of their logistic network, so bots can't bring anything: say so rather than offering"];
+  return [
+    `the player's logistic network is in range: ${n.available_robots} of ${n.robots} logistic robots free, ${n.total_kinds} item kinds in it`,
+    n.trash_unrequested ? "the player has \"trash unrequested\" on, so anything not requested is taken back out of their inventory: warn them if the list needs items the requests won't cover" : "",
+  ].filter(Boolean);
 }

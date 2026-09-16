@@ -166,6 +166,9 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun scripts/eval-ratios.ts` (server running) checks production-plan answers against an independent reference.
 - `bun scripts/test-spidertron.ts` (dev save hosted) checks sending the player's spidertron and taking it back, with the helmet refusals (FC-144, FC-051). It makes a test spidertron and removes it after.
 - `bun scripts/e2e-spidertron.ts` (server and dev save running, resets the conversation) checks the card, the confirm and "stop" through the server.
+- `bun scripts/test-panel.ts` (dev save hosted) checks the in-game list panel: what it shows, the toggle, the cap, and that nothing in it is clickable (FC-164).
+- `bun scripts/test-requests.ts` (dev save hosted) checks handing a packing list to the player's bots: the companion's own request section only, the player's untouched (FC-168).
+- `bun scripts/e2e-packing.ts` (server and dev save running, resets the conversation) runs the player's own example: a described build becomes a packing list that ticks itself off, and "am I ready?" answers (FC-166, FC-167).
 - `bun scripts/eval-pointing.ts` (server and dev save running, resets the conversation) asks "what is this?" about test entities and checks answers stick to the save's own facts (FC-160).
 - `bun scripts/e2e-measure.ts` (server and dev save running, resets the conversation) checks "what rate are they really hitting?" measures the machines in the game (FC-162).
 - `bun scripts/eval-voice-session.ts` (server and dev save running, resets the conversation) replays the first voice session and checks its odd replies stay gone (S27).

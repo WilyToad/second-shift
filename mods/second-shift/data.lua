@@ -19,6 +19,14 @@ data:extend({
     consuming = "none",
     order = "b",
   },
+  -- Show or hide the companion's list (FC-164). The player can't edit it: they ask the companion.
+  {
+    type = "custom-input",
+    name = "second-shift-list",
+    key_sequence = "ALT + L",
+    consuming = "none",
+    order = "c",
+  },
   {
     type = "selection-tool",
     name = "companion-selection-tool",

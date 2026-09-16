@@ -13,7 +13,7 @@ test("FC-163: a list is started, added to, ticked off and cleared by asking", ()
   expect(l.apply({ done: ["the belts"] })).toContain("ticked off 200 transport belt");
   expect(l.active()!.items.filter((i) => i.done).map((i) => i.text)).toEqual(["200 transport belt"]);
   expect(l.apply({ undone: ["belt"] })).toContain("put back 200 transport belt");
-  expect(l.apply({ remove: ["stone furnace"] })).toContain("removed stone furnace");
+  expect(l.apply({ remove: ["stone furnace"] })).toContain("removed 20 stone furnace");
   expect(l.active()!.items).toHaveLength(1);
   expect(l.apply({ clear: true })).toContain("cleared 1 item");
 });
@@ -87,4 +87,19 @@ test("FC-166: a changed count replaces the item instead of adding another line",
   l.update("packing", "200 transport belt", { done: true, note: "have 200" });
   l.apply({ set: ["400 transport belt"] });
   expect(l.active()!.items.find((i) => /belt/.test(i.text))).toEqual({ text: "400 transport belt", done: false });
+});
+
+test("FC-163: items that merely share a word are not the same item", () => {
+  const l = lists();
+  l.apply({ list: "packing", kind: "packing", add: ["5 iron chest", "20 iron plate"] });
+  // "50 iron gear wheel" shares "iron" with both, so it's a new line, not a replacement.
+  l.apply({ add: ["50 iron gear wheel"] });
+  expect(l.active()!.items.map((i) => i.text)).toEqual(["5 iron chest", "20 iron plate", "50 iron gear wheel"]);
+  // The same item with a new count still replaces.
+  l.apply({ add: ["12 iron chest"] });
+  expect(l.active()!.items.map((i) => i.text)).toEqual(["12 iron chest", "20 iron plate", "50 iron gear wheel"]);
+  // An ambiguous word ticks nothing off; a clear one works.
+  expect(l.apply({ done: ["iron"] })).toBe('Nothing to change on "packing".');
+  expect(l.apply({ done: ["the gear wheels"] })).toContain("ticked off 50 iron gear wheel");
+  expect(l.apply({ remove: ["plate"] })).toContain("removed 20 iron plate");
 });

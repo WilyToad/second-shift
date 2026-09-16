@@ -22,7 +22,7 @@ import { entityFacts } from "./grounding";
 import { Lists, type Checklist, type ListsData } from "./lists";
 import { arithmeticCorrections } from "./numbers";
 import { check, essentials, parseNeed, readiness, slots, type Need } from "./packing";
-import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, formatStock, wantsStock, wantsReady, wantsListTalk, wantsPackingList, wantsContents, wantsMeasuredOutput, wantsPointedAt, wantsSpidertronSent, wantsStop, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, formatStock, formatNetwork, wantsStock, wantsReady, wantsListTalk, wantsPackingList, wantsBotsToFill, wantsRequestsCleared, wantsContents, wantsMeasuredOutput, wantsPointedAt, wantsSpidertronSent, wantsStop, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -583,6 +583,12 @@ export class Agent {
     const stock = askedStock ? await this.lookup("stock", { radius: 48 }) : null;
     const stockLines = stock && !packing ? formatStock(stock, found?.items ?? []) : [];
     const packingLines = packing && stock ? this.checkPacking(packing, stock, status, askedReady) : [];
+    // "Get the bots to fill it": the companion's own request section, behind a card (FC-168).
+    const askedFill = Boolean(packing) && wantsBotsToFill(question);
+    const network = askedFill || (packing && wantsReady(question)) ? await this.lookup("logistic_network") : null;
+    const networkLines = network ? formatNetwork(network) : [];
+    const fillLine = askedFill ? await this.proposeRequests(packing!, network) : null;
+    const clearLine = !pasted.summaries.length && wantsRequestsCleared(question) ? await this.clearRequests(false) : null;
     const askedContents = !pasted.summaries.length && wantsContents(question);
     const target = askedContents ? contentsTarget(pointed, lastOne) : null;
     const contentsLine = target ? await this.contentsOf(target) : askedContents ? "no container is under the mouse, open or just hovered, so its contents weren't looked at: ask the player to hover over it" : null;
@@ -598,6 +604,9 @@ export class Agent {
       ...stockLines,
       ...this.lists.format(),
       ...packingLines,
+      ...networkLines,
+      ...(fillLine ? [fillLine] : []),
+      ...(clearLine ? [clearLine] : []),
       ...spiderLines,
       ...(sendLine ? [sendLine] : []),
       ...(stopLine ? [stopLine] : []),
@@ -921,6 +930,41 @@ export class Agent {
    * Keeps a packing list honest (FC-166, FC-167): adds what the save's data proves the build also needs, ticks
    * items off against what the player can reach, and answers "am I ready?" with the load's slot count.
    */
+  /**
+   * "Get the bots to bring the rest": the shortfall goes in the companion's own section of the player's requests,
+   * behind a card, so their own requests are untouched and the section can simply be switched off (FC-168).
+   */
+  private async proposeRequests(list: Checklist, network: ActionData<"logistic_network"> | null): Promise<string> {
+    if (!network?.in_range) return "the player isn't in range of their logistic network, so there's nothing to request: say so";
+    const protos = this.deps.prototypes();
+    const stock = await this.lookup("stock", { radius: 48 });
+    const needs = list.items.map((i) => parseNeed(i.text, protos)).filter((n): n is Need => n !== null);
+    const states = check(needs, stock, []);
+    const short = states.filter((s) => s.missing > 0);
+    if (!short.length) return "nothing on the list is missing, so there's nothing for the bots to bring";
+    const items = short.map((s) => ({ name: s.need.item, count: s.need.count }));
+    const canBring = short.filter((s) => (network.items.find((i) => i.name === s.need.item)?.count ?? 0) > 0);
+    const detail = `Its own request section, so your own requests stay as they are. ${canBring.length} of ${short.length} are in the network now; switching the section off (or "stop requesting") ends the deliveries.`;
+    return this.card(`Ask the bots for ${short.map((s) => `${s.need.count} ${s.need.item}`).join(", ")}?`, detail, async () => {
+      const r = await this.deps.game.call("set_requests", { items });
+      const short2 = r.short.length ? `; the network can't cover ${r.short.map((x) => `${x.name} (${x.reason})`).join(", ")}` : "";
+      const message = `Requested ${r.set.map((x) => `${x.count} ${x.name}`).join(", ")} in the "${r.group}" section of your requests (${r.robots} robots free)${short2}.`;
+      this.deps.emit({ type: "tool", summary: message });
+      return message;
+    });
+  }
+
+  /** Switches the companion's request section off, or removes it when the list itself is gone (FC-168). */
+  private async clearRequests(remove: boolean): Promise<string | null> {
+    try {
+      const r = await this.deps.game.call("clear_requests", remove ? { remove: true } : {});
+      if (!r.found) return "the companion had no request section, so there was nothing to stop";
+      return remove ? "removed the companion's request section from the player's requests" : `switched the companion's request section off, leaving its ${r.slots ?? 0} slots in place to switch on again`;
+    } catch {
+      return null;
+    }
+  }
+
   /** The same check, run from the list tool: it fetches the stock itself. */
   private async checkPackingNow(list: Checklist): Promise<string[]> {
     const stock = await this.lookup("stock", { radius: 48 });
@@ -947,6 +991,11 @@ export class Agent {
     }
     if (ticked.length) lines.push(`ticked off now that the player has them: ${ticked.join(", ")}`);
     if (added.length || ticked.length) this.showLists();
+    // Everything in reach: the deliveries have done their job, so the section goes quiet but stays (FC-168).
+    if (states.length && states.every((s) => s.missing === 0) && ticked.length) {
+      void this.clearRequests(false);
+      lines.push("the list is complete, so the companion's request section was switched off (it stays, to switch on again)");
+    }
     if (asked) lines.push(...readiness(states, slots(needs, protos, stock.free_slots)));
     return lines;
   }
@@ -971,7 +1020,7 @@ export class Agent {
     }
   }
 
-  private async lookup<A extends "player_status" | "surroundings" | "pointed_at" | "spidertrons" | "stock">(action: A, args?: ActionArgs<A>): Promise<ActionData<A> | null> {
+  private async lookup<A extends "player_status" | "surroundings" | "pointed_at" | "spidertrons" | "stock" | "logistic_network">(action: A, args?: ActionArgs<A>): Promise<ActionData<A> | null> {
     try {
       return await this.deps.game.call(action, args);
     } catch {
@@ -1053,6 +1102,8 @@ export class Agent {
           // A packing list is checked straight away, so the same answer can say what the data added and what the
           // player already has — waiting for the next turn made the first answer miss both (FC-166).
           const list = this.lists.active();
+          // The list is gone or empty: take the companion's request section out with it (FC-168).
+          if (args.clear === true || !list) void this.clearRequests(true);
           const extra = list?.kind === "packing" ? await this.checkPackingNow(list) : [];
           this.showLists();
           const full = [message, ...extra].join(" ");

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PlayerStatusSchema, SurroundingsSchema } from "@companion/interfaces";
-import { acceptedOffer, contentsTarget, correctedRequest, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, formatStock, wantsMeasuredOutput, wantsStock, wantsSpidertronSent, wantsStop, wantsContents, wantsPointedAt, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, formatContents, formatMachineOutput, formatNetwork, formatPointedAt, formatSpidertrons, formatStock, wantsBotsToFill, wantsMeasuredOutput, wantsRequestsCleared, wantsStock, wantsSpidertronSent, wantsStop, wantsContents, wantsPointedAt, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 test("a short yes takes up the question the last answer offered", () => {
   const last = "Start by mining iron.\n\nWant me to look around to see what you built?";
@@ -250,4 +250,19 @@ test("FC-165: stock questions, and lines that say what's carried and where the r
   // Asking about one item narrows the line to it.
   expect(formatStock(stock, ["steel-plate"])[0]).not.toContain("transport-belt");
   expect(formatStock({ ...stock, items: [] }, ["steel-plate"])[0]).toContain("nothing the player can reach");
+});
+
+test("FC-168: the words that hand the list to the bots, and the network lines", () => {
+  for (const q of ["get the bots to bring the rest", "can the robots fill it?", "fill the list", "request the missing items"]) {
+    expect(wantsBotsToFill(q)).toBe(true);
+  }
+  for (const q of ["stop requesting", "clear the requests", "cancel the request"]) {
+    expect(wantsRequestsCleared(q)).toBe(true);
+    expect(wantsBotsToFill(q)).toBe(false);
+  }
+  expect(formatNetwork({ in_range: false, robots: 0, available_robots: 0, items: [], total_kinds: 0, trash_unrequested: false }))
+    .toEqual(["the player isn't in range of their logistic network, so bots can't bring anything: say so rather than offering"]);
+  const lines = formatNetwork({ in_range: true, network_id: 3, robots: 42, available_robots: 12, items: [{ name: "transport-belt", count: 900 }], total_kinds: 88, trash_unrequested: true });
+  expect(lines[0]).toBe("the player's logistic network is in range: 12 of 42 logistic robots free, 88 item kinds in it");
+  expect(lines[1]).toContain('"trash unrequested" on');
 });

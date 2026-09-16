@@ -50,8 +50,33 @@ const words = (text: string) =>
 const looksLike = (item: string, said: string) => {
   const a = words(item), b = words(said);
   if (!a.length || !b.length) return item.trim().toLowerCase() === said.trim().toLowerCase();
-  return b.every((w) => a.includes(w)) || a.every((w) => b.includes(w)) || b.some((w) => a.includes(w));
+  return b.every((w) => a.includes(w)) || a.every((w) => b.includes(w));
 };
+/** A looser last resort: one shared word, used only when exactly one item matches that way. */
+const sharesAWord = (item: string, said: string) => {
+  const a = words(item), b = words(said);
+  return b.some((w) => a.includes(w));
+};
+/** The same thing, ignoring the count: "5 iron chest" and "50 iron chest", but not "50 iron gear wheel". */
+const sameItem = (a: string, b: string) => {
+  const x = words(a), y = words(b);
+  return x.length > 0 && x.length === y.length && x.every((w) => y.includes(w));
+};
+
+/**
+ * The item the player means: the exact text, else the only one whose words line up, else the only one sharing a
+ * word. Anything matching more than one item is left alone — "iron" must not tick off the iron chests when the
+ * list also holds iron plates.
+ */
+function findItem(items: ListItem[], said: string): ListItem | undefined {
+  const exact = items.find((i) => same(i.text, said));
+  if (exact) return exact;
+  const close = items.filter((i) => looksLike(i.text, said));
+  if (close.length === 1) return close[0];
+  if (close.length > 1) return undefined;
+  const loose = items.filter((i) => sharesAWord(i.text, said));
+  return loose.length === 1 ? loose[0] : undefined;
+}
 
 export class Lists {
   private lists: Checklist[] = [];
@@ -134,7 +159,7 @@ export class Lists {
     for (const text of edit.set ?? []) {
       const item = clean(text);
       if (!item) continue;
-      const hit = list.items.find((i) => looksLike(i.text, item));
+      const hit = list.items.find((i) => sameItem(i.text, item));
       if (hit) {
         if (same(hit.text, item)) continue;
         changes.push(`changed "${hit.text}" to ${item}`);
@@ -151,7 +176,7 @@ export class Lists {
       if (!item) continue;
       if (list.items.some((i) => same(i.text, item))) continue;
       // On a packing list, adding the same thing again means changing its count.
-      const existing = list.kind === "packing" ? list.items.find((i) => looksLike(i.text, item)) : undefined;
+      const existing = list.kind === "packing" ? list.items.find((i) => sameItem(i.text, item)) : undefined;
       if (existing) {
         changes.push(`changed "${existing.text}" to ${item}`);
         existing.text = item;
@@ -164,13 +189,15 @@ export class Lists {
       changes.push(`added ${item}`);
     }
     for (const text of edit.remove ?? []) {
-      const before = list.items.length;
-      list.items = list.items.filter((i) => !looksLike(i.text, text));
-      if (list.items.length < before) changes.push(`removed ${clean(text)}`);
+      const hit = findItem(list.items, clean(text));
+      if (hit) {
+        list.items = list.items.filter((i) => i !== hit);
+        changes.push(`removed ${hit.text}`);
+      }
     }
     for (const [texts, done] of [[edit.done ?? [], true], [edit.undone ?? [], false]] as const) {
       for (const text of texts) {
-        const hit = list.items.find((i) => looksLike(i.text, text));
+        const hit = findItem(list.items, clean(text));
         if (hit && hit.done !== done) {
           hit.done = done;
           changes.push(`${done ? "ticked off" : "put back"} ${hit.text}`);
@@ -185,7 +212,7 @@ export class Lists {
   /** Sets an item's state and note from a rule (FC-166), without pretending the player asked. */
   update(listName: string, text: string, state: { done?: boolean; note?: string }): boolean {
     const list = this.get(listName);
-    const item = list?.items.find((i) => looksLike(i.text, text));
+    const item = list ? findItem(list.items, text) : undefined;
     if (!list || !item) return false;
     let changed = false;
     if (state.done !== undefined && item.done !== state.done) { item.done = state.done; changed = true; }
@@ -204,7 +231,7 @@ export class Lists {
     const added: string[] = [];
     for (const item of items) {
       const text = clean(item.text);
-      if (!text || list.items.some((i) => looksLike(i.text, text))) continue;
+      if (!text || list.items.some((i) => sameItem(i.text, text))) continue;
       if (list.items.length >= MAX_ITEMS) break;
       list.items.push({ text, done: false, note: clean(item.note) });
       added.push(text);
