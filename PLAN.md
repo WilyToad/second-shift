@@ -417,6 +417,11 @@ token 2.2–7.4 s). Two measured causes:
   drops back each block (the session's turns at 6,144 cached had 376–950 uncached). Keep history append-only:
   compacting earlier rewrites cached blocks, which costs a cold prefill.
 
+**The list tool costs nothing (FC-163, 2026-09-16):** adding `update_list` left the system prompt at 3,876 tokens,
+inside the same cached 4,096-token block, so eval-grounding first token came in at a median **1.29 s** (1.55 s
+before it, same conditions) and the follow-up at 1.82 s. The active list rides in the turn's tail, so a long list
+costs a few tail tokens rather than breaking the cache.
+
 **Sending the spidertron (S29, 2026-09-15):** the engine's own autopilot does the walking, so the mod only hands
 it a spot after the player confirms a card, and the order lives in `storage` so the stop key can end it. Looking up
 the player's spidertrons costs **0.67 ms** (near the player first; a type-filtered sweep of the whole gleba surface

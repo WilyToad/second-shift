@@ -19,6 +19,7 @@ import { buildMessages, formatSnapshot, userTurn } from "./prompt";
 import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
 import { entityFacts } from "./grounding";
+import { Lists, type ListsData } from "./lists";
 import { arithmeticCorrections } from "./numbers";
 import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, wantsContents, wantsMeasuredOutput, wantsPointedAt, wantsSpidertronSent, wantsStop, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
@@ -51,7 +52,7 @@ export type TurnRecord = {
 
 const MAX_TOOL_ROUNDS = 3;
 export type TranscriptItem = { kind: "user" | "agent"; text: string };
-export type SessionData = { savedAt: string; history: ChatMessage[]; transcript: TranscriptItem[] };
+export type SessionData = { savedAt: string; history: ChatMessage[]; transcript: TranscriptItem[]; lists?: ListsData };
 export type SessionStore = { load(): SessionData | null; save(data: SessionData): void; clear(): void };
 const MAX_TRANSCRIPT = 60;
 
@@ -131,6 +132,26 @@ const REFERENCE = /\b(these|those|them|they|that one|this one)\b|\b(use|make|nee
 const HIGHLIGHT_SECONDS = 60;
 
 export const TOOLS: ToolSpec[] = [
+  {
+    type: "function",
+    function: {
+      name: "update_list",
+      description: "Change one of the player's lists when they ask: start one, add or remove items, tick items off, rename or clear it. The player can't edit lists themselves, so every change comes through here. One call can do several changes.",
+      parameters: {
+        type: "object",
+        properties: {
+          list: { type: "string", description: "Which list, in the player's words (\"packing\", \"repairs\"). Left out means the one they're already working on." },
+          kind: { type: "string", enum: ["plain", "packing"], description: "\"packing\" for a list of items to take on a build run: it ticks itself off against what the player carries." },
+          add: { type: "array", items: { type: "string" }, description: "Items to add, one string each, with the count first: \"20 stone furnace\"." },
+          done: { type: "array", items: { type: "string" }, description: "Items to tick off, as the player named them." },
+          undone: { type: "array", items: { type: "string" }, description: "Items to put back." },
+          remove: { type: "array", items: { type: "string" }, description: "Items to take off the list." },
+          rename: { type: "string", description: "A new name for the list." },
+          clear: { type: "boolean", description: "Empty the list but keep it." },
+        },
+      },
+    },
+  },
   {
     type: "function",
     function: {
@@ -288,6 +309,8 @@ export const ASKS_FOR: Record<string, RegExp> = {
   queue_research: /\b(queue|start research\w*|begin research\w*|research (it|that|this|them)\b|go research|(want me to|shall i|should i|can you|could you|will you|would you) research)|^\s*(please |ok,? |okay,? |yes,? )?research\b/i,
   map_action: /\b(tag|pin|label|mark\w* (it |them |that |this |the [\w -]{1,24})?on (the |your |my )?map|map (tag|marker|pin)|(drop|put|place|add) a (marker|flag|pin)|marker|camera|jump|take me|go to|show me where|look at)\b/i,
   set_train_stop: /\b(limit|priority|prioriti[sz]e|rename|name (it|them|those|these|the stops?)|call (it|them))\b/i,
+  // Lists are the player's own plan, so the model only edits them when the words are about that (FC-126, FC-163).
+  update_list: /\b(list|checklist|packing|pack|todo|to-do|remind\w*|add\b|added|remove\b|drop\b|cross (it |them )?off|tick\w* off|check\w* off|clear|rename|start (a|the) list|note (it |that )?down|shopping)\b/i,
   show_the_way: /\b(show (me|you) the way|point(ing)? (me|you|the way|it out|them out|out|toward\w*|to|at)|which way|what direction|guide (me|you)|lead (me|you)|ping|arrow|how do i get to|direct (me|you)|way to)\b/i,
 };
 
@@ -397,6 +420,8 @@ const plural = (n: number, word: string) => `${n} ${n === 1 ? word : word.endsWi
 
 export class Agent {
   readonly history: ChatMessage[] = [];
+  /** The player's lists: the companion owns them, the player asks for changes (FC-163). */
+  readonly lists: Lists;
   private readonly shown: TranscriptItem[] = [];
   private lastResult: LastResult | null = null;
   private lastBlueprint: { raw: string; at: number } | null = null;
@@ -425,6 +450,7 @@ export class Agent {
       scriptOutput?: string;
     },
   ) {
+    this.lists = new Lists(() => this.now());
     this.session = deps.session;
     this.restore();
   }
@@ -436,7 +462,23 @@ export class Agent {
     if (saved) {
       this.history.push(...saved.history);
       this.shown.push(...saved.transcript);
+      this.lists.load(saved.lists);
+      this.showLists();
     }
+  }
+
+  /** The console shows every list; the active one also goes to the game's panel (FC-164). */
+  private listsShown = false;
+
+  private showLists(): void {
+    // Nothing to show and nothing shown before: stay quiet, so a conversation without lists is unchanged.
+    if (!this.lists.all().length && !this.listsShown) return;
+    this.listsShown = this.lists.all().length > 0;
+    this.deps.emit({ type: "lists", lists: this.lists.all(), active: this.lists.active()?.name });
+    void this.deps.game.call("set_list", {
+      name: this.lists.active()?.name ?? "",
+      items: (this.lists.active()?.items ?? []).map((i) => ({ text: i.text, done: i.done, ...(i.note ? { note: i.note } : {}) })),
+    }).catch(() => {}); // an older mod or no game: the console still shows it
   }
 
   /**
@@ -446,6 +488,7 @@ export class Agent {
   useSession(store: SessionStore): void {
     this.history.length = 0;
     this.shown.length = 0;
+    this.lists.load(null);
     this.lastResult = null;
     this.lastBlueprint = null;
     this.pending.clear();
@@ -462,7 +505,7 @@ export class Agent {
   }
 
   private saveSession(): void {
-    this.session?.save({ savedAt: new Date(this.now()).toISOString(), history: this.history, transcript: this.shown.slice(-MAX_TRANSCRIPT) });
+    this.session?.save({ savedAt: new Date(this.now()).toISOString(), history: this.history, transcript: this.shown.slice(-MAX_TRANSCRIPT), lists: this.lists.save() });
   }
 
   private now(): number {
@@ -538,6 +581,7 @@ export class Agent {
       ...(pointed ? formatPointedAt(pointed, (name) => (protos ? entityFacts(name, protos) : null)) : []),
       ...(contentsLine ? [contentsLine] : []),
       ...(measuredLine ? [measuredLine] : []),
+      ...this.lists.format(),
       ...spiderLines,
       ...(sendLine ? [sendLine] : []),
       ...(stopLine ? [stopLine] : []),
@@ -937,6 +981,21 @@ export class Agent {
           return this.proposeBlueprint();
         case "set_train_stop":
           return this.proposeTrainStop(args);
+        case "update_list": {
+          const message = this.lists.apply({
+            ...(typeof args.list === "string" ? { list: args.list } : {}),
+            ...(args.kind === "packing" || args.kind === "plain" ? { kind: args.kind } : {}),
+            ...(Array.isArray(args.add) ? { add: args.add.map(String) } : {}),
+            ...(Array.isArray(args.done) ? { done: args.done.map(String) } : {}),
+            ...(Array.isArray(args.undone) ? { undone: args.undone.map(String) } : {}),
+            ...(Array.isArray(args.remove) ? { remove: args.remove.map(String) } : {}),
+            ...(typeof args.rename === "string" ? { rename: args.rename } : {}),
+            ...(args.clear === true ? { clear: true } : {}),
+          });
+          this.showLists();
+          this.deps.emit({ type: "tool", summary: message });
+          return message;
+        }
         case "show_the_way":
           return await this.showTheWay(String(args.what ?? ""), args.at === "last_result");
         default:

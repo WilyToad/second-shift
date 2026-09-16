@@ -722,3 +722,30 @@ test("FC-144 FC-051: sending a spidertron waits for a card, and 'stop' takes it 
   expect(calls.map((c) => c.action)).toContain("stop_control");
   expect(model.seen[1]!.at(-1)!.content).toContain("stopped the spidertron in the game, as asked");
 });
+
+test("FC-163: the list tool edits the player's list, shows it, and is dropped when they didn't ask", async () => {
+  const events: ServerMessage[] = [];
+  const model = fakeModel([
+    { tool: "update_list", args: { list: "packing", kind: "packing", add: ["20 stone furnace", "200 transport belt"] } }, { text: "On the list." },
+    { text: "Three radars." },
+    { tool: "update_list", args: { list: "packing", clear: true } }, { text: "Nothing to add." },
+  ]);
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: (m) => events.push(m) });
+
+  await agent.ask("start a packing list: 20 stone furnace and 200 transport belt");
+  expect(agent.lists.active()!.items.map((i) => i.text)).toEqual(["20 stone furnace", "200 transport belt"]);
+  const shown = events.filter((e) => e.type === "lists").at(-1) as any;
+  expect(shown.active).toBe("packing");
+  expect(shown.lists[0].kind).toBe("packing");
+
+  // The next turn sees the list in its tail, so it can answer about it without asking the game.
+  await agent.ask("how many radars are near me?");
+  const tail = model.seen[2]!.at(-1)!.content; // the first ask used two rounds (tool, then answer)
+  expect(tail).toContain('the player\'s list "packing" (0 of 2 done');
+  expect(tail).toContain("- [ ] 200 transport belt");
+
+  // A question that isn't about lists: an edit the player didn't ask for is dropped (FC-126).
+  await agent.ask("what's my iron plate production?");
+  expect(agent.lists.active()!.items).toHaveLength(2);
+  expect(model.seen[4]!.at(-1)!.content).toContain("the player hasn't asked for this yet");
+});

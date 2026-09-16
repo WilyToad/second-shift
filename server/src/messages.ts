@@ -1,5 +1,6 @@
 // WebSocket messages between the server and the web page.
 import type { Digest, GameEvent } from "@companion/interfaces";
+import type { Checklist } from "./lists";
 import type { Plan } from "./planner";
 import type { SeriesMap } from "./series";
 
@@ -31,7 +32,9 @@ export type ServerMessage =
   | { type: "transcript"; items: { kind: "user" | "agent"; text: string }[] }
   | { type: "reset" }
   // The player pressed the push-to-talk key in the game (FC-147).
-  | { type: "talk" };
+  | { type: "talk" }
+  // The lists the companion keeps for the player (FC-163); the player can't edit them, so this is display only.
+  | { type: "lists"; lists: Checklist[]; active?: string };
 
 export type ClientMessage =
   | { type: "ask"; text: string; thinking?: boolean }

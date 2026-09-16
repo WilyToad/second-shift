@@ -214,6 +214,13 @@ export const actions = {
   player_status: { args: z.object({}), data: PlayerStatusSchema, kind: "look" },
   pointed_at: { args: z.object({}), data: PointedAtSchema, kind: "look" },
   // FC-162: what the machines the player asked about have really made, from each machine's own craft count.
+  // FC-164: the active list, pushed to the game for its read-only panel. The player shows or hides it; only the
+  // companion changes what's on it.
+  set_list: {
+    args: z.object({ name: z.string(), items: luaArray(z.object({ text: z.string(), done: z.boolean(), note: z.string().optional() })) }),
+    data: z.object({ shown: z.number(), name: z.string() }),
+    kind: "look",
+  },
   spidertrons: { args: z.object({}), data: SpidertronsSchema, kind: "look" },
   // Character control (FC-144): the player confirms it in a card, and the stop key cancels it.
   send_spidertron: {

@@ -22,7 +22,18 @@ button, textarea { font: inherit; color: inherit; }
 .pill.ok { color: var(--ok); } .pill.warn { color: var(--amber); } .pill.crit { color: var(--crit); }
 
 .console { display: grid; gap: 16px; padding-block: 16px; min-height: 0; grid-template-columns: 280px minmax(0, 1fr) 320px; grid-template-areas: "alerts chat live"; }
-.col-alerts { grid-area: alerts; overflow-y: auto; }
+.col-alerts { grid-area: alerts; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3, 12px); }
+.col-alerts > .panel { flex: 0 0 auto; }
+.col-alerts > .panel:last-child { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+/* Lists the companion keeps (FC-163): read-only, so no controls. */
+.list-panel .check-list { list-style: none; margin: 0; padding: 0; }
+.list-panel .check { display: flex; gap: 8px; align-items: baseline; padding: 4px 10px; }
+.list-panel .check[data-done="yes"] { opacity: 0.55; }
+.list-panel .check[data-done="yes"] .check-text { text-decoration: line-through; }
+.list-panel .tick { width: 1em; color: var(--accent, #e0a03d); }
+.list-panel .check-note { color: var(--muted, #8a8a8a); }
+.list-panel .panel-foot { padding: 6px 10px; }
 .col-chat { grid-area: chat; display: grid; grid-template-rows: 1fr auto; min-height: 0; }
 .col-live { grid-area: live; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
 @media (max-width: 1180px) { .console { grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "chat live" "alerts live"; } }

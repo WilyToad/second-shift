@@ -1,6 +1,7 @@
 // Page state as signals, fed by the server's WebSocket. Components read these; only this file writes.
 import { signal, type Signal } from "@preact/signals";
 import type { Digest, GameEvent } from "@companion/interfaces";
+import type { Checklist } from "../../server/src/lists";
 import type { ClientMessage, ServerMessage } from "../../server/src/messages";
 import type { Plan } from "../../server/src/planner";
 import type { BlueprintCard } from "../../server/src/messages";
@@ -21,6 +22,8 @@ export const status = signal<Status | null>(null);
 export const connected = signal(false);
 export const thread = signal<ThreadItem[]>([]);
 export const events = signal<GameEvent[]>([]);
+/** The lists the companion keeps (FC-163). Display only: the player asks the companion to change them. */
+export const lists = signal<{ lists: Checklist[]; active?: string }>({ lists: [] });
 export const droppedEvents = signal(0);
 export const digest = signal<{ digest: Digest; receivedAt: number } | null>(null);
 export const series = signal<SeriesMap>({});
@@ -119,6 +122,9 @@ export function onMessage(m: ServerMessage): void {
       break;
     case "blueprint":
       if (streaming) streaming.blueprint.value = m.blueprint;
+      break;
+    case "lists":
+      lists.value = { lists: m.lists, ...(m.active ? { active: m.active } : {}) };
       break;
     case "series":
       series.value = m.series;

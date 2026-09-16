@@ -1,6 +1,6 @@
 import { render } from "preact";
 import { Composer, Thread } from "./chat";
-import { AlertFeed, LivePanel } from "./console";
+import { AlertFeed, ListPanel, LivePanel } from "./console";
 import { connect, connected, send, status } from "./store";
 import { loadElevenVoices, probeRecognition } from "./voice";
 import { loadSounds } from "./sounds";
@@ -43,7 +43,10 @@ function App() {
     <div class="shell">
       <Header />
       <div class="console">
-        <AlertFeed />
+        <div class="col-alerts">
+          <ListPanel />
+          <AlertFeed />
+        </div>
         <section class="col-chat panel" aria-label="Conversation">
           <Thread />
           <Composer />

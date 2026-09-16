@@ -3,7 +3,7 @@ import type { GameEvent } from "@companion/interfaces";
 import { useSignal } from "@preact/signals";
 import type { Point } from "../../server/src/series";
 import { RichName } from "./rich-text";
-import { digest, droppedEvents, events, series } from "./store";
+import { digest, droppedEvents, events, series, lists } from "./store";
 
 const round = (n: number) => (n >= 100 ? Math.round(n).toLocaleString() : String(Math.round(n * 10) / 10));
 const words = (s: string) => s.replace(/[-_]/g, " ");
@@ -22,6 +22,37 @@ function describe(e: GameEvent): string {
   if (e.kind === "control_stopped") return `Stopped ${words(e.entity ?? e.control ?? "it")}${e.reason ? ` (${words(e.reason)})` : ""}`;
   const what = e.entity ? `${words(e.entity)}: ` : "";
   return `${what}${words(e.type ?? "alert")}${e.count && e.count > 1 ? ` (${e.count})` : ""}`;
+}
+
+/** The companion's lists (FC-163): the whole active list, done items ticked. Nothing here is clickable — the
+ * player asks the companion to change a list, which is what they wanted. */
+export function ListPanel() {
+  const { lists: all, active } = lists.value;
+  if (!all.length) return null;
+  const current = all.find((l) => l.name === active) ?? all[0]!;
+  const done = current.items.filter((i) => i.done).length;
+  return (
+    <section class="panel list-panel" aria-label="Lists the companion keeps">
+      <div class="panel-head">
+        <span class="label">{current.name}</span>
+        <span class="label-sub num">{done} of {current.items.length} done</span>
+      </div>
+      <ul class="check-list">
+        {current.items.length === 0 && <li class="empty">Ask for items and they show up here.</li>}
+        {current.items.map((item) => (
+          <li key={item.text} class="check" data-done={item.done ? "yes" : "no"}>
+            <span class="tick" aria-hidden="true">{item.done ? "✓" : "○"}</span>
+            <span class="check-text"><RichName text={item.text} />{item.note ? <span class="check-note"> — {item.note}</span> : null}</span>
+          </li>
+        ))}
+      </ul>
+      {all.length > 1 && (
+        <div class="panel-foot label-sub">
+          also: {all.filter((l) => l !== current).map((l) => `${l.name} (${l.items.filter((i) => i.done).length}/${l.items.length})`).join(", ")}
+        </div>
+      )}
+    </section>
+  );
 }
 
 export function AlertFeed() {
