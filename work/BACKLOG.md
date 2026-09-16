@@ -34,6 +34,15 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
   - Acceptance (from FC-145): (1) a go/no-go measurement first — `request_path` for a tank-sized collision box with the tank's own mask across ~200 tiles of the dev save: success rate, `try_again_later` rate, response latency, and whether the paths are drivable for a ~2x3 box; if poor, stop and record the decision not to build; (2) per-tick script time idle vs driving under 0.05 ms average and no tick over 1 ms, with the `try_again_later` counter alongside (engine pathfinder time isn't in the script profile); (3) stop latency: control released within one tick of a key press, with the tiles travelled after it recorded; (4) helmet tests that must fail: uncharted destination, no fuel, a path needing something destroyed, not the driver, another surface, player presses a movement key, player exits, vehicle damaged — plus a test that the code never writes `orientation` or `speed`; (5) in-world path preview, approval card, and everything re-checked at confirm time
 - [ ] FC-060 In-game UI (mod GUI chat panel / hotkey popup)
 
+## Phase 4 — Voice and extras (continued)
+
+- [ ] FC-168 Packing lists filled by your own bots
+  - Notes: phase 2 of the inventory work (player, 2026-09-15: "Phase 1 - before logistic bots & Phase 2 - after logistic bots"). Once the player has a logistic network, the list can be handed to it: set their personal logistic requests from the packing list and turn on trash-unrequested, each behind a card, so the bots fill their inventory. The API is there (`LuaControl.get_requester_point`, logistic sections, `trash_not_requested`)
+  - Acceptance: "fill this list" sets personal requests matching what's missing, behind a card that names every slot it will set; the player's existing requests are left alone or restored afterwards; refuses when there's no network in range; helmet test (a player with no roboport coverage gets a refusal, not a silent no-op); in-game test that the bots really deliver
+- [ ] FC-169 Chests that sort themselves
+  - Notes: the other half of the player's pain (2026-09-15): "20 chests with unsorted and uneven items". With bots, storage-chest filters and requester contents do the sorting; the agent proposes a scheme and sets the filters behind a card
+  - Acceptance: a proposed scheme the player can read (which chest takes what, and why), set behind one card, with every change undoable; refuses chests it can't see or that aren't the player's; in-game test that the filters land on the right chests
+
 ## Tech debt and risks
 
 

@@ -649,9 +649,20 @@ judge by time to first token.
 Phase order decided by the player 2026-09-15: voice and the other console extras come before character control,
 and car driving is last, split into a spike and an implementation.
 
+**Lists the agent keeps (decided with the player 2026-09-15, S30).** Inventory management is the player's biggest
+day-to-day pain, and half of it is a to-do list: "I'll need 20 ovens, a couple hundred belt, arms to feed them,
+chests" — then you arrive at the outpost without the belts. So the companion gets one small primitive: named lists
+it owns and the player asks it to change, shown in the console and on a **read-only** panel in the game (the player
+shows or hides it; only the agent edits it). The packing list is a list with a rule that ticks items off against
+what the player carries. Phase 1 is before logistic bots, so nothing is set on the player's behalf: it does the
+arithmetic, finds where things are, says what the save's data proves is also needed (fuel for a burner oven, poles
+for an electric one), and checks the load against free inventory slots. Phase 2, once bots exist, hands the list to
+the player's own logistic network behind a card (FC-168, FC-169).
+
 **Phase 4 — voice and extras**
 - Voice in/out in the web console, using the browser's own speech features (Chrome, Safari) first
 - In-game UI (mod GUI chat panel / hotkey popup)
+- Lists the agent keeps, with a read-only in-game panel (S30)
 - ~~Background Factorio test instance for measuring blueprints~~ dropped (see Blueprints): better estimates and measuring builds in the player's game instead
 - ~~Session memory across play sessions~~ done in S18 (FC-063) and per map in S22 (FC-137)
 
