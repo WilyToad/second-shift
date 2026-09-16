@@ -312,7 +312,9 @@ export const ASKS_FOR: Record<string, RegExp> = {
   map_action: /\b(tag|pin|label|mark\w* (it |them |that |this |the [\w -]{1,24})?on (the |your |my )?map|map (tag|marker|pin)|(drop|put|place|add) a (marker|flag|pin)|marker|camera|jump|take me|go to|show me where|look at)\b/i,
   set_train_stop: /\b(limit|priority|prioriti[sz]e|rename|name (it|them|those|these|the stops?)|call (it|them))\b/i,
   // Lists are the player's own plan, so the model only edits them when the words are about that (FC-126, FC-163).
-  update_list: /\b(list|checklist|packing|pack|todo|to-do|remind\w*|add\b|added|remove\b|drop\b|cross (it |them )?off|tick\w* off|check\w* off|clear|rename|start (a|the) list|note (it |that )?down|shopping)\b/i,
+  // Also a build the player is about to go and make ("I'm building an outpost, I need…"), which is a list even
+  // when they don't use the word (FC-166).
+  update_list: /\b(list|checklist|packing|pack|todo|to-do|remind\w*|add\b|added|remove\b|drop\b|cross (it |them )?off|tick\w* off|check\w* off|clear|rename|start (a|the) list|note (it |that )?down|shopping)\b|\b(building|build|set(ting)? up|putting up|outpost)\b[^.?!]{0,80}\b(need|bring|take|gather|grab)\b/i,
   show_the_way: /\b(show (me|you) the way|point(ing)? (me|you|the way|it out|them out|out|toward\w*|to|at)|which way|what direction|guide (me|you)|lead (me|you)|ping|arrow|how do i get to|direct (me|you)|way to)\b/i,
 };
 
@@ -1090,7 +1092,9 @@ export class Agent {
         case "update_list": {
           const message = this.lists.apply({
             ...(typeof args.list === "string" ? { list: args.list } : {}),
-            ...(args.kind === "packing" || args.kind === "plain" ? { kind: args.kind } : {}),
+            // A build the player is about to go and make is a packing list whether or not the model says so: it
+            // forgot the kind and the list then never ticked itself off (FC-166).
+            ...(args.kind === "packing" || args.kind === "plain" ? { kind: args.kind } : wantsPackingList(this.currentQuestion) ? { kind: "packing" as const } : {}),
             ...(Array.isArray(args.add) ? { add: args.add.map(String) } : {}),
             ...(Array.isArray(args.set) ? { set: args.set.map(String) } : {}),
             ...(Array.isArray(args.done) ? { done: args.done.map(String) } : {}),

@@ -111,6 +111,9 @@ const server = Bun.serve({
       // The conversation so far, so a reloaded page (or a restarted server) shows where things stand (FC-063).
       const transcript = agent.transcript();
       if (transcript.length) ws.send(JSON.stringify({ type: "transcript", items: transcript } satisfies ServerMessage));
+      // The lists the companion keeps, so a reloaded page shows the panel straight away (FC-163).
+      const lists = agent.lists.all();
+      if (lists.length) ws.send(JSON.stringify({ type: "lists", lists, ...(agent.lists.active()?.name ? { active: agent.lists.active()!.name } : {}) } satisfies ServerMessage));
       const latest = game.latest();
       if (latest) {
         ws.send(JSON.stringify({ type: "series", series: buildSeries(game.history()) } satisfies ServerMessage));

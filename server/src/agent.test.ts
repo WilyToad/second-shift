@@ -760,3 +760,15 @@ test("FC-163: clearing the conversation clears its lists", async () => {
   expect(agent.lists.all()).toHaveLength(0);
   expect((events.filter((e) => e.type === "lists").at(-1) as any).lists).toEqual([]);
 });
+
+test("FC-166: a build the player is about to make becomes a packing list even if the model forgets to say so", async () => {
+  const model = fakeModel([{ tool: "update_list", args: { list: "outpost", add: ["20 stone furnace"] } }, { text: "Listed." }]);
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask("I'm building a smelting outpost, I need 20 ovens and some belt");
+  expect(agent.lists.active()!.kind).toBe("packing");
+  // A list that isn't about a build stays plain.
+  const plain = fakeModel([{ tool: "update_list", args: { list: "jobs", add: ["fix the wall"] } }, { text: "Listed." }]);
+  const other = new Agent({ model: plain, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await other.ask("add fix the wall to my jobs list");
+  expect(other.lists.active()!.kind).toBe("plain");
+});

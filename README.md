@@ -92,15 +92,79 @@ sound effects with the same key into `data/sounds/` (they stay local, not in git
 simple built-in tones. `ELEVEN_LABS_KEY` works as the variable name too, `ELEVENLABS_VOICE_ID` sets a default voice
 and `ELEVENLABS_MODEL` another model.
 
+### Packing lists, so you don't arrive without the belts
+
+<p>
+  <img src="docs/media/packing-list.png" alt="A packing list in the console: stone furnaces ticked off, belts, inserters and chests still to gather, with the fuel the save's data added" width="520">
+  <img src="docs/media/packing-list-ingame.png" alt="The same list on a panel inside the game, with done items ticked and greyed" width="330">
+</p>
+
+Tell it what you're about to build, in your own words:
+
+> I'm building a new smelting outpost. I need about 20 ovens, a couple hundred belt, enough arms to feed the ovens
+> and chests for storage.
+
+It writes a list with real counts, says the assumptions it made ("48 inserters: two an oven, rounded up"), and adds
+what your save's own data says the build can't run without — fuel for a burner oven, poles and a power source for an
+electric one, each with its reason next to it. Nothing else gets added: it doesn't guess at a repair pack you didn't
+ask for.
+
+The list then keeps itself current. As items land in your inventory or in a chest you can see, they tick themselves
+off with a note ("have 24, none carried", "0 of 200 in reach"). Ask **"am I ready?"** before you walk out and you
+get what's still missing, what you could hand-craft right now, and whether the load even fits — "the load needs
+about 9 slots and you have 120 free".
+
+Press **Alt+L** in the game for the same list on a panel, so you can check it away from the second monitor. The
+panel is deliberately read-only: you show and hide it, and you change the list by asking. "Make it 30 ovens",
+"drop the chests", "cross off the belts" — all of it goes through the companion, which is also what keeps the
+console and the in-game panel saying the same thing.
+
+If you're standing in your logistic network, **"can the bots bring the rest?"** puts the shortfall into your
+requests behind a card. It goes in a section of its own called *Second Shift*, so your own requests are untouched;
+saying **"stop requesting"** switches that section off and leaves it there for next time, and clearing the list
+removes it. It never touches your *trash unrequested* setting — it only warns you when that setting would undo the
+delivery.
+
+Lists aren't only for packing: ask for one for repairs, or the things to check after a brownout. They're kept per
+save, so they survive a reload.
+
+### What you're pointing at
+
+Hover something and ask **"what is this?"** It answers from your save: what the thing is, how much it holds, which
+logistic job a chest does, how fast a belt runs, how far a pole reaches. If your mouse has moved on by the time you
+finish talking, it uses what you last hovered and says how long ago. Ask **"what's in this chest?"** and it reads
+the contents — of a wagon, a machine's input or a tank too.
+
+It sticks to what the save says about a thing and tells you when the rest is base-game behaviour that a mod could
+change, because on a heavily modded save the model's memory of vanilla is often wrong.
+
 ### Also
 
 - **Finds things near you or where you're looking:** "how many express belts are near me?" It counts them and
-  highlights them in-game.
+  highlights them in-game, and the highlight disappears with whatever it marked.
+- **Finds your stuff:** "where are my 200 steel?" It adds up what you carry and what's in the containers you can
+  see, and tells you which one is nearest.
+- **Measures a build instead of estimating it:** "what rate is this really hitting?" reads the machines' own craft
+  counts twice and reports the real number, with the window it measured over.
+- **Estimates as ranges, and names the limit:** a reviewed blueprint reads "about 287–600 a minute, held back by
+  the inserters loading the assemblers", including when a machine has no inserter on one side at all.
+- **Sends your spidertron:** "walk my spidertron over to me" puts up a card; on confirm it walks there with the
+  game's own autopilot. **Alt+X**, saying "stop", driving it yourself or using your own remote all take it back at
+  once.
 - **Screenshots on request:** "take a screenshot of this spot."
 - **Alerts and live state:** attacks, destroyed buildings, and finished research show up the moment they happen.
   Science rates and top products update every two seconds.
 - **Small requests run straight away:** queue research, add a map tag, move the camera.
 - **Map changes wait for you:** deconstruction and upgrade marks, blueprint pastes, recipe changes.
+
+**In-game keys** (all rebindable under **Settings → Controls → Mods**):
+
+| Key | What it does |
+|---|---|
+| **Alt+V** | Talk to Second Shift: starts and stops listening, in the game or in the console |
+| **Alt+L** | Show or hide the list panel |
+| **Alt+X** | Stop whatever the companion set moving |
+| Shortcut bar | **Show the companion a build**: drag over part of your factory to have it reviewed |
 
 ## The helmet rule
 
@@ -190,6 +254,9 @@ Other model providers (OpenAI-compatible servers, hosted APIs) are planned but n
 - "How many express belts are near me?"
 - "Give me a blueprint for 120 gears a minute."
 - "What should I research next?"
+- Hover something and ask "what is this?", or "what's in this chest?"
+- "I'm building a smelting outpost: 20 ovens, a couple hundred belt, arms to feed them and chests." Then **Alt+L**
+  in the game, and "am I ready?" when you think you're packed.
 - Click **Talk** and ask any of these out loud.
 
 Tick **Think it through** for harder planning questions (slower, more careful). **New conversation** clears the
@@ -229,6 +296,8 @@ The full design, measurements and decisions are in [`PLAN.md`](PLAN.md).
 | Voice says the microphone is blocked | Allow the microphone for `127.0.0.1:5170` from the icon in Chrome's address bar |
 | Voice says the speech service couldn't be reached | Use Chrome with a network connection, or click **Recognize on this device instead** once |
 | Alt+V in the game doesn't start listening | Click **Talk** once in the console tab first so Chrome allows it; check the key under Controls → Mods |
+| Alt+L shows no panel in the game | There's no list yet, or it's empty. Ask for one first: the panel hides itself when there's nothing on it |
+| The bots don't bring what the list asked for | You have to be inside your own logistic network, and the network has to hold the items. The answer says which of the two it is |
 | The first answer is very slow | The model is loading or its cache is cold. Later answers are faster |
 
 ## Development

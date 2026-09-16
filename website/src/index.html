@@ -25,6 +25,7 @@
     </a>
     <nav aria-label="Sections">
       <a href="#features">What it does</a>
+      <a href="#packing">Packing lists</a>
       <a href="#helmet">The helmet rule</a>
       <a href="#how">How it works</a>
       <a href="#start">Get started</a>
@@ -131,11 +132,39 @@
         </figure>
       </article>
 
+      <article class="feature" id="packing">
+        <div class="feature-copy">
+          <h3>Never arrive without the belts</h3>
+          <p>Say what you’re about to build, in your own words: “a new smelting outpost — about 20 ovens, a couple hundred belt, enough arms to feed them and chests for storage.”</p>
+          <ol class="steps">
+            <li><span class="step-n mono">1</span>It writes the list with counts, and says the assumptions</li>
+            <li><span class="step-n mono">2</span>Your save’s data adds the rest: fuel for a burner oven, poles for an electric one</li>
+            <li><span class="step-n mono">3</span>Items tick themselves off as you pick them up</li>
+            <li><span class="step-n mono">4</span>“Am I ready?” — what’s missing, and whether the load fits your slots</li>
+          </ol>
+          <p>Press <strong>Alt+L</strong> for the same list on a panel in the game. It’s read-only on purpose: you show and hide it, and you change the list by asking. In range of your bots, “can the bots bring the rest?” puts the shortfall in a request section of its own — your own requests are never touched.</p>
+        </div>
+        <figure class="capture">
+          <img src="./media/packing-list.jpg" alt="The packing list on a panel inside the game: three of eight items ticked off, the rest with what's in reach next to them" width="1100" height="618" loading="lazy">
+          <figcaption>Alt+L in the game. The list is kept per save, so it survives a reload — and it isn’t only for packing: repairs, or what to check after a brownout.</figcaption>
+        </figure>
+      </article>
+
+      <article class="feature feature-text" id="pointing">
+        <div class="feature-copy">
+          <h3>“What is this?”</h3>
+          <p>Hover something and ask. It answers from your save: what the thing is, how much it holds, which logistic job a chest does, how fast a belt runs, how far a pole reaches. Ask what’s inside and it reads the contents — chest, wagon, tank or a machine’s input.</p>
+          <p>If your mouse has moved on by the time you finish the sentence, it uses what you last hovered and says how long ago. And it sticks to what the save says, telling you when the rest is base-game behaviour a mod could change.</p>
+        </div>
+      </article>
+
       <ul class="also" aria-label="More it can do">
         <li><h4>Finds things</h4><p>“How many express belts are near me?” It counts them and highlights them in-game.</p></li>
+        <li><h4>Finds your stuff</h4><p>“Where are my 200 steel?” It adds up what you carry and the chests you can see, and says which is nearest.</p></li>
+        <li><h4>Measures, not guesses</h4><p>“What rate is this really hitting?” reads the machines’ own craft counts and reports the real number.</p></li>
+        <li><h4>Sends your spidertron</h4><p>“Walk my spidertron over to me.” Confirm the card; <strong>Alt+X</strong> or “stop” takes it back at once.</p></li>
         <li><h4>Takes screenshots</h4><p>“Take a screenshot of this spot.” The picture shows up in the console.</p></li>
         <li><h4>Watches for trouble</h4><p>Attacks, destroyed buildings and finished research arrive the moment they happen.</p></li>
-        <li><h4>Handles small jobs</h4><p>Queue research, drop a map tag, move the camera when you ask.</p></li>
       </ul>
     </section>
 
@@ -177,8 +206,8 @@
         <div class="node console"><span class="label">Console</span><strong>Your browser</strong><span>second monitor</span></div>
       </div>
       <dl class="stats">
-        <div><dt class="mono">&lt;&thinsp;0.1 ms</dt><dd>added per game tick on a large Space Age base (0.043 ms in the latest benchmark). No map scans on a timer, only a one-time scan when a save first loads.</dd></div>
-        <div><dt class="mono">~2 s</dt><dd>to the first words of a follow-up, with the model's prompt cache kept warm.</dd></div>
+        <div><dt class="mono">&lt;&thinsp;0.1 ms</dt><dd>added per game tick on a large Space Age base (0.05 ms of script time in the latest profile). No map scans on a timer, only a one-time scan when a save first loads.</dd></div>
+        <div><dt class="mono">~1.5 s</dt><dd>to the first words of an answer, with the model's prompt cache kept warm and the model kept awake while you talk.</dd></div>
         <div><dt class="mono">0</dt><dd>calls to the cloud needed. The game, the mod, the server and the model all run locally; voice can use online services if you turn them on.</dd></div>
       </dl>
     </section>

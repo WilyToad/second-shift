@@ -95,3 +95,15 @@ Nothing is blocked. The backlog's remaining items (FC-050 character control, FC-
 in-game panel you can click) are all in the Future section by the player's decision, so nothing was started there.
 
 Commits tonight, oldest first: S30 setup · FC-163 · FC-165 · FC-166/FC-167 · FC-164/FC-168. Nothing pushed.
+### Docs pass (07:40, at the player's word)
+
+- README: packing-list section, "what you're pointing at" section, in-game keys table, first questions, two
+  troubleshooting rows, and two captures (console panel, in-game panel).
+- Website: packing-list feature with the in-game capture, a "What is this?" block, four new "also" cards, a nav
+  link, stats updated (0.05 ms script time, ~1.5 s to first words). Built into `website/dist`, **not deployed**.
+- Three code fixes found while capturing the screenshots:
+  1. A build description now becomes a *packing* list even when the model omits the kind (it did, and the list
+     then never ticked itself off).
+  2. The ask guard lets "I'm building an outpost, I need…" edit the list without the word "list" in it.
+  3. The server sends the lists on connect: a reloaded console showed no panel until the next change.
+
