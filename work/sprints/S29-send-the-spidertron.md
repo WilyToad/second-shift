@@ -19,3 +19,15 @@
 Planned and activated at the player's request (2026-09-15): "Let's just do the spidertron autopilot." Everything else from the driving discussion (FC-050 character control, FC-146 car and tank driving, FC-060 in-game panel) moved to the backlog's Future section. FC-051 stays with FC-144 because the sprint's goal needs it: the spidertron is the first thing the companion moves, so the stop key and the player-input rules ship with it.
 
 From the FC-145 spike (`work/spikes/FC-145-driving.md`): spidertrons have the autopilot built in (`autopilot_destination`, `add_autopilot_destination`, `on_spider_command_completed`), so this is the small version of driving — the confirm card, stop key and refusals, with none of the steering risk. Clearing `autopilot_destination` is how a stop must work; `stop_spider` writes `speed` and is a cheat under the helmet rule.
+
+## Review
+
+The player can say "walk my spidertron over here", confirm the card, and watch it go — and take it back instantly with Alt+X or by saying "stop".
+
+- Built: a `second-shift-stop` custom input and the player-input rules (one order at a time in `storage`; driving it, using your own remote, or losing it ends the order by itself; every stop says why in the game and the console feed; arrival reported once), a `spidertrons` look, `send_spidertron` behind an approval card, `stop_control`, console feed labels for the two new events, and a source-level test that fails the build if the mod ever writes `teleport`, `speed`, `orientation`, `stop_spider`, `create_entity`, cheat mode or game speed.
+- Decided: §8 Q11 (character control vs player input) is answered in PLAN, and the same rules carry to anything the companion moves later.
+- Measured: spidertron lookup 0.67 ms (a whole-surface sweep was 4.0 ms, so it only runs when nothing is within 256 tiles); mod 0.080 ms/tick whole-tick, per-tick script time unchanged at 0.05 ms, because nothing new runs per tick. The request is recognised in code, so the cached prompt is untouched — no new model tool.
+- Tests: in-game 10/10 including walking there and reporting arrival, plus every refusal (no spidertron, no remote, someone driving, another surface, off the map); through the server 4/4; 171 unit tests; the earlier suites still pass.
+- Fixed along the way: the first server run answered "I can't move it for you" while the card was up, because the card is created in code and the model didn't know. The turn now says the card is up.
+
+**For the player to check:** you need a spidertron and a remote in the save (the tests make their own and remove them). Then: "walk my spidertron over to me", confirm the card, and try Alt+X mid-walk and "stop" in words. Driving it yourself or using your own remote should also end the order.
