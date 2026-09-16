@@ -23,3 +23,14 @@
 ## Notes
 
 Activated by the player (2026-09-15, "Go ahead and get started"). Planned at their request from the throughput decision: no second Factorio instance and no custom simulator, so the estimates get better and the exact numbers come from the player's own game. The in-game panel (FC-060) stays in the backlog: the player left it out of this sprint.
+
+## Review
+
+Rates are roughly right and name the real limit, the exact rate comes from the player's own machines, and answers about a thing stick to what the save says about it.
+
+- Built: belt-lane caps, hand-size shares for belt ends, the game's machine insertion rule and a missing-inserter check in the throughput estimate, with rates said as a range; a `machine_output` look that reads machines' own finished-craft counts twice and reports the real rate; and save-grounded entity facts (dump v10: inventory size, logistic job, fluid capacity, pole supply area and wire reach) in the pointed-at lines, with a turn rule to use them and nothing else.
+- Measured: five rows built and fed through their own belts in the dev game, every estimate within 1.1% of the game with the right part blamed (13/13); measured output matched the game's own counts (289.9 vs 289.0/min in-game, 266 vs 263.9/min through the server); a read costs ~6 µs a machine (200 in 1.03 ms); mod 0.051 ms/tick whole-tick, script 0.05 ms.
+- Evals: test-generated-builds 13/13, eval-pointing 9/9, e2e-measure 3/3, test-machines 11/11, test-player 27/27, test-helmet 13/13, voice session replay 8/8, throughput e2e 8/8, blueprint review 9/9, blueprint request 6/6, inserter geometry 5/5, 167 unit tests.
+- Not met as written: FC-162's "500 machines under 1 ms". A read is ~6 µs a machine, so 500 took 2.7 ms; the action caps at 200 machines (1.03 ms) instead. Recorded in the item.
+
+**For the player to check:** ask about a build you care about ("what rate is this really hitting?" — ask twice, a minute apart), and hover something modded and ask what it is, to see whether the save's facts are enough.
