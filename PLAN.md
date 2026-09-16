@@ -417,6 +417,11 @@ token 2.2–7.4 s). Two measured causes:
   drops back each block (the session's turns at 6,144 cached had 376–950 uncached). Keep history append-only:
   compacting earlier rewrites cached blocks, which costs a cold prefill.
 
+**Stock: what the player can reach (FC-165, 2026-09-16):** their inventory plus the containers they can see within
+48 tiles, summed by item with the nearest container for each and their free slot count. On demand only and capped
+at 60 containers: **0.58 ms** for 22 containers on the dev save (50 item kinds), matching the game's own counts.
+This is the pre-bots answer; with a logistic network the network can answer far more cheaply (FC-168).
+
 **The list tool costs nothing (FC-163, 2026-09-16):** adding `update_list` left the system prompt at 3,876 tokens,
 inside the same cached 4,096-token block, so eval-grounding first token came in at a median **1.29 s** (1.55 s
 before it, same conditions) and the follow-up at 1.82 s. The active list rides in the turn's tail, so a long list

@@ -1,7 +1,7 @@
 // The player's own situation, fetched only when a question needs it (S22): what they carry and can
 // hand-craft, what they built, what they can see around them. Decided and formatted in code, sent in
 // the uncached tail, never in the system prompt.
-import type { ContainerContents, MachineOutput, PlayerStatus, PointedAt, SeenEntity, Spidertrons, Surroundings } from "@companion/interfaces";
+import type { ContainerContents, MachineOutput, PlayerStatus, PointedAt, SeenEntity, Spidertrons, Stock, Surroundings } from "@companion/interfaces";
 
 const AFFIRMATIVE = /^\s*(y|yes|yeah|yea|yep|yup|sure|ok|okay|please|go ahead|do it|go for it|sounds good|absolutely|definitely|why not)\b[\s\w,.!']{0,30}$/i;
 
@@ -274,5 +274,30 @@ export function formatSpidertrons(s: Spidertrons): string[] {
   return [
     `the player's spidertrons on ${s.surface}, nearest first: ${lines.join("; ")}${s.total > s.spidertrons.length ? ` (+${s.total - s.spidertrons.length} more)` : ""}`,
     s.has_remote ? "the player carries a spidertron remote, so they could send it themselves" : "the player carries no spidertron remote, so sending one isn't something they could do right now",
+  ];
+}
+
+// "Where are my 200 steel?", "how many belts do I have around here?" (FC-165).
+const STOCK = /\b(where (are|is|can i find) (my|the|some)|how many .{0,30}\b(do i have|have i got|are (there )?(around|nearby|here))|do i have (enough|any)|what('?s| is| do i have) (in|around) (my|the) (chests|boxes|base)|stock|stockpile|supplies|do we have)\b/i;
+
+export function wantsStock(text: string): boolean {
+  return STOCK.test(text);
+}
+
+/** Lines for what the player can reach: carried first, then the nearest container holding each thing. */
+export function formatStock(s: Stock, only?: string[]): string[] {
+  const wanted = only?.length ? s.items.filter((i) => only.some((name) => i.name === name)) : s.items;
+  if (!wanted.length) {
+    return [`nothing the player can reach within ${s.radius} tiles${only?.length ? ` matches ${only.join(", ")}` : ""} (${s.containers} containers read, ${s.free_slots} free inventory slots)`];
+  }
+  const lines = wanted.slice(0, 12).map((i) => {
+    const where = i.carried === i.count ? "all carried"
+      : i.carried > 0 ? `${i.carried} carried, the rest nearest in a ${i.container} ${i.distance} tiles away at (${i.x}, ${i.y})`
+      : `none carried, nearest in a ${i.container} ${i.distance} tiles away at (${i.x}, ${i.y})`;
+    return `${i.name}${i.quality ? ` (${i.quality})` : ""} ${i.count} (${where})`;
+  });
+  return [
+    `what the player can reach within ${s.radius} tiles of (${s.x}, ${s.y}) on ${s.surface}, from ${s.containers} containers they can see${s.not_visible ? ` (${s.not_visible} more are somewhere they can't see)` : ""}: ${lines.join("; ")}`,
+    `${s.total_kinds > wanted.length ? `${s.total_kinds} kinds in reach in all; ` : ""}${s.free_slots} free slots in the player's inventory`,
   ];
 }

@@ -21,3 +21,13 @@ Order: FC-163 (lists) → FC-165 (stock) → FC-167 (what the save says you need
   **1.29 s** vs 1.55 s before the tool. No prompt cost.
 - Tests: 10 unit + 1 agent test; full check 177 tests.
 
+### FC-165 what you have, and where — done
+
+- Mod `stock` look: inventory + containers the player can see (area-limited, 60 cap, out-of-sight skipped), nearest
+  container per item, free slots. **0.58 ms** for 22 containers, counts matching the game.
+- Server: stock questions ("where are my 200 steel", "how many belts do I have around here") pull it into the turn,
+  narrowed to the items the question mentions.
+- Through the server: "224 iron plates in reach — none carried, all in a storage chest 16 tiles east at (25, 4)."
+- Fixed: the first answer explained the container scan; the turn now says to answer from the line and not describe
+  how it looked.
+

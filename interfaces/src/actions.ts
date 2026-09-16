@@ -72,6 +72,24 @@ export const PointedAtSchema = z.object({
 });
 export type PointedAt = z.infer<typeof PointedAtSchema>;
 
+/** What the player can reach without walking far: what they carry plus the containers they can see (FC-165). */
+export const StockSchema = z.object({
+  surface: z.string(),
+  radius: z.number(),
+  x: z.number(),
+  y: z.number(),
+  free_slots: z.number(),
+  containers: z.number(),
+  not_visible: z.number(),
+  items: luaArray(z.object({
+    name: z.string(), count: z.number(), carried: z.number(), quality: z.string().optional(),
+    // Where the nearest one outside the player's own inventory is.
+    x: z.number().optional(), y: z.number().optional(), distance: z.number().optional(), container: z.string().optional(),
+  })),
+  total_kinds: z.number(),
+});
+export type Stock = z.infer<typeof StockSchema>;
+
 /** The player's spidertrons on their surface, nearest first (FC-144). */
 export const SpidertronsSchema = z.object({
   spidertrons: luaArray(z.object({
@@ -221,6 +239,7 @@ export const actions = {
     data: z.object({ shown: z.number(), name: z.string() }),
     kind: "look",
   },
+  stock: { args: z.object({ radius: z.number().positive().max(64).optional() }), data: StockSchema, kind: "look" },
   spidertrons: { args: z.object({}), data: SpidertronsSchema, kind: "look" },
   // Character control (FC-144): the player confirms it in a card, and the stop key cancels it.
   send_spidertron: {

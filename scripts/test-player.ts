@@ -147,6 +147,41 @@ const boxesAfter = Number(await sc(`rcon.print(#rendering.get_all_objects("secon
 check("a highlight box goes when its entity is removed", boxes === 1 && boxesAfter === 0, `${boxes} before, ${boxesAfter} after`);
 await game.destroy([enemyChest, farChest].filter((c) => c.name));
 
+// FC-165: what the player can reach — carried plus the containers they can see — against the game's own counts.
+const stockChest = JSON.parse(await sc(`local p = game.connected_players[1] local s = p.physical_surface local at = p.physical_position
+  local pos = s.find_non_colliding_position("iron-chest", { x = at.x - 4, y = at.y + 4 }, 20, 1)
+  local e = pos and s.create_entity({ name = "iron-chest", position = pos, force = p.force })
+  if e then e.insert({ name = "iron-plate", count = 123 }) end
+  rcon.print(helpers.table_to_json(e and { name = e.name, x = e.position.x, y = e.position.y } or {}))`));
+const stock = await call("stock", { radius: 48 });
+const stockTruth = JSON.parse(await sc(`local p = game.connected_players[1] local s = p.physical_surface local at = p.physical_position
+  local r, totals, containers = 48, {}, 0
+  local inv = p.get_main_inventory()
+  for _, stack in pairs(inv.get_contents()) do totals[stack.name] = (totals[stack.name] or 0) + stack.count end
+  for _, e in pairs(s.find_entities_filtered({ type = { "container", "logistic-container", "linked-container", "cargo-wagon", "car", "spider-vehicle" }, force = p.force, area = { { at.x - r, at.y - r }, { at.x + r, at.y + r } } })) do
+    if p.force.is_chunk_visible(s, { x = math.floor(e.position.x / 32), y = math.floor(e.position.y / 32) }) then
+      containers = containers + 1
+      for i = 1, e.get_max_inventory_index() do
+        local einv = e.get_inventory(i)
+        if einv then for _, stack in pairs(einv.get_contents()) do totals[stack.name] = (totals[stack.name] or 0) + stack.count end end
+      end
+    end
+  end
+  rcon.print(helpers.table_to_json({ totals = totals, containers = containers, free = inv.count_empty_stacks() }))`));
+const inStock = Object.fromEntries((stock.data.items as any[]).map((i) => [i.name, i.count])) as Record<string, number>;
+const topTruth = Object.entries(stockTruth.totals as Record<string, number>).sort((a, b) => b[1] - a[1]).slice(0, 20);
+// The base is running, so a chest's contents can change between the two reads: allow 2% drift on the totals and
+// hold the test chest (which nothing else touches) to the exact number.
+check("stock matches the game's own counts for what the player can reach", stock.ok
+  && topTruth.every(([name, count]) => inStock[name] === undefined || Math.abs(inStock[name]! - count) <= Math.max(2, count * 0.02))
+  && (inStock["iron-plate"] ?? 0) >= 123
+  && Math.abs((stock.data?.containers ?? 0) - stockTruth.containers) <= 2,
+  `${stock.data?.total_kinds} kinds from ${stock.data?.containers} containers (game says ${stockTruth.containers}), ${stock.data?.free_slots} free slots (game says ${stockTruth.free}); ${stock.profile}`);
+check("reading stock costs under 3 ms", parseFloat(stock.profile ?? "99") < 3, stock.profile ?? "");
+const stockNear = await call("stock", { radius: 8 });
+check("a smaller radius reads fewer containers", stockNear.ok && stockNear.data.containers <= stock.data.containers, `${stockNear.data?.containers} within 8 tiles vs ${stock.data?.containers} within 48`);
+if (stockChest.name) await game.destroy([stockChest]);
+
 // Trigger research: listed techs aren't researched and their prerequisites are.
 const research = await call("research_options");
 const triggers = research.data.triggers as { name: string; trigger: string }[];

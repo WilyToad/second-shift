@@ -21,7 +21,7 @@ import type { RecipeRetriever } from "./retrieval";
 import { entityFacts } from "./grounding";
 import { Lists, type ListsData } from "./lists";
 import { arithmeticCorrections } from "./numbers";
-import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, wantsContents, wantsMeasuredOutput, wantsPointedAt, wantsSpidertronSent, wantsStop, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, formatStock, wantsStock, wantsContents, wantsMeasuredOutput, wantsPointedAt, wantsSpidertronSent, wantsStop, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -569,6 +569,10 @@ export class Agent {
     const sendLine = wantsSpidertronSent(question) ? await this.proposeSpidertron(spiders, question) : null;
     // "Stop" takes it back at once: the player asked, so it doesn't wait for a card (FC-051).
     const stopLine = !pasted.summaries.length && wantsStop(question) ? await this.stopControl() : null;
+    // "Where are my 200 steel?": what the player carries plus the containers they can see (FC-165).
+    const askedStock = !pasted.summaries.length && wantsStock(question);
+    const stock = askedStock ? await this.lookup("stock", { radius: 48 }) : null;
+    const stockLines = stock ? formatStock(stock, found?.items ?? []) : [];
     const askedContents = !pasted.summaries.length && wantsContents(question);
     const target = askedContents ? contentsTarget(pointed, lastOne) : null;
     const contentsLine = target ? await this.contentsOf(target) : askedContents ? "no container is under the mouse, open or just hovered, so its contents weren't looked at: ask the player to hover over it" : null;
@@ -581,6 +585,7 @@ export class Agent {
       ...(pointed ? formatPointedAt(pointed, (name) => (protos ? entityFacts(name, protos) : null)) : []),
       ...(contentsLine ? [contentsLine] : []),
       ...(measuredLine ? [measuredLine] : []),
+      ...stockLines,
       ...this.lists.format(),
       ...spiderLines,
       ...(sendLine ? [sendLine] : []),
@@ -605,6 +610,9 @@ export class Agent {
       // "25,000 units each, 1,250,000 total" for storage tanks: neither number is in the save data (FC-153).
       // The card is put up in code, so the model has to know it exists: it answered "I can't move it for you"
       // while the player was looking at the card (FC-144).
+      // It answered "items in chests aren't findable as entities, so I used the container scan" — the player
+      // doesn't care how it looked (FC-165).
+      stockLines.length ? "the stock line is a fresh read of what the player carries and what's in the containers they can see: answer from it, don't search, and don't explain how you looked" : "",
       sendLine?.startsWith("An approval card") ? "the card asking them to confirm sending the spidertron is already up: tell them to confirm or cancel it in the app, and don't say you can't move it" : "",
       stopLine ? "say what the stop line says happened, in a few words" : "",
       // "Requester chests won't pull from it" about a passive provider chest: wrong, and nobody asked (FC-160).
@@ -914,7 +922,7 @@ export class Agent {
     }
   }
 
-  private async lookup<A extends "player_status" | "surroundings" | "pointed_at" | "spidertrons">(action: A, args?: ActionArgs<A>): Promise<ActionData<A> | null> {
+  private async lookup<A extends "player_status" | "surroundings" | "pointed_at" | "spidertrons" | "stock">(action: A, args?: ActionArgs<A>): Promise<ActionData<A> | null> {
     try {
       return await this.deps.game.call(action, args);
     } catch {

@@ -384,7 +384,79 @@ function M.register(handlers)
     return { entity = describe(player, entity), items = items, total_kinds = kinds, fluids = fluids }
   end
 
-  -- Test tooling: point the mouse at an entity (nil clears), as hovering does, and record it as the event would.
+  -- Look (FC-165): everything the player can get their hands on without walking far — what they carry and what's
+  -- in the containers they can see — summed by item, with the nearest container for each and their free slots.
+  -- On demand only, area-limited and capped: this is the expensive shape (a container sweep), so it never runs on a
+  -- timer. Pre-bots answer; once a logistic network exists the network itself can answer far more cheaply (FC-168).
+  local MAX_CONTAINERS = 60
+  local CONTAINER_TYPES = { "container", "logistic-container", "linked-container", "cargo-wagon", "car", "spider-vehicle" }
+  handlers.stock = function(args)
+    local player = require_player()
+    local radius = math.min(tonumber(args.radius) or 48, MAX_RADIUS)
+    local at = player.physical_position
+    local surface = player.physical_surface
+    local totals, list = {}, {}
+    local function add(name, count, quality, where, distance)
+      local key = name .. "/" .. (quality or "normal")
+      local entry = totals[key]
+      if not entry then
+        entry = { name = name, count = 0, quality = quality ~= "normal" and quality or nil, carried = 0 }
+        totals[key] = entry
+        list[#list + 1] = entry
+      end
+      entry.count = entry.count + count
+      if where == "carried" then
+        entry.carried = entry.carried + count
+      elseif not entry.distance or distance < entry.distance then
+        entry.distance, entry.x, entry.y, entry.container = distance, where.x, where.y, where.name
+      end
+    end
+
+    local inventory = player.get_main_inventory()
+    local free_slots = 0
+    if inventory then
+      for _, stack in pairs(inventory.get_contents()) do add(stack.name, stack.count, stack.quality, "carried", 0) end
+      free_slots = inventory.count_empty_stacks()
+    end
+
+    local containers, unseen = 0, 0
+    local found = surface.find_entities_filtered({
+      type = CONTAINER_TYPES, force = player.force,
+      area = { { at.x - radius, at.y - radius }, { at.x + radius, at.y + radius } },
+      limit = MAX_CONTAINERS * 2,
+    })
+    for _, e in pairs(found) do
+      if containers >= MAX_CONTAINERS then break end
+      if not helmet.visible(player.force, surface, e.position) then
+        unseen = unseen + 1
+      else
+        local dx, dy = e.position.x - at.x, e.position.y - at.y
+        local distance = math.floor(math.sqrt(dx * dx + dy * dy))
+        local counted = false
+        for i = 1, e.get_max_inventory_index() do
+          local inv = e.get_inventory(i)
+          if inv then
+            counted = true
+            for _, stack in pairs(inv.get_contents()) do
+              add(stack.name, stack.count, stack.quality, { x = math.floor(e.position.x), y = math.floor(e.position.y), name = e.name }, distance)
+            end
+          end
+        end
+        if counted then containers = containers + 1 end
+      end
+    end
+
+    table.sort(list, function(a, b) return a.count > b.count end)
+    local kinds = #list
+    for i = #list, MAX_ITEMS + 1, -1 do list[i] = nil end
+    return {
+      surface = surface.name, radius = radius, x = math.floor(at.x), y = math.floor(at.y),
+      free_slots = free_slots, containers = containers, not_visible = unseen,
+      items = list, total_kinds = kinds,
+    }
+  end
+
+  -- Test tooling: point the mouse at an entity (nil clears), as hovering does, and record it as the event would.  -- Test tooling: point the mouse at an entity (nil clears), as hovering does, and record it as the event would.
   handlers.debug_select_entity = function(args)
     local player = require_player()
     local entity = nil

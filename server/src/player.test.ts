@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PlayerStatusSchema, SurroundingsSchema } from "@companion/interfaces";
-import { acceptedOffer, contentsTarget, correctedRequest, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, wantsMeasuredOutput, wantsSpidertronSent, wantsStop, wantsContents, wantsPointedAt, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, formatStock, wantsMeasuredOutput, wantsStock, wantsSpidertronSent, wantsStop, wantsContents, wantsPointedAt, bearing, claimCorrections, craftableRecipes, lootNote, formatPlayerStatus, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 test("a short yes takes up the question the last answer offered", () => {
   const last = "Start by mining iron.\n\nWant me to look around to see what you built?";
@@ -225,4 +225,29 @@ test("FC-144: spidertron lines come from the game, including the remote the play
   expect(lines[0]).toBe("the player's spidertrons on gleba, nearest first: spidertron at (10, -4), 11 tiles away; spidertron at (90, 0), 80 tiles away, someone is driving it, already walking to (100, 0)");
   expect(lines[1]).toContain("carries a spidertron remote");
   expect(formatSpidertrons({ spidertrons: [], total: 0, has_remote: false, surface: "nauvis" })).toEqual(["the player has no spidertron on nauvis"]);
+});
+
+test("FC-165: stock questions, and lines that say what's carried and where the rest is", () => {
+  for (const q of ["where are my 200 steel?", "how many belts do I have around here", "do I have enough iron plate?", "what's in my chests?"]) {
+    expect(wantsStock(q)).toBe(true);
+  }
+  for (const q of ["what's this chest?", "send my spidertron to the copper"]) expect(wantsStock(q)).toBe(false);
+  const stock = {
+    surface: "nauvis", radius: 48, x: 10, y: -4, free_slots: 12, containers: 6, not_visible: 2, total_kinds: 9,
+    items: [
+      { name: "steel-plate", count: 240, carried: 40, x: 20, y: -4, distance: 10, container: "steel-chest" },
+      { name: "transport-belt", count: 100, carried: 100 },
+      { name: "iron-gear-wheel", count: 60, carried: 0, x: 4, y: 8, distance: 13, container: "wooden-chest" },
+    ],
+    total: 3,
+  } as any;
+  const lines = formatStock(stock);
+  expect(lines[0]).toContain("from 6 containers they can see (2 more are somewhere they can't see)");
+  expect(lines[0]).toContain("steel-plate 240 (40 carried, the rest nearest in a steel-chest 10 tiles away at (20, -4))");
+  expect(lines[0]).toContain("transport-belt 100 (all carried)");
+  expect(lines[0]).toContain("iron-gear-wheel 60 (none carried, nearest in a wooden-chest 13 tiles away at (4, 8))");
+  expect(lines[1]).toBe("9 kinds in reach in all; 12 free slots in the player's inventory");
+  // Asking about one item narrows the line to it.
+  expect(formatStock(stock, ["steel-plate"])[0]).not.toContain("transport-belt");
+  expect(formatStock({ ...stock, items: [] }, ["steel-plate"])[0]).toContain("nothing the player can reach");
 });
