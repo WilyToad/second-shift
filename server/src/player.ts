@@ -301,3 +301,24 @@ export function formatStock(s: Stock, only?: string[]): string[] {
     `${s.total_kinds > wanted.length ? `${s.total_kinds} kinds in reach in all; ` : ""}${s.free_slots} free slots in the player's inventory`,
   ];
 }
+
+// "Am I ready?", "what am I still missing?" — the question the packing list exists for (FC-166).
+const READY = /\b(am i ready|are we ready|ready to (go|head|build|leave)|what('?s| is| am i) (still )?(missing|short)|what do i still need|do i have everything|anything (else )?missing|good to go)\b/i;
+// Talk about the list at all, which is when a packing list is worth re-checking against what the player carries.
+const LIST_TALK = /\b(list|packing|pack|checklist|todo|to-do|add\b|remove\b|cross off|tick off|check off|got the|picked up|grabbed)\b/i;
+
+export function wantsReady(text: string): boolean {
+  return READY.test(text);
+}
+
+export function wantsListTalk(text: string): boolean {
+  return LIST_TALK.test(text);
+}
+
+// "I'm building a new smelting outpost. I need about 20 ovens, a couple hundred belt…" — the shape of a build
+// the player is about to walk out and make (FC-166).
+const BUILD_PLAN = /\b(building|build|set(ting)? up|putting up|outpost|new base|expansion)\b/i;
+
+export function wantsPackingList(text: string): boolean {
+  return BUILD_PLAN.test(text) && /\b(need|bring|take|pack|list|gather|grab)\b/i.test(text);
+}

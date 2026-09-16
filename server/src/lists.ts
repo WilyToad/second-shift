@@ -21,6 +21,8 @@ export type ListEdit = {
   list?: string;
   kind?: "plain" | "packing";
   add?: string[];
+  /** "30 stone furnace" replaces whatever count that item had: a list of amounts, not of lines. */
+  set?: string[];
   done?: string[];
   undone?: string[];
   remove?: string[];
@@ -66,6 +68,12 @@ export class Lists {
       updatedAt: typeof l.updatedAt === "number" ? l.updatedAt : this.now(),
     }));
     this.activeName = this.lists.find((l) => same(l.name, data.active ?? ""))?.name ?? this.lists[0]?.name;
+  }
+
+  /** Empties every list: the conversation they belonged to is gone (FC-163). */
+  clear(): void {
+    this.lists = [];
+    this.activeName = undefined;
   }
 
   save(): ListsData {
@@ -121,10 +129,36 @@ export class Lists {
       list.items = [];
       changes.push(`cleared ${n} item${n === 1 ? "" : "s"}`);
     }
+    // A count that changes replaces the item, because a packing list is amounts rather than lines. The model
+    // otherwise adds the difference as a second line ("20 stone furnace" plus "10 stone furnace").
+    for (const text of edit.set ?? []) {
+      const item = clean(text);
+      if (!item) continue;
+      const hit = list.items.find((i) => looksLike(i.text, item));
+      if (hit) {
+        if (same(hit.text, item)) continue;
+        changes.push(`changed "${hit.text}" to ${item}`);
+        hit.text = item;
+        hit.done = false;
+        delete hit.note;
+      } else if (list.items.length < MAX_ITEMS) {
+        list.items.push({ text: item, done: false });
+        changes.push(`added ${item}`);
+      }
+    }
     for (const text of edit.add ?? []) {
       const item = clean(text);
       if (!item) continue;
       if (list.items.some((i) => same(i.text, item))) continue;
+      // On a packing list, adding the same thing again means changing its count.
+      const existing = list.kind === "packing" ? list.items.find((i) => looksLike(i.text, item)) : undefined;
+      if (existing) {
+        changes.push(`changed "${existing.text}" to ${item}`);
+        existing.text = item;
+        existing.done = false;
+        delete existing.note;
+        continue;
+      }
       if (list.items.length >= MAX_ITEMS) { changes.push(`the list is full at ${MAX_ITEMS} items, so "${item}" wasn't added`); break; }
       list.items.push({ text: item, done: false });
       changes.push(`added ${item}`);
@@ -158,6 +192,25 @@ export class Lists {
     if (state.note !== undefined && item.note !== state.note) { item.note = clean(state.note); changed = true; }
     if (changed) list.updatedAt = this.now();
     return changed;
+  }
+
+  /**
+   * Adds items a rule worked out (FC-167's essentials), each with the reason as its note. Returns what it added,
+   * so the answer can say it out loud instead of the list changing silently.
+   */
+  addFromRule(listName: string, items: { text: string; note: string }[]): string[] {
+    const list = this.get(listName);
+    if (!list) return [];
+    const added: string[] = [];
+    for (const item of items) {
+      const text = clean(item.text);
+      if (!text || list.items.some((i) => looksLike(i.text, text))) continue;
+      if (list.items.length >= MAX_ITEMS) break;
+      list.items.push({ text, done: false, note: clean(item.note) });
+      added.push(text);
+    }
+    if (added.length) list.updatedAt = this.now();
+    return added;
   }
 
   /** What goes in the turn's tail: the active list in full, the others as names. Short on purpose. */

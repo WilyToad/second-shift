@@ -417,6 +417,15 @@ token 2.2–7.4 s). Two measured causes:
   drops back each block (the session's turns at 6,144 cached had 376–950 uncached). Keep history append-only:
   compacting earlier rewrites cached blocks, which costs a cold prefill.
 
+**The packing list (FC-166, FC-167, 2026-09-16):** the player's own example — "20 ovens, a couple hundred belt,
+enough arms to feed the ovens and chests for storage" — becomes a list with counts, and the save's data adds what
+the build can't run without: fuel for burners, poles and a power-source reminder for electric machines, each with
+its reason attached. The rule runs the moment the list changes, so one answer covers what was added and what the
+player already has; items tick themselves off against stock. `scripts/e2e-packing.ts` passes 5/5 on the dev save.
+Two rules came from getting it wrong first: pick the fuel the player *has* (else the most energetic gathered one,
+not the least), and the pole that covers the most ground (else a big electric pole gets suggested, which reaches
+far between poles but powers almost nothing).
+
 **Stock: what the player can reach (FC-165, 2026-09-16):** their inventory plus the containers they can see within
 48 tiles, summed by item with the nearest container for each and their free slot count. On demand only and capped
 at 60 containers: **0.58 ms** for 22 containers on the dev save (50 item kinds), matching the game's own counts.

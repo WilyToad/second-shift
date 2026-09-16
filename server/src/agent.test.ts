@@ -749,3 +749,14 @@ test("FC-163: the list tool edits the player's list, shows it, and is dropped wh
   expect(agent.lists.active()!.items).toHaveLength(2);
   expect(model.seen[4]!.at(-1)!.content).toContain("the player hasn't asked for this yet");
 });
+
+test("FC-163: clearing the conversation clears its lists", async () => {
+  const events: ServerMessage[] = [];
+  const model = fakeModel([{ tool: "update_list", args: { list: "packing", add: ["20 stone furnace"] } }, { text: "Added." }]);
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: (m) => events.push(m) });
+  await agent.ask("add 20 stone furnace to a packing list");
+  expect(agent.lists.all()).toHaveLength(1);
+  agent.reset();
+  expect(agent.lists.all()).toHaveLength(0);
+  expect((events.filter((e) => e.type === "lists").at(-1) as any).lists).toEqual([]);
+});

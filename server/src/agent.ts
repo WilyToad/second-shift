@@ -19,9 +19,10 @@ import { buildMessages, formatSnapshot, userTurn } from "./prompt";
 import { formatPlan, Planner, type Plan } from "./planner";
 import type { RecipeRetriever } from "./retrieval";
 import { entityFacts } from "./grounding";
-import { Lists, type ListsData } from "./lists";
+import { Lists, type Checklist, type ListsData } from "./lists";
 import { arithmeticCorrections } from "./numbers";
-import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, formatStock, wantsStock, wantsContents, wantsMeasuredOutput, wantsPointedAt, wantsSpidertronSent, wantsStop, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { check, essentials, parseNeed, readiness, slots, type Need } from "./packing";
+import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, formatStock, wantsStock, wantsReady, wantsListTalk, wantsPackingList, wantsContents, wantsMeasuredOutput, wantsPointedAt, wantsSpidertronSent, wantsStop, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -143,6 +144,7 @@ export const TOOLS: ToolSpec[] = [
           list: { type: "string", description: "Which list, in the player's words (\"packing\", \"repairs\"). Left out means the one they're already working on." },
           kind: { type: "string", enum: ["plain", "packing"], description: "\"packing\" for a list of items to take on a build run: it ticks itself off against what the player carries." },
           add: { type: "array", items: { type: "string" }, description: "Items to add, one string each, with the count first: \"20 stone furnace\"." },
+          set: { type: "array", items: { type: "string" }, description: "Items whose count changes, written in full: \"30 stone furnace\" when 20 were on the list. Never add the difference as another item." },
           done: { type: "array", items: { type: "string" }, description: "Items to tick off, as the player named them." },
           undone: { type: "array", items: { type: "string" }, description: "Items to put back." },
           remove: { type: "array", items: { type: "string" }, description: "Items to take off the list." },
@@ -488,7 +490,7 @@ export class Agent {
   useSession(store: SessionStore): void {
     this.history.length = 0;
     this.shown.length = 0;
-    this.lists.load(null);
+    this.lists.clear();
     this.lastResult = null;
     this.lastBlueprint = null;
     this.pending.clear();
@@ -519,6 +521,10 @@ export class Agent {
     this.lastResult = null;
     this.pending.clear();
     this.notes = [];
+    // Lists are part of this conversation's state, so clearing it clears them (FC-163): a stale packing list
+    // outliving the conversation it was made in confused both the answers and the evals.
+    this.lists.clear();
+    this.showLists();
     this.deps.emit({ type: "reset" });
   }
 
@@ -569,10 +575,14 @@ export class Agent {
     const sendLine = wantsSpidertronSent(question) ? await this.proposeSpidertron(spiders, question) : null;
     // "Stop" takes it back at once: the player asked, so it doesn't wait for a card (FC-051).
     const stopLine = !pasted.summaries.length && wantsStop(question) ? await this.stopControl() : null;
+    // A packing list keeps itself in step with what the player carries, and answers "am I ready?" (FC-166).
+    const packing = this.lists.active()?.kind === "packing" ? this.lists.active()! : null;
+    const askedReady = Boolean(packing) && wantsReady(question);
     // "Where are my 200 steel?": what the player carries plus the containers they can see (FC-165).
-    const askedStock = !pasted.summaries.length && wantsStock(question);
+    const askedStock = !pasted.summaries.length && (wantsStock(question) || askedReady || (Boolean(packing) && wantsListTalk(question)));
     const stock = askedStock ? await this.lookup("stock", { radius: 48 }) : null;
-    const stockLines = stock ? formatStock(stock, found?.items ?? []) : [];
+    const stockLines = stock && !packing ? formatStock(stock, found?.items ?? []) : [];
+    const packingLines = packing && stock ? this.checkPacking(packing, stock, status, askedReady) : [];
     const askedContents = !pasted.summaries.length && wantsContents(question);
     const target = askedContents ? contentsTarget(pointed, lastOne) : null;
     const contentsLine = target ? await this.contentsOf(target) : askedContents ? "no container is under the mouse, open or just hovered, so its contents weren't looked at: ask the player to hover over it" : null;
@@ -587,6 +597,7 @@ export class Agent {
       ...(measuredLine ? [measuredLine] : []),
       ...stockLines,
       ...this.lists.format(),
+      ...packingLines,
       ...spiderLines,
       ...(sendLine ? [sendLine] : []),
       ...(stopLine ? [stopLine] : []),
@@ -612,6 +623,10 @@ export class Agent {
       // while the player was looking at the card (FC-144).
       // It answered "items in chests aren't findable as entities, so I used the container scan" — the player
       // doesn't care how it looked (FC-165).
+      // It answered the player's own example with a list that dropped the belts and the chests (FC-166).
+      wantsPackingList(question) && !packing ? "the player is describing a build they're about to go and make: start a packing list with every single thing they named, one line each, count first (\"20 stone furnace\"), rounding vague amounts up generously and saying the assumption; add nothing else yourself" : "",
+      askedReady ? "answer with what's still missing and whether the load fits the player's free slots, both from the lines" : "",
+      packing ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",
       stockLines.length ? "the stock line is a fresh read of what the player carries and what's in the containers they can see: answer from it, don't search, and don't explain how you looked" : "",
       sendLine?.startsWith("An approval card") ? "the card asking them to confirm sending the spidertron is already up: tell them to confirm or cancel it in the app, and don't say you can't move it" : "",
       stopLine ? "say what the stop line says happened, in a few words" : "",
@@ -902,6 +917,40 @@ export class Agent {
     }
   }
 
+  /**
+   * Keeps a packing list honest (FC-166, FC-167): adds what the save's data proves the build also needs, ticks
+   * items off against what the player can reach, and answers "am I ready?" with the load's slot count.
+   */
+  /** The same check, run from the list tool: it fetches the stock itself. */
+  private async checkPackingNow(list: Checklist): Promise<string[]> {
+    const stock = await this.lookup("stock", { radius: 48 });
+    return stock ? this.checkPacking(list, stock, null, false) : [];
+  }
+
+  private checkPacking(list: Checklist, stock: ActionData<"stock">, status: ActionData<"player_status"> | null, asked: boolean): string[] {
+    const protos = this.deps.prototypes();
+    const needs = list.items.map((i) => parseNeed(i.text, protos)).filter((n): n is Need => n !== null);
+    const lines: string[] = [];
+    // What the data says is missing goes on the list once, with its reason as the note.
+    const additions = essentials(needs, protos, stock).filter((a) => a.text);
+    const added = this.lists.addFromRule(list.name, additions.map((a) => ({ text: a.text, note: a.reason })));
+    if (added.length) lines.push(`added to the list from the save's data: ${additions.filter((a) => added.includes(a.text)).map((a) => `${a.text} (${a.reason})`).join("; ")}`);
+    // Tick off what they already have, and note the rest, so the panel and the answer agree.
+    const states = check(needs, stock, status?.craftable ?? []);
+    const ticked: string[] = [];
+    for (const state of states) {
+      const done = state.missing === 0;
+      const note = done
+        ? `have ${state.have}${state.carried < state.have ? ` (${state.carried} carried)` : ""}`
+        : `${state.have} of ${state.need.count} in reach`;
+      if (this.lists.update(list.name, state.need.text, { done, note }) && done) ticked.push(state.need.item);
+    }
+    if (ticked.length) lines.push(`ticked off now that the player has them: ${ticked.join(", ")}`);
+    if (added.length || ticked.length) this.showLists();
+    if (asked) lines.push(...readiness(states, slots(needs, protos, stock.free_slots)));
+    return lines;
+  }
+
   /** Measured output of the machines the player just searched for, else the ones around them. */
   private async measuredOutput(): Promise<string | null> {
     const last = this.lastResult && this.now() - this.lastResult.at <= RESULT_TTL_MS ? this.lastResult : null;
@@ -994,15 +1043,21 @@ export class Agent {
             ...(typeof args.list === "string" ? { list: args.list } : {}),
             ...(args.kind === "packing" || args.kind === "plain" ? { kind: args.kind } : {}),
             ...(Array.isArray(args.add) ? { add: args.add.map(String) } : {}),
+            ...(Array.isArray(args.set) ? { set: args.set.map(String) } : {}),
             ...(Array.isArray(args.done) ? { done: args.done.map(String) } : {}),
             ...(Array.isArray(args.undone) ? { undone: args.undone.map(String) } : {}),
             ...(Array.isArray(args.remove) ? { remove: args.remove.map(String) } : {}),
             ...(typeof args.rename === "string" ? { rename: args.rename } : {}),
             ...(args.clear === true ? { clear: true } : {}),
           });
+          // A packing list is checked straight away, so the same answer can say what the data added and what the
+          // player already has — waiting for the next turn made the first answer miss both (FC-166).
+          const list = this.lists.active();
+          const extra = list?.kind === "packing" ? await this.checkPackingNow(list) : [];
           this.showLists();
-          this.deps.emit({ type: "tool", summary: message });
-          return message;
+          const full = [message, ...extra].join(" ");
+          this.deps.emit({ type: "tool", summary: full });
+          return full;
         }
         case "show_the_way":
           return await this.showTheWay(String(args.what ?? ""), args.at === "last_result");

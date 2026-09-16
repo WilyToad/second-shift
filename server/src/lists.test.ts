@@ -70,3 +70,21 @@ test("FC-163: lists come back from a saved session, capped and cleaned", () => {
   expect(messy.all()[0]).toEqual({ name: "odd name", kind: "plain", items: [{ text: "spaced out", done: true }], updatedAt: 1001 });
   expect(messy.active()!.name).toBe("odd name");
 });
+
+test("FC-166: a changed count replaces the item instead of adding another line", () => {
+  const l = lists();
+  l.apply({ list: "packing", kind: "packing", add: ["20 stone furnace", "200 transport belt"] });
+  expect(l.apply({ set: ["30 stone furnace"] })).toContain('changed "20 stone furnace" to 30 stone furnace');
+  expect(l.active()!.items.map((i) => i.text)).toEqual(["30 stone furnace", "200 transport belt"]);
+  // Adding the same thing again on a packing list means the same thing.
+  expect(l.apply({ add: ["24 stone furnace"] })).toContain('changed "30 stone furnace" to 24 stone furnace');
+  expect(l.active()!.items).toHaveLength(2);
+  // A plain list keeps both lines: "call mum" and "call mum again" are two jobs.
+  const plain = lists();
+  plain.apply({ list: "jobs", add: ["walk the wall", "walk the wall again"] });
+  expect(plain.active()!.items).toHaveLength(2);
+  // Setting a count also clears the tick and the note, because the number to reach changed.
+  l.update("packing", "200 transport belt", { done: true, note: "have 200" });
+  l.apply({ set: ["400 transport belt"] });
+  expect(l.active()!.items.find((i) => /belt/.test(i.text))).toEqual({ text: "400 transport belt", done: false });
+});

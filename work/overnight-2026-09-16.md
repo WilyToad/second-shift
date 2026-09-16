@@ -31,3 +31,25 @@ Order: FC-163 (lists) → FC-165 (stock) → FC-167 (what the save says you need
 - Fixed: the first answer explained the container scan; the turn now says to answer from the line and not describe
   how it looked.
 
+### FC-167 what the save says you also need — done
+
+- `server/src/packing.ts`: fuel for burners (the fuel the player has most of, else the most energetic *gathered*
+  one — a first pass picked the least energetic and suggested wood), poles plus a power-source reminder for
+  electric machines (a first pass picked the *smallest* supply area and suggested a big electric pole, which
+  reaches far but powers almost nothing). Each addition carries its reason as the item's note.
+- Covered by kind, not by name, so a later pass can't add a second pole or a second fuel.
+
+### FC-166 a packing list you build by talking — done
+
+- The rule runs the moment the list changes, not a turn later: the first answer used to miss both the additions
+  and the ticking.
+- Ticks items off against stock with notes ("have 24 (0 carried)", "0 of 200 in reach"); `set` added to the tool
+  after the model wrote the *difference* as a second line ("20 stone furnace" plus "10 stone furnace").
+- "Am I ready?" gives what's missing, what's craftable now, and the load's slots against free slots.
+- `reset` now clears lists: a stale list outlived its conversation and confused both answers and the eval.
+- `scripts/e2e-packing.ts` 5/5. Turn guidance added twice along the way: list every item the player named (an
+  early run dropped the belts and chests), and say whether the load fits.
+- For the player to look at: on this save the fuel pick is *carbon* (2,000+ in reach beats coal), and "ovens"
+  resolved to stone furnaces in one run and electric furnaces in another. Both are defensible from the data, but
+  worth a glance.
+
