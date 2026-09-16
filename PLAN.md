@@ -657,7 +657,11 @@ shows or hides it; only the agent edits it). The packing list is a list with a r
 what the player carries. Phase 1 is before logistic bots, so nothing is set on the player's behalf: it does the
 arithmetic, finds where things are, says what the save's data proves is also needed (fuel for a burner oven, poles
 for an electric one), and checks the load against free inventory slots. Phase 2, once bots exist, hands the list to
-the player's own logistic network behind a card (FC-168, FC-169).
+the player's own logistic network behind a card: the companion keeps its requests in **its own named section** of
+the player's requester point (2.0 sections), so their own requests are never touched, switches the section off when
+the list is done rather than deleting it, and never writes `trash_not_requested` (FC-168, decided with the player
+2026-09-15). Sorting chests (FC-169) was dropped: storage filters only place *incoming* items, and once chests are
+on the network `get_supply_counts` already says which one holds what.
 
 **Phase 4 — voice and extras**
 - Voice in/out in the web console, using the browser's own speech features (Chrome, Safari) first
