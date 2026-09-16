@@ -7,7 +7,7 @@
 
 <p align="center"><strong>A second engineer in your helmet.</strong></p>
 
-<p align="center">A local AI companion for Factorio 2.0 that answers from your own save and can only do what you could.</p>
+<p align="center">A local AI companion for Factorio 2.0 that answers from your own game and can only do what you could.</p>
 
 <p align="center"><a href="https://second-shift.wilytoad.com">second-shift.wilytoad.com</a></p>
 
@@ -16,7 +16,7 @@
 </p>
 
 Second Shift runs next to your game, usually on a second monitor. You ask about your factory in plain words, and it
-reads the answer from the running game and your save's own recipe data. When you ask it to change something, it
+reads the answer from the running game: its live state and its own recipe data. When you ask it to change something, it
 shows you exactly what will happen and waits for your OK. It never plays the game for you.
 
 Everything runs on your machine: the game, a small mod, a local server and a local language model. Nothing is sent to
@@ -27,10 +27,10 @@ the cloud unless you use voice features that rely on an online service (see [Tal
 
 ## What it does
 
-### Answers from your save, not from the wiki
+### Answers from your game, not from the wiki
 
 Ask how much of something you make, what's holding production back, or how many machines a target needs. Recipes,
-machine speeds and research come from a dump of your own save, so modded recipes are right. Charts are drawn from
+machine speeds and research are read from the game you're playing, mods and all, so modded recipes are right. Charts are drawn from
 the game's production statistics, never by the model.
 
 <img src="docs/media/production-plan.png" alt="A production plan for 60 advanced circuits a minute, with a recipe graph from raw inputs to 4.8 assembling machines" width="880">
@@ -95,7 +95,7 @@ and `ELEVENLABS_MODEL` another model.
 ### Packing lists, so you don't arrive without the belts
 
 <p>
-  <img src="docs/media/packing-list.png" alt="A packing list in the console: stone furnaces ticked off, belts, inserters and chests still to gather, with the fuel the save's data added" width="520">
+  <img src="docs/media/packing-list.png" alt="A packing list in the console: stone furnaces ticked off, belts, inserters and chests still to gather, with the fuel the game's data added" width="520">
   <img src="docs/media/packing-list-ingame.png" alt="The same list on a panel inside the game, with done items ticked and greyed" width="330">
 </p>
 
@@ -105,7 +105,7 @@ Tell it what you're about to build, in your own words:
 > and chests for storage.
 
 It writes a list with real counts, says the assumptions it made ("48 inserters: two an oven, rounded up"), and adds
-what your save's own data says the build can't run without — fuel for a burner oven, poles and a power source for an
+what your game's own data says the build can't run without — fuel for a burner oven, poles and a power source for an
 electric one, each with its reason next to it. Nothing else gets added: it doesn't guess at a repair pack you didn't
 ask for.
 
@@ -126,17 +126,17 @@ removes it. It never touches your *trash unrequested* setting — it only warns 
 delivery.
 
 Lists aren't only for packing: ask for one for repairs, or the things to check after a brownout. They're kept per
-save, so they survive a reload.
+world, so they survive a reload.
 
 ### What you're pointing at
 
-Hover something and ask **"what is this?"** It answers from your save: what the thing is, how much it holds, which
+Hover something and ask **"what is this?"** It answers from your game: what the thing is, how much it holds, which
 logistic job a chest does, how fast a belt runs, how far a pole reaches. If your mouse has moved on by the time you
 finish talking, it uses what you last hovered and says how long ago. Ask **"what's in this chest?"** and it reads
 the contents — of a wagon, a machine's input or a tank too.
 
-It sticks to what the save says about a thing and tells you when the rest is base-game behaviour that a mod could
-change, because on a heavily modded save the model's memory of vanilla is often wrong.
+It sticks to what your game's data says about a thing and tells you when the rest is base-game behaviour that a mod could
+change, because in a heavily modded game the model's memory of vanilla is often wrong.
 
 ### Also
 
@@ -310,7 +310,7 @@ bun run board          # sprint progress
 With a save copy hosted (`bun run launch -- --dev`) and the server running:
 
 - `bun scripts/test-helmet.ts` proves each action fails when the player couldn't do it.
-- `bun scripts/eval-grounding.ts` and `bun scripts/eval-ratios.ts` check answers against the save's data.
+- `bun scripts/eval-grounding.ts` and `bun scripts/eval-ratios.ts` check answers against the game's own data.
 - `bun scripts/benchmark.ts` (game closed) measures the mod's cost per tick.
 - `bun scripts/capture/scene.ts` re-records the clips in `docs/media/`.
 

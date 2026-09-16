@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Second Shift: a second engineer in your helmet</title>
-  <meta name="description" content="A local AI companion for Factorio 2.0 that answers from your own save and can only do what you could.">
+  <meta name="description" content="A local AI companion for Factorio 2.0 that answers from your own game and can only do what you could.">
   <meta name="theme-color" content="#1c1a18">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Second Shift">
-  <meta property="og:description" content="A second engineer in your helmet. A local AI companion for Factorio 2.0 that answers from your own save and can only do what you could.">
+  <meta property="og:description" content="A second engineer in your helmet. A local AI companion for Factorio 2.0 that answers from your own game and can only do what you could.">
   <meta property="og:image" content="https://second-shift.wilytoad.com/og.png">
   <meta property="og:url" content="https://second-shift.wilytoad.com/">
   <link rel="canonical" href="https://second-shift.wilytoad.com/">
@@ -40,7 +40,7 @@
         <div class="hero-copy">
           <p class="eyebrow">A local AI companion for Factorio 2.0</p>
           <h1 id="hero-title">A second engineer in your&nbsp;helmet.</h1>
-          <p class="lead">Ask about your factory in plain words. Second Shift answers from your own save, draws its charts from the game's real statistics, and only does what you could do yourself.</p>
+          <p class="lead">Ask about your factory in plain words. Second Shift answers from your own game, draws its charts from the real production statistics, and only does what you could do yourself.</p>
           <div class="cta">
             <a class="btn primary" href="https://github.com/WilyToad/second-shift">Get it on GitHub</a>
             <a class="btn" href="#build">Watch it build</a>
@@ -58,12 +58,12 @@
 
     <section id="features" class="section wrap" aria-labelledby="features-title">
       <p class="eyebrow">What it does on shift</p>
-      <h2 id="features-title">It has read the whole save, so you don't have to.</h2>
+      <h2 id="features-title">It has read your whole factory, so you don't have to.</h2>
 
       <article class="feature">
         <div class="feature-copy">
           <h3>Plans from your recipes, not the wiki</h3>
-          <p>Recipes, machine speeds and research come from a dump of your own save, so modded recipes are right. The numbers are worked out in code, and the model explains them.</p>
+          <p>Recipes, machine speeds and research are read from the game you're playing, mods and all, so modded recipes are right. The numbers are worked out in code, and the model explains them.</p>
           <dl class="facts">
             <div><dt>Asked</dt><dd class="mono">60 advanced circuits / min</dd></div>
             <div><dt>Answer</dt><dd class="mono">4.8× assembling machine 3</dd></div>
@@ -138,7 +138,7 @@
           <p>Say what you’re about to build, in your own words: “a new smelting outpost — about 20 ovens, a couple hundred belt, enough arms to feed them and chests for storage.”</p>
           <ol class="steps">
             <li><span class="step-n mono">1</span>It writes the list with counts, and says the assumptions</li>
-            <li><span class="step-n mono">2</span>Your save’s data adds the rest: fuel for a burner oven, poles for an electric one</li>
+            <li><span class="step-n mono">2</span>Your game’s own data adds the rest: fuel for a burner oven, poles for an electric one</li>
             <li><span class="step-n mono">3</span>Items tick themselves off as you pick them up</li>
             <li><span class="step-n mono">4</span>“Am I ready?” — what’s missing, and whether the load fits your slots</li>
           </ol>
@@ -146,15 +146,15 @@
         </div>
         <figure class="capture">
           <img src="./media/packing-list.jpg" alt="The packing list on a panel inside the game: three of eight items ticked off, the rest with what's in reach next to them" width="1100" height="618" loading="lazy">
-          <figcaption>Alt+L in the game. The list is kept per save, so it survives a reload — and it isn’t only for packing: repairs, or what to check after a brownout.</figcaption>
+          <figcaption>Alt+L in the game. The list is kept per world, so it survives a reload — and it isn’t only for packing: repairs, or what to check after a brownout.</figcaption>
         </figure>
       </article>
 
       <article class="feature feature-text" id="pointing">
         <div class="feature-copy">
           <h3>“What is this?”</h3>
-          <p>Hover something and ask. It answers from your save: what the thing is, how much it holds, which logistic job a chest does, how fast a belt runs, how far a pole reaches. Ask what’s inside and it reads the contents — chest, wagon, tank or a machine’s input.</p>
-          <p>If your mouse has moved on by the time you finish the sentence, it uses what you last hovered and says how long ago. And it sticks to what the save says, telling you when the rest is base-game behaviour a mod could change.</p>
+          <p>Hover something and ask. It answers from your game: what the thing is, how much it holds, which logistic job a chest does, how fast a belt runs, how far a pole reaches. Ask what’s inside and it reads the contents — chest, wagon, tank or a machine’s input.</p>
+          <p>If your mouse has moved on by the time you finish the sentence, it uses what you last hovered and says how long ago. And it sticks to what your game’s data says, telling you when the rest is base-game behaviour a mod could change.</p>
         </div>
       </article>
 

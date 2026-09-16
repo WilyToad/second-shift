@@ -7,12 +7,12 @@ guide doesn't cover, add it here first, then build it.
 ## The idea
 
 Second Shift is **a second engineer in your helmet.** It watches your factory with you, answers in plain
-words from your own save, and does only what you could do yourself. It never plays for you.
+words from your own game, and does only what you could do yourself. It never plays for you.
 
 Everything in the brand comes from that picture:
 
 - **The helmet.** The companion sees what you see and reaches what you reach. The logo is a helmet with its visor lit.
-- **The shift.** A coworker on the factory floor who has read the whole save. Warm steel, work lights, and signage type.
+- **The shift.** A coworker on the factory floor who has read your whole factory. Warm steel, work lights, and signage type.
 - **Cyan means the companion.** In the console, on the website and in the logo, cyan marks what the companion says, proposes or does. Nothing else uses it.
 
 ## Name
@@ -24,7 +24,7 @@ Everything in the brand comes from that picture:
 | "the companion" for the assistant inside the product | "the AI", "the bot", "Claude", or a model name |
 
 - **Tagline:** *A second engineer in your helmet.*
-- **One-liner:** *A local AI companion for Factorio 2.0 that answers from your own save and can only do what you could.*
+- **One-liner:** *A local AI companion for Factorio 2.0 that answers from your own game and can only do what you could.*
 - **Uppercase:** only in the wordmark and in `label`-style captions.
 - **Factorio credit:** Factorio is a trademark of Wube Software. Say "for Factorio", never imply it's official, and don't use Wube's logo or the Factorio gear wordmark.
 
