@@ -83,3 +83,15 @@ Order: FC-163 (lists) → FC-165 (stock) → FC-167 (what the save says you need
 - 188 unit tests; in-game player 30/30, panel 7/7, requests 9/9; server-side packing 5/5, measure 3/3,
   pointing 9/9, voice replay 8/8, grounding 10/10 (first token median 1.32 s).
 
+### Wrap-up (02:50)
+
+S30 is 6/6 with its review written. Game and server closed; the dev-save conversation from before the night was
+restored (the e2e runs reset it, so it was backed up first — the packing lists made while testing went with it).
+
+Not touched, on purpose: README and the website. Every feature this sprint is player-facing, so they probably want
+a docs pass, but the last one was done on their explicit word and the site only deploys when they ask.
+
+Nothing is blocked. The backlog's remaining items (FC-050 character control, FC-146 car and tank driving, FC-060 an
+in-game panel you can click) are all in the Future section by the player's decision, so nothing was started there.
+
+Commits tonight, oldest first: S30 setup · FC-163 · FC-165 · FC-166/FC-167 · FC-164/FC-168. Nothing pushed.
