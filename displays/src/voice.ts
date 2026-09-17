@@ -58,6 +58,15 @@ export function setPhrases(list: string[]): void {
   phrases.value = list;
 }
 
+/**
+ * What the engine offered for the last spoken question and what the console did with it (FC-185). Without this, a
+ * good transcript can't be attributed: biasing preventing the error, rescoring correcting it, and the engine simply
+ * getting it right all look identical afterwards. Sent with the question for the log, never into the prompt.
+ */
+export type HeardDetail = { first: string; picked: string; alternatives: number; offered: string[]; phrases: number; where: string; carried: boolean };
+let detail: HeardDetail | null = null;
+export const heardDetail = (): HeardDetail | null => detail;
+
 /** Applies the phrases to one recognition, where the browser has the API. Never throws. */
 export function biasRecognition(rec: Recognition, list = phrases.value): number {
   const Phrase = (globalThis as { SpeechRecognitionPhrase?: new (phrase: string, boost: number) => unknown }).SpeechRecognitionPhrase;
@@ -102,9 +111,14 @@ export const recognizedWhere = signal<Where>("unknown");
 export const deviceStatus = signal<Availability | null>(null);
 export const readAloud = signal(loadSetting("second-shift.readAloud", false));
 /**
- * Which engine turns the voice into text (FC-174). Chrome's online service hears more accurately; on-device keeps
- * the voice on this machine. The player picks, because it's their tradeoff — before this, installing the on-device
+ * Which engine turns the voice into text (FC-174). The browser's own service sends the audio off the machine;
+ * on-device keeps it here. The player picks, because it's their tradeoff — before this, installing the on-device
  * model silently made it permanent, and near-homophones ("wire" heard as "wine") had no way back.
+ *
+ * The picker used to promise the online service "hears more accurately" (FC-186). That claim is gone: on the
+ * player's own five test sentences, Safari's engine beat Chrome's online service on both formatting failures
+ * ("I've got 10" and "up there", which Chrome mangled) and matched it on the near-homophone. One voice and one
+ * session is not a measurement, so the picker now says what's actually true — where the audio goes.
  */
 export const preferOnDevice = signal(loadSetting("second-shift.onDevice", false));
 /** Counts push-to-talk presses from the game (FC-147); the composer toggles listening on each change. */
@@ -142,13 +156,22 @@ export function describeError(code: string): string | null {
     case "not-allowed":
     case "service-not-allowed": return "The microphone is blocked for this page. Allow it from the icon in the address bar, then try again.";
     case "audio-capture": return "No microphone was found.";
-    case "network": return "The browser's speech service couldn't be reached. Voice input needs Chrome (Brave can't reach the service) and a network connection.";
+    case "network": return "The browser's speech service couldn't be reached. It needs a network connection, and a browser that can reach it (Brave can't; Chrome and Safari can).";
     case "language-not-supported": return "Speech recognition doesn't support this language.";
     default: return `Voice input stopped (${code}).`;
   }
 }
 
-let active: { rec: Recognition; aborted: boolean } | null = null;
+type Run = { rec: Recognition; aborted: boolean; pending: () => string; markSent: () => void; record: (sent: string) => HeardDetail };
+let active: Run | null = null;
+/**
+ * Words heard by a recognition that has already ended, not yet sent (FC-183). The engine decides when a recognition
+ * ends — Safari after every utterance, Chrome after a few minutes — and that can land inside the player's pause.
+ * The pending text and the send timer therefore belong to the talk session, not to one recognition: before this, a
+ * restart cleared the screen and the pending send found itself attached to a run that was no longer current, so the
+ * sentence was dropped in silence.
+ */
+let carried = "";
 let onDevice: boolean | null = null;
 
 /**
@@ -282,10 +305,8 @@ function listen(): void {
   rec.interimResults = true;
   rec.maxAlternatives = ALTERNATIVES;
   if (onDevice) rec.processLocally = true;
-  biasRecognition(rec);
+  const applied = biasRecognition(rec);
   if (onDevice === null) recognizedWhere.value = s.ctor.available ? "unknown" : "speech-service";
-  const run = { rec, aborted: false };
-  const current = () => active === run;
   // Results from this recognition that were already sent as a question.
   let sentUpTo = 0;
   let latest: ArrayLike<Result> = [];
@@ -294,39 +315,52 @@ function listen(): void {
     for (let i = sentUpTo; i < results.length; i++) text += pickAlternative(results[i]!);
     return text.trim();
   };
+  let lastOffered: string[] = [];
+  const run: Run = {
+    rec, aborted: false,
+    // Everything heard and not yet sent: what earlier recognitions left behind, then this one's own words.
+    pending: () => [carried, textFrom(latest)].filter(Boolean).join(" ").replace(/\s+/g, " ").trim(),
+    markSent: () => { sentUpTo = latest.length; carried = ""; },
+    record: (sent: string) => ({
+      first: lastOffered[0] ?? sent, picked: sent, alternatives: lastOffered.length, offered: lastOffered,
+      phrases: applied, where: recognizedWhere.value, carried: Boolean(carried),
+    }),
+  };
+  const current = () => active === run;
   rec.onstart = () => { if (current()) listenState.value = "listening"; };
   rec.onresult = (e) => {
     if (!current()) return;
     latest = e.results;
-    heard.value = textFrom(e.results);
-    if (silence) clearTimeout(silence);
-    silence = setTimeout(() => {
-      silence = null;
-      const text = textFrom(latest);
-      if (!text || !current()) return;
-      sentUpTo = latest.length;
-      send(text);
-    }, silenceSeconds.value * 1000);
+    const last = e.results[e.results.length - 1];
+    if (last) {
+      const offered: string[] = [];
+      for (let i = 0; i < last.length && i < ALTERNATIVES; i++) offered.push(last[i]!.transcript.trim());
+      lastOffered = offered;
+    }
+    heard.value = run.pending();
+    armSend();
   };
   rec.onerror = (e) => {
     if (!current()) return;
     // Quiet or our own abort just means "keep going"; anything else ends the session with a reason.
     if (e.error === "no-speech" || e.error === "aborted") return;
     const message = s.fromGame && e.error === "not-allowed"
-      ? "Chrome wouldn't start listening from the game's hotkey. Click Talk once in this tab (and allow the microphone), then the hotkey works."
+      ? "The browser wouldn't start listening from the game's hotkey. Click Talk once in this tab (and allow the microphone), then the hotkey works."
       : describeError(e.error);
     if (message) voiceError.value = message;
     listenState.value = "error";
     stopTalking({ send: false, keepError: true });
   };
   rec.onend = () => {
-    // Chrome ends continuous recognition on its own after a while: start again while the session is on.
+    // The engine ends recognition on its own — Safari every utterance, Chrome every few minutes. Carry the words
+    // forward and start again while the session is on; the pending send stays armed across the restart.
     if (run.aborted || !current()) return;
+    carried = run.pending();
     active = null;
     if (session && !awaitingAnswer) listen();
   };
   active = run;
-  heard.value = "";
+  heard.value = carried; // a restart mid-sentence keeps what the player already said on screen
   listenState.value = "listening";
   try {
     rec.start();
@@ -336,6 +370,24 @@ function listen(): void {
     listenState.value = "error";
     stopTalking({ send: false, keepError: true });
   }
+}
+
+/**
+ * Arms the send for one pause's worth of quiet. The timer reads whichever recognition is current when it fires, so
+ * the engine restarting in the meantime doesn't lose the sentence (FC-183).
+ */
+function armSend(): void {
+  if (silence) clearTimeout(silence);
+  silence = setTimeout(() => {
+    silence = null;
+    const run = active;
+    if (!session || !run) return;
+    const text = run.pending();
+    if (!text) return;
+    detail = run.record(text);
+    run.markSent();
+    send(text);
+  }, silenceSeconds.value * 1000);
 }
 
 /** Sends a spoken question and pauses the mic until the answer is done. */
@@ -357,6 +409,7 @@ function pauseForAnswer(): void {
 
 function endRecognition(): void {
   if (silence) { clearTimeout(silence); silence = null; }
+  carried = "";
   const run = active;
   active = null;
   if (run) { run.aborted = true; run.rec.abort(); }

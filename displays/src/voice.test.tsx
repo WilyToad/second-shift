@@ -171,7 +171,7 @@ test("FC-062: Escape-style cancelling never sends; errors end the session and te
   made.at(-1).onerror({ error: "network" });
   expect(voice.talking.value).toBe(false);
   expect(voice.listenState.value).toBe("error");
-  expect(voice.voiceError.value).toContain("Brave can't reach the service");
+  expect(voice.voiceError.value).toContain("Brave can't"); // browser-neutral since FC-186
   expect(voice.describeError("not-allowed")).toContain("microphone is blocked");
   expect(voice.describeError("aborted")).toBeNull();
 });
@@ -461,4 +461,51 @@ test("FC-177: the recognizer is told which phrases to expect, and a browser with
     delete (globalThis as any).SpeechRecognitionPhrase;
     voice.setPhrases([]);
   }
+});
+
+test("FC-183: the words survive the engine ending a recognition inside the pause (Safari)", async () => {
+  const voice = await import("./voice");
+  const said: string[] = [];
+  const { ctor, made } = fakeRecognition("unavailable");
+  voice.setSilenceSeconds(0.08);
+  voice.startTalking((text) => said.push(text), ctor);
+  made[0].say([{ text: "okay I'm running wire", final: true }]);
+  // Safari ends recognition after every utterance, well inside the player's pause. Chrome does it too, just rarely.
+  made[0].onend();
+  await new Promise((r) => setTimeout(r, 200));
+  expect(said).toEqual(["okay I'm running wire"]);
+  // A restart carried the words forward rather than clearing them off the screen.
+  expect(made.length).toBe(2);
+  voice.stopTalking({ send: false });
+  voice.setSilenceSeconds(2);
+});
+
+test("FC-185: a spoken question carries what the engine offered and what was picked", async () => {
+  const voice = await import("./voice");
+  const said: string[] = [];
+  const { ctor, made } = fakeRecognition("unavailable");
+  voice.setVocabulary(["wire", "belt"]);
+  voice.setSilenceSeconds(0.08);
+  voice.startTalking((text) => said.push(text), ctor);
+  // Two transcripts, the save's word in the second: the record has to show that's why it won.
+  made[0].onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: "okay I'm running wine" }, { transcript: "okay I'm running wire" }], { isFinal: true, length: 2 })] } as any);
+  await new Promise((r) => setTimeout(r, 200));
+  const record = voice.heardDetail()!;
+  expect(said).toEqual(["okay I'm running wire"]);
+  expect(record.picked).toBe("okay I'm running wire");
+  expect(record.first).toBe("okay I'm running wine");
+  expect(record.alternatives).toBe(2);
+  expect(record.phrases).toBe(0); // no biasing API on this browser
+  expect(record.where).toBe(voice.recognizedWhere.value);
+  voice.stopTalking({ send: false });
+  voice.setSilenceSeconds(2);
+  voice.setVocabulary([]);
+});
+
+test("FC-186: the console says where the voice goes, and never which browser hears best", async () => {
+  const voice = await import("./voice");
+  // The accuracy promise is gone (the player's own session had Safari beating Chrome's service), and the
+  // browser-specific wording with it: the same console runs in Safari.
+  expect(voice.describeError("network")).toContain("Brave can't");
+  expect(voice.describeError("network")).not.toContain("needs Chrome");
 });

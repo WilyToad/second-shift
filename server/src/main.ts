@@ -131,6 +131,12 @@ const server = Bun.serve({
       const msg = JSON.parse(String(raw)) as ClientMessage;
       if (msg.type === "ask" && msg.text.trim()) busy = busy.then(async () => {
         asking++;
+        // One line per spoken question, so a good transcript can be attributed afterwards (FC-185).
+        if (msg.heard) {
+          const h = msg.heard;
+          const others = h.offered.slice(1).filter((t) => t !== h.picked);
+          console.log(`Heard (${h.where}, ${h.alternatives} alternative${h.alternatives === 1 ? "" : "s"}, ${h.phrases} phrase${h.phrases === 1 ? "" : "s"}${h.carried ? ", carried across a restart" : ""}): "${h.picked}"${h.first !== h.picked ? ` — engine's first guess was "${h.first}"` : ""}${others.length ? ` · also offered: ${others.map((t) => `"${t}"`).join(", ")}` : ""}`);
+        }
         try {
           await agent.ask(msg.text.trim(), msg.thinking ?? false, msg.spoken === true);
         } finally {

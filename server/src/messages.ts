@@ -41,7 +41,9 @@ export type ServerMessage =
 
 export type ClientMessage =
   // `spoken` marks a question that came through speech recognition, which mis-hears words (FC-175).
-  | { type: "ask"; text: string; thinking?: boolean; spoken?: boolean }
+  // `heard` is the diagnostic record of a spoken question (FC-185): what the engine offered, what was picked and
+  // whether the phrases were accepted. Logged, never put in the prompt.
+  | { type: "ask"; text: string; thinking?: boolean; spoken?: boolean; heard?: { first: string; picked: string; alternatives: number; offered: string[]; phrases: number; where: string; carried: boolean } }
   | { type: "approve"; id: string }
   | { type: "decline"; id: string }
   | { type: "reset" }
