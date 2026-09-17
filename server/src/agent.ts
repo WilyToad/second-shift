@@ -364,9 +364,28 @@ export function anchorSpot(digest: Digest | undefined, from: "character" | "view
 export const SELECTED_PREFIX = "Review the build I just selected:";
 const SELECTED = /^Review the build I just selected:/;
 
-/** Is the player asking for a blueprint built to a rate ("a blueprint for 120 gears per minute")? */
+const BUILD = /\b(build|builds|building|set ?up|lay|run|place|make)\b[^.?!]{0,48}\b(lines?|belts?|rows?|bus|smelt\w*|furnaces?|ovens?|outposts?|malls?|factory|base|drills?|mine|walls?|defen[cs]\w*|plants?|assembl\w*|labs?|miners?)\b/i;
+const ASKED_TO_BUILD = /\b(can|could|will|would) you\b[^.?!]{0,24}\bbuild\b|\bbuild (me|us)\b/i;
+
+/**
+ * Is the player asking for a blueprint built to a rate? Either they said the word ("a blueprint for 120 gears per
+ * minute"), or they asked for the thing itself at a rate ("build me 120 gears a minute") — which is the same
+ * request, and used to fall through to prose because the word "blueprint" was missing (FC-172).
+ */
 export function wantsBlueprint(question: string): boolean {
-  return /\b(blueprints?|layouts?|schematics?)\b/i.test(question) && parseTarget(question) !== null;
+  const rate = parseTarget(question) !== null;
+  return rate && (/\b(blueprints?|layouts?|schematics?)\b/i.test(question) || BUILD.test(question) || ASKED_TO_BUILD.test(question));
+}
+
+/**
+ * Is the player asking for something to be built that isn't a row at a rate (FC-172)? Asked to "build a line up to
+ * my metal", the answer was "I can only do what a player could do — I can't build belts or place entities for you",
+ * which undersells it: it can build a production row in code and offer to paste it as ghosts behind a card, the same
+ * way the player's own robots build. What's actually true is narrower and more useful than a flat refusal.
+ */
+export function wantsBuild(question: string): boolean {
+  if (wantsBlueprint(question) || wantsPackingList(question)) return false; // a rate builds one; a load packs one
+  return BUILD.test(question) || ASKED_TO_BUILD.test(question);
 }
 
 const MAX_SKETCH_ENTITIES = 4000;
@@ -597,6 +616,7 @@ export class Agent {
     // "Is this hitting 150 a minute?": measured in the player's own game from the machines' craft counts (FC-162).
     const protos = this.deps.prototypes();
     const measuredLine = !pasted.summaries.length && wantsMeasuredOutput(question) ? await this.measuredOutput() : null;
+    const askedBuild = !pasted.summaries.length && wantsBuild(question);
     const playerLines = [
       ...(status ? formatPlayerStatus(status, { builds: start || /\b(buil\w*|plac\w*|made)\b/i.test(intent) }) : []),
       ...(around ? formatSurroundings(around) : []),
@@ -639,6 +659,9 @@ export class Agent {
       // Speech recognition mis-hears words ("wire" as "wine", "dots" as "darts"): read the odd one as a mis-hear
       // rather than a fact, and ask if it changes the answer (FC-175).
       spoken ? "this question was spoken and turned into text, so a word that makes no sense in Factorio is probably a mis-hear: answer what they plainly meant, and only ask if the wrong word changes the answer" : "",
+      // "I can't build belts or place entities for you" for a belt run, then a plan in words anyway (FC-172).
+      askedBuild ? "the player is asking for something to be built: say what you can actually do — build a blueprint in code for one production row (machines for a single item, with inserters, an input belt, an output belt and poles) and offer to paste it as ghosts where they stand, on a card they confirm — rather than saying you can't place anything" : "",
+      askedBuild ? "and the real limits: there's no template for a belt run between two points or a mixed layout, and ghosts are built by construction robots, so before robots a paste would sit unbuilt and a plan in words is the honest offer" : "",
       askedReady ? "answer with what's still missing and whether the load fits the player's free slots, both from the lines" : "",
       packing ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",
       stockLines.length ? "the stock line is a fresh read of what the player carries and what's in the containers they can see: answer from it, don't search, and don't explain how you looked" : "",

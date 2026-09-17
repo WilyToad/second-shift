@@ -772,3 +772,37 @@ test("FC-166: a build the player is about to make becomes a packing list even if
   await other.ask("add fix the wall to my jobs list");
   expect(other.lists.active()!.kind).toBe("plain");
 });
+
+test("FC-172: a build request hears what it can actually do, not a flat refusal", async () => {
+  const { game } = firstHourGame();
+  const model = fakeModel([{ text: "Here's the plan." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  // The player's own words, from the 2026-09-17 session.
+  await agent.ask("build a line up to my metal");
+  const turn = model.seen[0]!.at(-1)!.content as string;
+  expect(turn).toContain("build a blueprint in code for one production row");
+  expect(turn).toContain("on a card they confirm");
+  // The limits are named rather than implied.
+  expect(turn).toContain("no template for a belt run between two points");
+  expect(turn).toContain("ghosts are built by construction robots");
+
+  // A question that isn't about building gets none of it.
+  const other = fakeModel([{ text: "12 rails." }]);
+  const plain = new Agent({ model: other, game: firstHourGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await plain.ask("how many rails are near me?");
+  expect(other.seen[0]!.at(-1)!.content as string).not.toContain("one production row");
+});
+
+test("FC-172: 'build me 120 gears a minute' is the same request as asking for a blueprint", async () => {
+  const { wantsBlueprint, wantsBuild } = await import("./agent");
+  // A rate makes it a row we can build in code, with or without the word "blueprint".
+  expect(wantsBlueprint("build me 120 iron gear wheels per minute")).toBe(true);
+  expect(wantsBlueprint("a blueprint for 120 gears per minute")).toBe(true);
+  // No rate: it's a build request, answered in words with the real limits.
+  expect(wantsBlueprint("build a line up to my metal")).toBe(false);
+  expect(wantsBuild("build a line up to my metal")).toBe(true);
+  expect(wantsBuild("can you build a smelting row here?")).toBe(true);
+  // A described load is a packing list, not a build offer (FC-166 keeps that turn).
+  expect(wantsBuild("I'm building a smelting outpost, I need 20 ovens and some belt")).toBe(false);
+  expect(wantsBuild("how many rails are near me?")).toBe(false);
+});
