@@ -39,4 +39,8 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-170 "New conversation" left the alert feed alone
+  - Notes: player, 2026-09-16: "I just clicked New Conversation, but I still see a bunch of old alerts." Two causes: the console's reset only cleared the thread, and the server replays the mod's whole event ring (200 events, no age limit) to every page that connects, so alerts from days ago in that world came back
+  - Done: reset clears the feed and the missed-event count as well, and the replay on connect only carries events from the last 10 minutes of game time — enough to see what happened while away, without dredging up a week. Unit tests for both
+
 

@@ -119,7 +119,8 @@ const server = Bun.serve({
         ws.send(JSON.stringify({ type: "series", series: buildSeries(game.history()) } satisfies ServerMessage));
         ws.send(JSON.stringify({ type: "digest", digest: latest.digest, receivedAt: latest.receivedAt } satisfies ServerMessage));
       }
-      const recent = game.events().filter((e) => e.kind !== "talk"); // an old key press must not start listening
+      // Recent alerts only, and never a key press (an old one must not start listening): FC-150, FC-170.
+      const recent = game.eventsForReplay();
       // Marked as a replay: old alerts fill the feed without making sounds (FC-150).
       if (recent.length) ws.send(JSON.stringify({ type: "events", events: recent, replay: true } satisfies ServerMessage));
     },

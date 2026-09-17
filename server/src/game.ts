@@ -15,6 +15,18 @@ export class ModError extends Error {
   constructor(readonly code: string, message: string) { super(message); }
 }
 
+/**
+ * The events worth showing a page that just connected: what happened in the last few minutes of game time
+ * (FC-170). The mod keeps 200 events per world, which for a world the player hasn't touched in days meant
+ * "New conversation" still faced a wall of week-old alerts.
+ */
+export const REPLAY_AGE_TICKS = 10 * 60 * 60; // ten minutes of game time
+
+export function replayable(events: GameEvent[], tick: number | undefined, maxAge = REPLAY_AGE_TICKS): GameEvent[] {
+  if (tick === undefined) return [];
+  return events.filter((e) => e.kind !== "talk" && tick - e.tick <= maxAge);
+}
+
 export class GameLink {
   private rcon: RconClient | null = null;
   private nextId = 1;
@@ -41,6 +53,11 @@ export class GameLink {
   /** The last events seen, for pages that connect later. */
   events(): GameEvent[] {
     return [...this.recentEvents];
+  }
+
+  /** What a page that just connected should see: recent alerts only (FC-170). */
+  eventsForReplay(): GameEvent[] {
+    return replayable(this.recentEvents, this.latest()?.digest.tick);
   }
 
   /** Snapshot history, oldest first (for charts). */

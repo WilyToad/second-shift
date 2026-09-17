@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GameLink } from "./game";
+import { GameLink, replayable, REPLAY_AGE_TICKS } from "./game";
 import { decodePackets, encodePacket } from "./rcon";
 
 const prototypes = {
@@ -106,4 +106,13 @@ test("reconnecting with the same mods patches research progress instead of dumpi
   link.disconnect();
   await until(() => state.researchCalls.includes("all"));
   expect(state.dumps).toBe(1);
+});
+
+test("FC-170: a page that connects sees recent alerts only, and never a key press", () => {
+  const at = (tick: number, kind: GameEvent["kind"] = "alert"): GameEvent => ({ seq: tick, tick, kind, severity: "warning" });
+  const now = 1_000_000;
+  const events = [at(now - REPLAY_AGE_TICKS - 1), at(now - REPLAY_AGE_TICKS), at(now - 600), at(now, "talk"), at(now, "research_finished")];
+  expect(replayable(events, now).map((e) => e.tick)).toEqual([now - REPLAY_AGE_TICKS, now - 600, now]);
+  // No game connected yet: nothing to replay, rather than a wall of whatever was last seen.
+  expect(replayable(events, undefined)).toEqual([]);
 });

@@ -92,6 +92,10 @@ export function onMessage(m: ServerMessage): void {
       answerSpeech.onQuestion();
       thread.value = [];
       streaming = null;
+      // "New conversation" clears the console, alerts included: leaving them made it look like nothing happened
+      // (FC-170). New ones arrive as the game reports them.
+      events.value = [];
+      droppedEvents.value = 0;
       break;
     case "events": {
       const seen = new Set(events.value.map((e) => e.seq));
