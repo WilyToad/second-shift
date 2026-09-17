@@ -4,6 +4,7 @@
 // audio goes to the browser's speech service, and the console says which.
 import { signal } from "@preact/signals";
 import { playSound } from "./sounds";
+import { keepClip, markUtterance } from "./capture";
 
 type Alternative = { transcript: string };
 type Result = { isFinal: boolean; 0: Alternative; length: number; [index: number]: Alternative };
@@ -332,6 +333,7 @@ function listen(): void {
   rec.onstart = () => { if (current()) listenState.value = "listening"; };
   rec.onresult = (e) => {
     if (!current()) return;
+    markUtterance(); // the clip starts a little before this, to catch the first word (FC-188)
     latest = e.results;
     const last = e.results[e.results.length - 1];
     if (last) {
@@ -428,6 +430,8 @@ function send(text: string): void {
   pauseForAnswer();
   playSound("sent");
   s.onUtterance(text);
+  // After the question has gone, never before: a diagnostic clip must not cost the player any delay (FC-188).
+  void keepClip(text, detail);
 }
 
 function pauseForAnswer(): void {

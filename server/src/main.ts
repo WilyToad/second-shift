@@ -6,6 +6,7 @@ import { GameLink, type Snapshot } from "./game";
 import type { ClientMessage, ServerMessage } from "./messages";
 import { OmlxClient, readOmlxApiKey } from "./model";
 import { craftersByCategory, recognitionPhrases, vocabulary } from "./grounding";
+import { VoiceClips } from "./voice-clips";
 import { alignToCacheBlock, buildMessages, systemPrompt, userTurn } from "./prompt";
 import { RecipeRetriever } from "./retrieval";
 import { buildSeries } from "./series";
@@ -61,6 +62,8 @@ const SOUNDS_DIR = new URL("../../data/sounds", import.meta.url).pathname;
 // ElevenLabs voices (FC-148), only when the player has put a key in the environment or .env.
 const tts = elevenLabsKey() ? new ElevenLabs({ key: elevenLabsKey()!, model: process.env.ELEVENLABS_MODEL, defaultVoice: process.env.ELEVENLABS_VOICE_ID }) : null;
 
+const clips = new VoiceClips(join(import.meta.dir, "..", "..", "data", "captures", "voice"));
+
 const server = Bun.serve({
   port: PORT,
   hostname: "127.0.0.1",
@@ -79,6 +82,33 @@ const server = Bun.serve({
       if (!SOUND_NAMES.includes(name)) return new Response("Not found", { status: 404 });
       const file = Bun.file(join(SOUNDS_DIR, `${name}.mp3`));
       return new Response(file, { headers: { "content-type": "audio/mpeg", "cache-control": "no-cache" } });
+    },
+    // The player's own voice, kept for FC-189's comparison. Local only, gitignored, and off unless they turn it on.
+    "/capture/voice": {
+      POST: async (req) => {
+        try {
+          const form = await req.formData();
+          const audio = form.get("audio");
+          if (!(audio instanceof Blob)) return new Response("no audio", { status: 400 });
+          const meta = JSON.parse(String(form.get("meta") ?? "{}")) as { heard?: string; detail?: unknown; seconds?: number; sampleRate?: number };
+          const id = await clips.save(await audio.arrayBuffer(), {
+            heard: String(meta.heard ?? ""), detail: meta.detail,
+            seconds: Number(meta.seconds ?? 0), sampleRate: Number(meta.sampleRate ?? 16000),
+          });
+          console.log(`Kept clip ${id} (${meta.seconds}s): "${meta.heard}"`);
+          return Response.json({ id, ...(await clips.count()) });
+        } catch (e) {
+          return new Response((e as Error).message, { status: 500 });
+        }
+      },
+    },
+    "/capture/truth": {
+      POST: async (req) => {
+        const body = (await req.json().catch(() => ({}))) as { id?: string; said?: string };
+        const ok = await clips.setTruth(String(body.id ?? ""), String(body.said ?? ""));
+        if (ok) console.log(`Clip ${body.id}: the player actually said "${body.said}"`);
+        return Response.json({ ok, ...(await clips.count()) });
+      },
     },
     "/tts/voices": async () => {
       if (!tts) return Response.json({ available: false, voices: [] });

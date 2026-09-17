@@ -5,6 +5,7 @@ import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
 import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 import { setSoundsOn, soundsOn } from "./sounds";
+import { capturing, captureError, clipCount, lastClip, sayTruth, setCapturing } from "./capture";
 import { chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
 
 const SILENCE_CHOICES = [1, 1.5, 2, 3, 4, 5];
@@ -115,6 +116,28 @@ export function whereLabel(where: string): string {
   return where === "on-device" ? "Voice is recognized on this device." : where === "speech-service" ? "Voice is sent to your browser's speech service to turn it into text." : "";
 }
 
+/** "That's not what I said": the ground truth a transcriber can be scored against (FC-188). */
+export function TruthRow({ heard }: { heard: string }) {
+  const editing = useSignal(false);
+  const text = useSignal(heard);
+  if (!editing.value) {
+    return (
+      <div class="voice-note" id="truth-row">
+        Kept that clip as “{heard}”.{" "}
+        <button type="button" class="link" id="fix-truth" onClick={() => { editing.value = true; text.value = heard; }}>Not what I said</button>
+      </div>
+    );
+  }
+  return (
+    <div class="voice-note" id="truth-row">
+      <label for="truth" class="visually-hidden">What you actually said</label>
+      <input id="truth" value={text.value} onInput={(e) => (text.value = e.currentTarget.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void sayTruth(text.value); editing.value = false; } if (e.key === "Escape") editing.value = false; }} />{" "}
+      <button type="button" onClick={() => { void sayTruth(text.value); editing.value = false; }}>Save what I said</button>
+    </div>
+  );
+}
+
 export function Composer({ onAsk = (text: string, thinking: boolean, spoken = false) => send({ type: "ask", text, thinking, ...(spoken ? { spoken: true, ...(heardDetail() ? { heard: heardDetail()! } : {}) } : {}) }), recognition = recognitionCtor() }: { onAsk?: (text: string, thinking: boolean, spoken?: boolean) => void; recognition?: ReturnType<typeof recognitionCtor> } = {}) {
   const text = useSignal("");
   const thinking = useSignal(false);
@@ -163,6 +186,7 @@ export function Composer({ onAsk = (text: string, thinking: boolean, spoken = fa
         <span class="voice">
           <label><input type="checkbox" id="thinking" checked={thinking.value} onChange={(e) => (thinking.value = e.currentTarget.checked)} /> Think it through</label>
           <label title="Short sounds for listening, alerts, research and cards"><input type="checkbox" id="sounds" checked={soundsOn.value} onChange={(e) => setSoundsOn(e.currentTarget.checked)} /> Sounds</label>
+          <label title="Writes each spoken question to disk as audio, so a local transcriber can be tested against your own voice. Nothing is sent anywhere."><input type="checkbox" id="keep-audio" checked={capturing.value} onChange={(e) => void setCapturing(e.currentTarget.checked)} /> Keep my audio</label>
           <label title="Reads each answer aloud as it arrives"><input type="checkbox" id="read-aloud" checked={readAloud.value} onChange={(e) => { readAloud.value = e.currentTarget.checked; saveSetting("second-shift.readAloud", readAloud.value); if (!readAloud.value) stopSpeaking(); }} /> Read answers aloud</label>
           {readAloud.value && elevenVoices.value.length > 0 && (
             <label title="ElevenLabs voices send the answer text to ElevenLabs">
@@ -213,6 +237,15 @@ export function Composer({ onAsk = (text: string, thinking: boolean, spoken = fa
           </select>
         </div>
       )}
+      {capturing.value && (
+        <div class="voice-note" id="keeping-audio" role="status">
+          Your voice is being written to <code>data/captures/voice/</code> on this Mac — nothing is sent anywhere.
+          {clipCount.value ? ` ${clipCount.value.clips} clip${clipCount.value.clips === 1 ? "" : "s"} kept, ${clipCount.value.withTruth} with your own wording.` : ""}
+        </div>
+      )}
+      {captureError.value && <div class="voice-note error" role="status">{captureError.value}</div>}
+      {/* Said right after hearing it go wrong, while they still remember what they said (FC-188). */}
+      {capturing.value && lastClip.value && <TruthRow heard={lastClip.value.heard} />}
       {recognition && !voiceError.value && deviceStatus.value === "downloading" && (
         <div class="voice-note" id="on-device-downloading">
           Chrome is downloading on-device speech recognition. It shows no progress here; to check, open chrome://components
