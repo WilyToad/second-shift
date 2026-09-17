@@ -1,7 +1,8 @@
 # S32 — Ballast
 
-- **Status:** active
+- **Status:** done
 - **Started:** 2026-09-17
+- **Finished:** 2026-09-17
 - **Goal:** The companion is somebody: Ballast, a ship's pilot AI that came down with the crash and now runs the second shift from inside the player's helmet — dry, competent, faintly over it, and gradually less bored as the factory outgrows the ship he used to fly.
 - **Acceptance:** Ballast answers to his name in voice and in text, and the name is everywhere the product's is; the register is dry in lookups and chat and provably flat on alerts, counts, readiness checks and cards; a short canon exists in one file and he deflects rather than inventing past it; "what should I be doing?" answers from an authored table keyed on what the save can prove, with generic goals on a save that matches no trigger; at most one throwback a session, never on an urgent turn, rate-limited in code; the system prompt's cost is measured before and after with `scripts/latency-report.ts`; names the save doesn't have get corrected (FC-171); existing suites and evals pass, including the ones whose assertions the new tone breaks.
 
@@ -43,3 +44,36 @@ Planned 2026-09-17 from the player's three ideas — a name and personality, sta
 Player decisions (2026-09-17, AskUserQuestion): the name is **Ballast**, with his old callsign in canon; the arc shows as **register plus the odd throwback**, about one a session; the tone is **dry everywhere, flat when it counts**, with the barbs pointed at his own situation rather than at the player; canon is **about eight lines**, the crew left blank; he volunteers direction **only when asked**.
 
 Costs known going in: personality, canon and the stage table together are likely 300–600 tokens of stable prefix, which pushes past the current 4,096-token cache block and re-triggers `alignToCacheBlock` padding — a real cold-start cost and roughly nothing warm, but a number to measure rather than estimate. And a tone change breaks eval assertions that check wording (grounding, the voice-session replay, the packing e2e); updating those is sprint work, not a surprise at the end.
+
+## Review
+
+Six items. The companion is somebody now: **Ballast**, with eight lines of past in `brand/CANON.md`, a register that
+follows the factory rather than the clock, opinionated direction from an authored table, and a check that catches him
+naming things this save doesn't have.
+
+**Measured, and the headline is that personality is free.** Identity sits at the top of the cached prefix, which is
+exactly where it could have cost real latency: `alignToCacheBlock` traded padding for it — aligned 4,120 tokens
+against 4,122 before, system 4,080 against 4,078 — and the latency report was unchanged to the last figure (median
+visible first token 1.46 s, single-round 1.31 s, with tools 2.36 s). That holds only while the text displaces
+padding, which is why the stage table rides in the tail instead: 107–164 tokens per row against ~2,650 for the whole
+table, on "what should I do" turns only, ~0.16 s there and nothing elsewhere.
+
+**Evals:** `eval-canon` 66/66 (new), `eval-register` 12/12 (new), `eval-stages` 11/11 (new), `eval-grounding` 10/10,
+`eval-requests` 18/18, 231 unit tests. Zero corrections fired on any grounded answer across the three live suites.
+
+**Three bugs the sprint's own evals caught**, each now a test: an answer said "Every hauler I flew", a career he
+never had (canon, prompt and eval now pin it to one ship — asked directly, "How many ships did you fly?" → "One.");
+FC-179 had treated *being allowed* to use world tools as a count, so ordinary follow-ups were answered flat; and the
+dump writes a technology trigger's item as `{ name }` rather than a string, so trigger-only names were entering the
+known set as objects — masked because those names are also entities, and shared with `stages.ts`.
+
+**What the spike changed about the plan, and it was right:** the stage table cannot live in the cached prefix, and
+this save's `basic-oil-processing` makes petroleum gas and nothing else, so the famous heavy-oil stall belongs a row
+later than vanilla memory would put it. Both verified by hand before anything was built on them.
+
+**Pending the player, not claimed:** that Ballast answers to his name *in voice*. The name is sent to the recognizer
+at boost 8 against 3 for every other phrase, but whether the engine applies biasing at all is the same open question
+S31 left — one Chrome session answers both. Also unverified from the spike: the planet surface names for Vulcanus,
+Fulgora and Aquilo are inferred, and closing that needs a small mod change (dump the save's planet names, bump
+`DUMP_VERSION`, re-benchmark) rather than a guess. Until then those three rows are selected by a name we believe
+rather than one we've read, and a surface that doesn't match asks instead of guessing.
