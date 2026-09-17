@@ -1,7 +1,8 @@
 # S31 — Hear you properly
 
-- **Status:** active
+- **Status:** done
 - **Started:** 2026-09-17
+- **Finished:** 2026-09-17
 - **Goal:** What the player says is what the companion reads: they choose the recognition engine, the console picks the alternative that matches their save's words, and a local transcriber is researched before anyone builds one.
 - **Acceptance:** The composer offers a clear choice of recognition engine with the tradeoff stated, and remembers it; several alternatives are scored against a vocabulary the server sends, so the save's own words win; a spoken question is marked as spoken in the turn; the FC-176 recommendation is written up in these notes and PLAN, including what to measure before building anything; existing suites still pass.
 
@@ -107,3 +108,31 @@ principled fix — no dictionary on the page to say "built" is a word and "belt"
 the choice is "biasing instead of rescoring", not "both".
 
 Opened at the player's request (2026-09-17) after an early-game session where three of 24 spoken turns came through wrong: "I'm running wire" → "running wine", "I've got 10 red bottles" → "Got10 red bottles", "a big red dots on the map up there" → "a big red darts on the map of there". FC-176 was delegated as a research pass; FC-173 (hands-free cutting sentences off) sits next to these in the backlog and wasn't pulled in.
+
+## Review
+
+Ten items, all shipped: the engine choice (FC-174), N-best rescoring against the save's words (FC-175), the local
+speech-to-text spike (FC-176), contextual biasing from the save's own phrases (FC-177), and then six things the
+player's real session exposed — vanishing words (FC-183), a tool call written as text eating a whole question
+(FC-184), no way to attribute a good transcript (FC-185), a picker promising accuracy it couldn't back (FC-186),
+hands-free cutting sentences off (FC-173), and read-aloud reciting the working (FC-190).
+
+**Measured:** vocabulary 555 words / 5.5 KB and 100 phrases / 1.8 KB, sent on connect *and* when the save arrives,
+none of it in the prompt; `eval-grounding` 10/10 with first token median 1.13 s after the turn-guidance changes;
+211 unit tests.
+
+**What the player's own voice showed, which changed two of our beliefs.** Their Safari session got four of five
+test sentences right, including the two Chrome's online service had mangled ("I've got 10", "up there"). So the
+accuracy claim in FC-174's picker was wrong and is gone (FC-186), and the premise behind FC-176 — that the online
+service is the better engine — doesn't survive contact either. The one remaining miss is the near-homophone class
+("wire" heard as "where"), which is exactly what biasing targets.
+
+**Acceptance is partly pending, and deliberately not claimed.** Three things need the player's voice in Chrome:
+whether the engine applies `SpeechRecognition.phrases` at all, whether it does so outside `processLocally` (SODA is
+still stuck "downloading" here), and whether FC-175's rescoring helps or hurts. That last one has evidence *against*
+it now, pinned in a test: this save's words are ordinary English words, so "I built ten of them" is rescored to "I
+belt ten of them". If biasing works, rescoring comes out rather than sitting beside it.
+
+**Moved on:** FC-187 (a follow-up question drifting onto the wrong subject) and FC-188/FC-189 (keep the audio, then
+measure three transcribers) are in the backlog. FC-189 only earns its keep once the Chrome session says whether
+biasing already fixed the acoustic misses.

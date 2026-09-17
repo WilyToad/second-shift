@@ -14,6 +14,12 @@ const CASES: Case[] = [
   { name: "blueprint request without paste", questions: ["Give me a blueprint for 300 electronic circuits a minute"], card: false },
   { name: "blueprint request, then 'paste it here'", questions: ["Give me a blueprint for 120 iron gear wheels a minute", "paste it here"], card: true },
   { name: "blueprint request with paste in it", questions: ["Make a blueprint for 60 iron gear wheels per minute and paste it here"], card: true },
+  // FC-172 widened what counts as asking for a row: "build me N a minute" is the same request as asking for a
+  // blueprint, so it must build one — and still not put a card up until the player asks to paste it.
+  { name: "'build me 120 a minute' builds a row without a card", questions: ["Build me 120 iron gear wheels a minute"], card: false },
+  { name: "'build me 120 a minute', then 'paste it'", questions: ["Build me 120 iron gear wheels a minute", "paste it here"], card: true },
+  // And a build request with no rate is answered in words, with the real limits, and no card either.
+  { name: "build a belt line (no template for it)", questions: ["build a line up to my metal"], card: false },
   { name: "research prerequisites question", questions: ["What do I need before I can research agricultural science?"], card: false, ran: /^Queued/ },
   { name: "what to work on next", questions: ["What should I work on next?"], card: false, ran: /^(Queued|Map tag|Camera)/ },
   { name: "rails near me, then mark them", questions: ["How many rails are near me?", "mark them for deconstruction"], card: true },
