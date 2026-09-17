@@ -214,6 +214,9 @@ async function reviewSelection(seq: number): Promise<void> {
 game.onPrototypes((p) => {
   retriever = new RecipeRetriever(p.data);
   console.log(`Grounding on ${Object.keys(p.data.recipes).length} recipes (${p.source}).`);
+  // The console usually opens before the game does, so the words and phrases also go out when the save arrives
+  // rather than only to a page that connects after it (FC-175, FC-177).
+  broadcast({ type: "vocabulary", words: vocabulary(p.data), phrases: recognitionPhrases(p.data) });
   busy = busy.then(async () => {
     const base = systemPrompt(p.data, p.mods);
     // Research only flips enabled and researched flags, which the system prompt doesn't show: the

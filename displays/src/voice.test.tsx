@@ -11,6 +11,7 @@ function fakeRecognition(availability?: "available" | "unavailable" | "downloada
   const made: any[] = [];
   class FakeRecognition {
     lang = ""; continuous = true; interimResults = false; maxAlternatives = 0; processLocally?: boolean;
+    phrases: any[] = []; // Chromium 153 has this; a browser without it is covered by its own test
     onresult: any = null; onerror: any = null; onend: any = null; onstart: any = null;
     started = false; stopped = false; aborted = false;
     constructor() { made.push(this); }
@@ -400,6 +401,19 @@ test("FC-175: the transcript that matches the save wins, and the engine's order 
   expect(voice.pickAlternative(result("running wine", "running wire") as any)).toBe("running wine");
 });
 
+test("FC-175 has a cost: this save's words are ordinary English words too", async () => {
+  const voice = await import("./voice");
+  // Pinned, not endorsed. The vocabulary holds "belt", "rail", "tank", "lab" and "wall", so a wrong alternative can
+  // carry a save word that the *correct* first guess doesn't, and rescoring then picks the wrong one. Biasing the
+  // engine (FC-177) makes such alternatives more likely, which is why the spike says rescoring comes out if biasing
+  // works. The decision waits on the player's next session; this test is the evidence for it.
+  voice.setVocabulary(["belt", "inserter", "wire", "furnace"]);
+  const result = (...transcripts: string[]) => Object.assign(transcripts.map((transcript) => ({ transcript })), { length: transcripts.length });
+  expect(voice.pickAlternative(result("I built ten of them", "I belt ten of them") as any)).toBe("I belt ten of them");
+  expect(voice.pickAlternative(result("a bit further", "a belt further") as any)).toBe("a belt further");
+  voice.setVocabulary([]);
+});
+
 test("FC-174: the player picks the engine, and installing the on-device model counts as picking it", async () => {
   const voice = await import("./voice");
   const { ctor } = fakeRecognition("available");
@@ -433,6 +447,12 @@ test("FC-177: the recognizer is told which phrases to expect, and a browser with
   try {
     expect(voice.biasRecognition(rec)).toBe(2);
     expect(rec.phrases.map((p: FakePhrase) => [p.phrase, p.boost])).toEqual([["transport belt", 3], ["iron gear wheel", 3]]);
+    // The wiring, not just the function: starting a talk session sets the phrases on the recognition it makes.
+    voice.setPhrases(["transport belt", "iron gear wheel"]);
+    const { ctor, made } = fakeRecognition("unavailable");
+    voice.startTalking(() => {}, ctor);
+    expect(made[0].phrases.map((p: FakePhrase) => p.phrase)).toEqual(["transport belt", "iron gear wheel"]);
+    voice.stopTalking({ send: false });
     // A recognition without the property is left alone, and so is an empty phrase list.
     expect(voice.biasRecognition({} as any)).toBe(0);
     voice.setPhrases([]);
