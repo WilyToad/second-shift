@@ -5,7 +5,7 @@ import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
 import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 import { setSoundsOn, soundsOn } from "./sounds";
-import { chooseVoice, deviceStatus, elevenVoices, voiceChoice, heard, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
+import { chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, voiceChoice, heard, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
 
 const SILENCE_CHOICES = [1, 1.5, 2, 3, 4, 5];
 
@@ -115,7 +115,7 @@ export function whereLabel(where: string): string {
   return where === "on-device" ? "Voice is recognized on this device." : where === "speech-service" ? "Voice is sent to your browser's speech service to turn it into text." : "";
 }
 
-export function Composer({ onAsk = (text: string, thinking: boolean) => send({ type: "ask", text, thinking }), recognition = recognitionCtor() }: { onAsk?: (text: string, thinking: boolean) => void; recognition?: ReturnType<typeof recognitionCtor> } = {}) {
+export function Composer({ onAsk = (text: string, thinking: boolean, spoken = false) => send({ type: "ask", text, thinking, ...(spoken ? { spoken: true } : {}) }), recognition = recognitionCtor() }: { onAsk?: (text: string, thinking: boolean, spoken?: boolean) => void; recognition?: ReturnType<typeof recognitionCtor> } = {}) {
   const text = useSignal("");
   const thinking = useSignal(false);
   const submit = () => {
@@ -132,7 +132,8 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
   // Talk starts a session that keeps listening until Talk is clicked again (FC-149).
   const toggleMic = (fromGame = false) => {
     if (talking.peek()) stopTalking();
-    else startTalking((spoken: string) => onAsk(spoken, thinking.value), recognition, undefined, { fromGame });
+    // The third argument marks it as speech, so the turn reads an odd word as a mis-hear (FC-175).
+    else startTalking((said: string) => onAsk(said, thinking.value, true), recognition, undefined, { fromGame });
   };
   // Push to talk from the game (FC-147): each press toggles, like clicking Talk.
   const seenTalk = useRef(talkRequests.peek());
@@ -200,6 +201,16 @@ export function Composer({ onAsk = (text: string, thinking: boolean) => send({ t
         <div class="voice-note">
           Voice goes to your browser's speech service.{" "}
           <button type="button" class="link" id="on-device" onClick={() => void installOnDevice(recognition)}>Recognize on this device instead</button>
+        </div>
+      )}
+      {/* Once the on-device model is there, the player picks which engine hears them (FC-174). */}
+      {recognition && deviceStatus.value === "available" && (
+        <div class="voice-note" id="engine-choice">
+          <label for="engine">Recognize with</label>{" "}
+          <select id="engine" value={preferOnDevice.value ? "device" : "service"} onChange={(e) => setPreferOnDevice(e.currentTarget.value === "device")}>
+            <option value="service">Chrome's speech service — hears more accurately</option>
+            <option value="device">This device — nothing leaves your Mac</option>
+          </select>
         </div>
       )}
       {recognition && !voiceError.value && deviceStatus.value === "downloading" && (

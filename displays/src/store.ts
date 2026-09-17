@@ -6,7 +6,7 @@ import type { ClientMessage, ServerMessage } from "../../server/src/messages";
 import type { Plan } from "../../server/src/planner";
 import type { BlueprintCard } from "../../server/src/messages";
 import type { Point, SeriesMap } from "../../server/src/series";
-import { answerSpeech, talkRequests } from "./voice";
+import { answerSpeech, setVocabulary, talkRequests } from "./voice";
 import { playSound } from "./sounds";
 
 export type ThreadItem =
@@ -126,6 +126,9 @@ export function onMessage(m: ServerMessage): void {
       break;
     case "blueprint":
       if (streaming) streaming.blueprint.value = m.blueprint;
+      break;
+    case "vocabulary":
+      setVocabulary(m.words);
       break;
     case "lists":
       lists.value = { lists: m.lists, ...(m.active ? { active: m.active } : {}) };

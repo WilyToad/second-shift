@@ -34,10 +34,13 @@ export type ServerMessage =
   // The player pressed the push-to-talk key in the game (FC-147).
   | { type: "talk" }
   // The lists the companion keeps for the player (FC-163); the player can't edit them, so this is display only.
-  | { type: "lists"; lists: Checklist[]; active?: string };
+  | { type: "lists"; lists: Checklist[]; active?: string }
+  // Words from this save, so the console can pick the transcript that matches them (FC-175).
+  | { type: "vocabulary"; words: string[] };
 
 export type ClientMessage =
-  | { type: "ask"; text: string; thinking?: boolean }
+  // `spoken` marks a question that came through speech recognition, which mis-hears words (FC-175).
+  | { type: "ask"; text: string; thinking?: boolean; spoken?: boolean }
   | { type: "approve"; id: string }
   | { type: "decline"; id: string }
   | { type: "reset" }

@@ -444,6 +444,16 @@ inside the same cached 4,096-token block, so eval-grounding first token came in 
 before it, same conditions) and the follow-up at 1.82 s. The active list rides in the turn's tail, so a long list
 costs a few tail tokens rather than breaking the cache.
 
+**Hearing the player properly (S31, 2026-09-17):** their early-game session had three of 24 spoken turns come
+through wrong ("I'm running wire" → "running wine", "I've got 10 red bottles" → "Got10 red bottles", "a big red
+dots on the map up there" → "a big red darts on the map of there"). Two changes, neither costing the prompt
+anything: the player chooses the engine (on-device is used only when it's ready and they asked for it — Chrome
+reports the model as still downloading here, so their session was on the online service all along), and the console
+now asks for four transcripts and keeps the one carrying the most words from their own save, with the server
+sending that vocabulary on connect (555 words, 5.5 KB on the dev save). A spoken question is also marked as spoken,
+so an odd word reads as a mis-hear. Whether the online engine's alternatives really rescue these cases is for the
+player's next session to show; if not, FC-176's local transcriber is the answer.
+
 **Sending the spidertron (S29, 2026-09-15):** the engine's own autopilot does the walking, so the mod only hands
 it a spot after the player confirms a card, and the order lives in `storage` so the stop key can end it. Looking up
 the player's spidertrons costs **0.67 ms** (near the player first; a type-filtered sweep of the whole gleba surface

@@ -530,7 +530,7 @@ export class Agent {
     this.deps.emit({ type: "reset" });
   }
 
-  async ask(rawQuestion: string, thinking = false): Promise<void> {
+  async ask(rawQuestion: string, thinking = false, spoken = false): Promise<void> {
     const started = performance.now();
     // Pasted blueprint strings never reach the model: they become checked summaries.
     const pasted = summarizePasted(rawQuestion, this.deps.prototypes());
@@ -636,6 +636,9 @@ export class Agent {
       // doesn't care how it looked (FC-165).
       // It answered the player's own example with a list that dropped the belts and the chests (FC-166).
       wantsPackingList(question) && !packing ? "the player is describing a build they're about to go and make: start a packing list with every single thing they named, one line each, count first (\"20 stone furnace\"), rounding vague amounts up generously and saying the assumption; add nothing else yourself" : "",
+      // Speech recognition mis-hears words ("wire" as "wine", "dots" as "darts"): read the odd one as a mis-hear
+      // rather than a fact, and ask if it changes the answer (FC-175).
+      spoken ? "this question was spoken and turned into text, so a word that makes no sense in Factorio is probably a mis-hear: answer what they plainly meant, and only ask if the wrong word changes the answer" : "",
       askedReady ? "answer with what's still missing and whether the load fits the player's free slots, both from the lines" : "",
       packing ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",
       stockLines.length ? "the stock line is a fresh read of what the player carries and what's in the containers they can see: answer from it, don't search, and don't explain how you looked" : "",

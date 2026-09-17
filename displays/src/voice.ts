@@ -6,7 +6,7 @@ import { signal } from "@preact/signals";
 import { playSound } from "./sounds";
 
 type Alternative = { transcript: string };
-type Result = { isFinal: boolean; 0: Alternative; length: number };
+type Result = { isFinal: boolean; 0: Alternative; length: number; [index: number]: Alternative };
 type ResultEvent = { resultIndex: number; results: ArrayLike<Result> };
 export interface Recognition {
   lang: string;
@@ -29,6 +29,38 @@ export type RecognitionCtor = {
   install?: (options: { langs: string[]; processLocally: boolean }) => Promise<boolean>;
 };
 
+/**
+ * Words from the player's own save, sent by the server once a page connects (FC-175). The recognizer offers
+ * several transcripts of what it heard; the one carrying this save's words is nearly always the right one
+ * ("running wire" over "running wine"), and the engine's own first guess breaks ties.
+ */
+export const vocabulary = signal<Set<string>>(new Set());
+/** How many transcripts to ask the recognizer for. More than a handful costs accuracy nothing and time nothing. */
+export const ALTERNATIVES = 4;
+
+/** Singular and plural count as the same word: the player says "belts", the save calls it "belt". */
+const stem = (word: string) => (word.length > 3 && word.endsWith("s") ? word.slice(0, -1) : word);
+
+export function setVocabulary(words: string[]): void {
+  vocabulary.value = new Set(words.map((w) => stem(w.toLowerCase())).filter((w) => w.length > 2));
+}
+
+const spoken = (text: string) => (text.toLowerCase().match(/[a-z']+/g) ?? []).map(stem);
+
+/** The transcript that matches the save best: most words it knows, the engine's order deciding a tie. */
+export function pickAlternative(result: { length: number; [index: number]: { transcript: string } }, words = vocabulary.value): string {
+  const first = result[0]?.transcript ?? "";
+  if (!words.size || result.length < 2) return first;
+  let best = first, bestScore = -1;
+  for (let i = 0; i < Math.min(result.length, ALTERNATIVES); i++) {
+    const transcript = result[i]?.transcript;
+    if (transcript === undefined) continue;
+    const score = spoken(transcript).filter((w) => words.has(w)).length;
+    if (score > bestScore) { best = transcript; bestScore = score; }
+  }
+  return best;
+}
+
 export type ListenState = "idle" | "listening" | "waiting" | "error";
 /** Where the voice is turned into text: known only once the browser has answered `available()`. */
 export type Where = "on-device" | "speech-service" | "unknown";
@@ -40,6 +72,12 @@ export const recognizedWhere = signal<Where>("unknown");
 /** On-device recognition for the page language, as the browser reports it (null: not asked or not supported). */
 export const deviceStatus = signal<Availability | null>(null);
 export const readAloud = signal(loadSetting("second-shift.readAloud", false));
+/**
+ * Which engine turns the voice into text (FC-174). Chrome's online service hears more accurately; on-device keeps
+ * the voice on this machine. The player picks, because it's their tradeoff — before this, installing the on-device
+ * model silently made it permanent, and near-homophones ("wire" heard as "wine") had no way back.
+ */
+export const preferOnDevice = signal(loadSetting("second-shift.onDevice", false));
 /** Counts push-to-talk presses from the game (FC-147); the composer toggles listening on each change. */
 export const talkRequests = signal(0);
 /** The current or last listening session was started from the game's hotkey. */
@@ -96,9 +134,21 @@ export async function probeRecognition(ctor = recognitionCtor(), lang = globalTh
   } catch {
     deviceStatus.value = "unavailable";
   }
-  onDevice = deviceStatus.value === "available";
-  recognizedWhere.value = onDevice ? "on-device" : "speech-service";
+  applyChoice();
   if (deviceStatus.value === "downloading") watchDownload(ctor, lang);
+}
+
+/** On-device is used only when it's ready *and* the player asked for it (FC-174). */
+function applyChoice(): void {
+  onDevice = deviceStatus.value === "available" && preferOnDevice.value;
+  recognizedWhere.value = onDevice ? "on-device" : "speech-service";
+}
+
+/** The player's choice of engine; takes effect on the next utterance. */
+export function setPreferOnDevice(on: boolean): void {
+  preferOnDevice.value = on;
+  saveSetting("second-shift.onDevice", on);
+  applyChoice();
 }
 
 let watching: ReturnType<typeof setInterval> | null = null;
@@ -118,8 +168,7 @@ function watchDownload(ctor: RecognitionCtor, lang: string, everyMs = 5000): voi
     if (deviceStatus.value !== "downloading") {
       clearInterval(watching!);
       watching = null;
-      onDevice = deviceStatus.value === "available";
-      recognizedWhere.value = onDevice ? "on-device" : "speech-service";
+      applyChoice();
     }
   }, everyMs);
 }
@@ -138,6 +187,9 @@ export async function installOnDevice(ctor = recognitionCtor(), lang = globalThi
   } catch {
     ok = false;
   }
+  // Downloading the model is an explicit act, so it counts as choosing it (FC-174).
+  preferOnDevice.value = true;
+  saveSetting("second-shift.onDevice", true);
   await probeRecognition(ctor, lang);
   if (!ok && (deviceStatus.value as Availability | null) !== "available") voiceError.value = "The on-device speech download didn't finish. Voice still works through the browser's speech service.";
   return (deviceStatus.value as Availability | null) === "available";
@@ -199,7 +251,7 @@ function listen(): void {
   rec.lang = s.lang;
   rec.continuous = true;
   rec.interimResults = true;
-  rec.maxAlternatives = 1;
+  rec.maxAlternatives = ALTERNATIVES;
   if (onDevice) rec.processLocally = true;
   if (onDevice === null) recognizedWhere.value = s.ctor.available ? "unknown" : "speech-service";
   const run = { rec, aborted: false };
@@ -209,7 +261,7 @@ function listen(): void {
   let latest: ArrayLike<Result> = [];
   const textFrom = (results: ArrayLike<Result>) => {
     let text = "";
-    for (let i = sentUpTo; i < results.length; i++) text += results[i]![0].transcript;
+    for (let i = sentUpTo; i < results.length; i++) text += pickAlternative(results[i]!);
     return text.trim();
   };
   rec.onstart = () => { if (current()) listenState.value = "listening"; };

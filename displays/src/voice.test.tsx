@@ -140,9 +140,10 @@ test("FC-149: while an answer is read aloud the mic stays off, so it never hears
   voice.readAloud.value = false;
 });
 
-test("FC-062: recognition runs on the device when the browser offers it, and the console says so", async () => {
+test("FC-062: recognition runs on the device when the browser offers it and the player asked for it", async () => {
   const { ctor, made } = fakeRecognition("available");
   const voice = await import("./voice");
+  voice.setPreferOnDevice(true); // the player's choice since FC-174; installing the model sets it too
   await voice.probeRecognition(ctor, "en-US");
   voice.startTalking(() => {}, ctor, "en-US");
   expect(made.at(-1).processLocally).toBe(true);
@@ -150,6 +151,7 @@ test("FC-062: recognition runs on the device when the browser offers it, and the
   const { whereLabel } = await import("./chat");
   expect(whereLabel("on-device")).toBe("Voice is recognized on this device.");
   voice.stopTalking({ send: false });
+  voice.setPreferOnDevice(false);
 });
 
 test("FC-062: Escape-style cancelling never sends; errors end the session and tell the player what to do", async () => {
@@ -381,4 +383,36 @@ test("FC-149: the pause length is a setting, remembered per browser", async () =
   expect(voice.silenceSeconds.value).toBe(3);
   expect(globalThis.localStorage?.getItem("second-shift.silenceSeconds") ?? "3").toBe("3");
   render(null, root);
+});
+
+test("FC-175: the transcript that matches the save wins, and the engine's order breaks ties", async () => {
+  const voice = await import("./voice");
+  voice.setVocabulary(["wire", "copper", "cable", "belt", "inserter", "automation", "bottle"]);
+  // The player's own examples: Chrome's first guess was the wrong one of a near-homophone pair.
+  const result = (...transcripts: string[]) => Object.assign(transcripts.map((transcript) => ({ transcript })), { length: transcripts.length });
+  expect(voice.pickAlternative(result("okay I'm running wine", "okay I'm running wire") as any)).toBe("okay I'm running wire");
+  expect(voice.pickAlternative(result("got 10 red darts", "got 10 red bottles") as any)).toBe("got 10 red bottles");
+  // Nothing from the save in any of them: the engine's first guess stands.
+  expect(voice.pickAlternative(result("that must be monsters", "that must be munsters") as any)).toBe("that must be monsters");
+  // One transcript only, or no vocabulary yet: unchanged.
+  expect(voice.pickAlternative(result("just the one") as any)).toBe("just the one");
+  voice.setVocabulary([]);
+  expect(voice.pickAlternative(result("running wine", "running wire") as any)).toBe("running wine");
+});
+
+test("FC-174: the player picks the engine, and installing the on-device model counts as picking it", async () => {
+  const voice = await import("./voice");
+  const { ctor } = fakeRecognition("available");
+  voice.setPreferOnDevice(false);
+  await voice.probeRecognition(ctor, "en-US");
+  // On-device is ready, but the player asked for the service: that's what the label says.
+  expect(voice.deviceStatus.value).toBe("available");
+  expect(voice.recognizedWhere.value).toBe("speech-service");
+  voice.setPreferOnDevice(true);
+  expect(voice.recognizedWhere.value).toBe("on-device");
+  // Without the model, the choice can't take effect.
+  const { ctor: none } = fakeRecognition("downloadable");
+  await voice.probeRecognition(none, "en-US");
+  expect(voice.recognizedWhere.value).toBe("speech-service");
+  voice.setPreferOnDevice(false);
 });
