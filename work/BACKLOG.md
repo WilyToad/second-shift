@@ -39,6 +39,7 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+
 - [ ] FC-171 Answers can still name something the save doesn't have
   - Notes: from the player's early-game session (2026-09-17). One answer in 22 said walls and turrets need "the defensive-structures research"; this save has no such technology (it has `stone-wall`, `gun-turret`, `laser-turret`). It happened on a turn with no retrieved lines, where nothing grounded the name. A scan of the session's answers for hyphenated names missing from the dump found exactly that one, so the check is cheap and the false-positive rate looks low (the only other hit was "pipe-to-ground" split by the scan's own regex)
   - Acceptance: after an answer, names that look like save entities (recipes, items, fluids, technologies, machines, entities) but aren't in the dump get a correction line, the same way invented inventory counts do (FC-140) — phrases the dump does contain, and ordinary English, must not trip it; unit tests from this session's answers; measured over the eval suites with no new corrections on grounded answers

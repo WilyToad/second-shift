@@ -1,7 +1,8 @@
 # S30 — Lists the agent keeps
 
-- **Status:** active
+- **Status:** done
 - **Started:** 2026-09-16
+- **Finished:** 2026-09-16
 - **Goal:** The companion keeps lists for the player — the first and best one being a packing list for a build run — shown in the console and on a read-only panel in the game, so nobody gets to the outpost and finds they forgot the belts.
 - **Acceptance:** "I'm building a smelting outpost: 20 ovens, a couple hundred belt, arms to feed them, chests for storage" becomes a list with real numbers and the things the save's data says it also needs (fuel or poles); the list survives a reload and a server restart, per map; the in-game panel shows it with a key and can't be clicked; "am I ready?" answers have / need / missing with what fits in the player's free slots and what's craftable now, and the list ticks itself off as the items arrive in the inventory; the list tool's cost to the cached prompt is measured before and after; the model never edits a list the player didn't ask about; mod per-tick cost unchanged; existing suites still pass.
 
