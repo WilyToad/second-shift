@@ -219,6 +219,14 @@ export function stageFor(p: Prototypes | null, digest: Digest | null): { row: St
   return fallback;
 }
 
+/**
+ * Words that show he's talking about his own past (FC-182). Used to spot a throwback in an answer, so the
+ * once-a-session allowance is only spent when he actually takes it — the model can't be asked to count.
+ */
+const THROWBACK = /\b(the ship|my ship|hauler|hold authority|the roster|manifest|trimmed?|ballast(?:ing)?|jump vector|orbit(?:al)?s?|flew|flying|crew|dry ?dock|cargo bay|docking)\b/i;
+
+export const tookAThrowback = (answer: string): boolean => THROWBACK.test(answer);
+
 /** The lines that ride in the turn's tail on a "what should I do" turn. */
 export function stageLines(stage: { row: StageRow; scale: boolean }): string[] {
   return [`[stage: ${stage.row.id}]`, ...stage.row.lines, ...(stage.scale ? [SCALE_NOTE] : [])];

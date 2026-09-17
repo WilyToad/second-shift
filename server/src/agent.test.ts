@@ -816,6 +816,8 @@ test("FC-179: the register is decided in code — flat on anything the player ac
   expect(plainAnswer("the power is down", nothing)).toBe(true);
   // Urgent by what the turn is: a count, a measurement, a readiness check, a card, a stop, a hover, stock.
   expect(plainAnswer("how many rails are near me?", { counted: true })).toBe(true);
+  // Being allowed to search isn't a count: a lookup keeps its register (FC-182 caught this).
+  expect(plainAnswer("and how many for a red circuit?", nothing)).toBe(false);
   expect(plainAnswer("what rate are they really hitting?", { measured: true })).toBe(true);
   expect(plainAnswer("am I ready?", { ready: true, packing: true })).toBe(true);
   expect(plainAnswer("send the spidertron over there", { card: true })).toBe(true);
@@ -859,4 +861,48 @@ test("FC-181: 'what should I do' carries the stage and its goals; other turns ca
   const plain = new Agent({ model: other, game: firstHourGame().game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {} });
   await plain.ask("how many copper cables does a green circuit take?");
   expect(other.seen[0]!.at(-1)!.content as string).not.toContain("[stage:");
+});
+
+test("FC-182: the register follows the stage, and the past shows once a conversation", async () => {
+  const { game } = firstHourGame();
+  const protos = PrototypesSchema.parse(await Bun.file(new URL("../../data/captures/prototypes.json", import.meta.url)).json());
+  // Every answer mentions the ship, so the allowance is spent on the first turn that's allowed to take it.
+  const model = fakeModel([
+    { text: "Three. I trimmed mass on the ship for less." },
+    { text: "Two. The ship had the same problem." },
+    { text: "One. The ship again." },
+  ]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {} });
+
+  await agent.ask("how many copper cables does a green circuit take?");
+  const first = model.seen[0]!.at(-1)!.content as string;
+  expect(first).toContain("your register here:");
+  expect(first).toContain("you may let one clause of your own past show");
+
+  // He took it, so the next turn doesn't get the offer again — the register stays.
+  await agent.ask("and how many for a red circuit?");
+  const second = model.seen[1]!.at(-1)!.content as string;
+  expect(second).toContain("your register here:");
+  expect(second).not.toContain("you may let one clause");
+
+  // A new conversation is a new shift.
+  agent.reset();
+  await agent.ask("how many copper cables does a green circuit take?");
+  expect(model.seen.at(-1)!.at(-1)!.content as string).toContain("you may let one clause");
+});
+
+test("FC-182: a turn the player acts on gets no register and no throwback at all", async () => {
+  const { game } = firstHourGame();
+  const protos = PrototypesSchema.parse(await Bun.file(new URL("../../data/captures/prototypes.json", import.meta.url)).json());
+  const model = fakeModel([{ text: "Nothing is attacking you." }, { text: "Three." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {} });
+  await agent.ask("is anything attacking me?");
+  const urgent = model.seen[0]!.at(-1)!.content as string;
+  expect(urgent).toContain("say this one flat");
+  expect(urgent).not.toContain("your register here:");
+  expect(urgent).not.toContain("you may let one clause");
+
+  // And the allowance wasn't spent by that turn, so it's still there for an ordinary question.
+  await agent.ask("how many copper cables does a green circuit take?");
+  expect(model.seen[1]!.at(-1)!.content as string).toContain("you may let one clause");
 });

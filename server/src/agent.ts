@@ -8,7 +8,7 @@ import type { ActionArgs, ActionData, ActionName, Digest, EntityRef, FindEntitie
 import { summarizePasted } from "./blueprint-review";
 import { blueprintsIn, decodeBlueprintString, encodeBlueprintString, type Blueprint } from "./blueprint";
 import { describeRow, productionRow, type RowBuild } from "./blueprint-template";
-import { stageFor, stageLines } from "./stages";
+import { stageFor, stageLines, tookAThrowback } from "./stages";
 import type { BlueprintCard } from "./messages";
 import { ChartBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
 import { pruneShots, waitForShot } from "./screenshots";
@@ -378,6 +378,13 @@ export function wantsBlueprint(question: string): boolean {
   return rate && (/\b(blueprints?|layouts?|schematics?)\b/i.test(question) || BUILD.test(question) || ASKED_TO_BUILD.test(question));
 }
 
+/**
+ * A question about what's actually around the player, which is answered with a count they act on. Being *allowed*
+ * to use world tools isn't enough: "and how many for a red circuit?" permits a search and is still a lookup, and
+ * treating it as a count silenced the character on ordinary follow-ups (caught by FC-182's own test).
+ */
+const SPATIAL = /\b(near me|nearby|near here|around me|around here|to my (left|right|north|south|east|west)|on the map|how many [^?]*\b(near|around|here|there|left|right|north|south|east|west)\b|what'?s (around|nearby|here)|nearest|closest)\b/i;
+
 /** Questions where something is happening to the player right now, and a remark would be an obstacle. */
 const URGENT = /\b(attack\w*|attacked|biters?|pentapods?|wriggler\w*|demolisher\w*|under fire|raid\w*|alarm|alert\w*|brownout|power (is )?(out|down|failing)|no power|out of ammo|low ammo|breach\w*|dying|destroyed|on fire|leak\w*|spoil\w*|starv\w*|help me|hurry|quick)\b/i;
 
@@ -470,6 +477,8 @@ export class Agent {
   private currentIntent = "";
   private pending = new Map<string, Pending>();
   private notes: string[] = [];
+  /** Throwbacks to his own past already spent this conversation (FC-182): one, and never on an urgent turn. */
+  private throwbacks = 0;
 
   constructor(
     private readonly deps: {
@@ -558,6 +567,7 @@ export class Agent {
     this.lastResult = null;
     this.pending.clear();
     this.notes = [];
+    this.throwbacks = 0; // a new conversation is a new shift
     // Lists are part of this conversation's state, so clearing it clears them (FC-163): a stale packing list
     // outliving the conversation it was made in confused both the answers and the evals.
     this.lists.clear();
@@ -636,14 +646,14 @@ export class Agent {
     // Where they are in the game and what to push for there (FC-180's authored table, FC-181). Only on a "what
     // should I do" turn, and only the matched row: the whole table is ~2,650 tokens and the cached prefix has no
     // room for it. Costs nothing on every other turn.
-    const stage = start ? stageFor(protos, snap?.digest ?? null) : null;
+    const stage = stageFor(protos, snap?.digest ?? null);
     const playerLines = [
       ...(status ? formatPlayerStatus(status, { builds: start || /\b(buil\w*|plac\w*|made)\b/i.test(intent) }) : []),
       ...(around ? formatSurroundings(around) : []),
       ...(pointed ? formatPointedAt(pointed, (name) => (protos ? entityFacts(name, protos) : null)) : []),
       ...(contentsLine ? [contentsLine] : []),
       ...(measuredLine ? [measuredLine] : []),
-      ...(stage ? stageLines(stage) : []),
+      ...(start ? stageLines(stage) : []),
       ...stockLines,
       ...this.lists.format(),
       ...packingLines,
@@ -659,7 +669,7 @@ export class Agent {
     const answeredFromData = Boolean(found?.lines.length || playerLines.length);
     // Register, decided in code (FC-179): flat on anything the player is about to act on, dry everywhere else.
     const plain = plainAnswer(question, {
-      counted: Boolean(found?.lines.length) || world, measured: Boolean(measuredLine), ready: askedReady,
+      counted: Boolean(found?.lines.length) || (world && SPATIAL.test(question)), measured: Boolean(measuredLine), ready: askedReady,
       card: Boolean(sendLine?.startsWith("An approval card")), stopped: Boolean(stopLine), pointed: Boolean(pointed),
       stock: stockLines.length > 0, packing: Boolean(packing),
     });
@@ -690,8 +700,11 @@ export class Agent {
       // "I can't build belts or place entities for you" for a belt run, then a plan in words anyway (FC-172).
       askedBuild ? "the player is asking for something to be built: say what you can actually do — build a blueprint in code for one production row (machines for a single item, with inserters, an input belt, an output belt and poles) and offer to paste it as ghosts where they stand, on a card they confirm — rather than saying you can't place anything" : "",
       askedBuild ? "and the real limits: there's no template for a belt run between two points or a mixed layout, and ghosts are built by construction robots, so before robots a paste would sit unbuilt and a plan in words is the honest offer" : "",
-      stage ? `say which stage you think they're in ("${stage.row.id}") so they can tell you if you've got it wrong, then give the stage's own next steps in your words, shortest first — the whole row won't fit, so drop the last goal before you drop the first` : "",
-      stage ? `your register here: ${stage.row.register}` : "",
+      start ? `say which stage you think they're in ("${stage.row.id}") so they can tell you if you've got it wrong, then give the stage's own next steps in your words, shortest first — the whole row won't fit, so drop the last goal before you drop the first` : "",
+      // The arc (FC-182): the register follows the factory, not the clock, and the past surfaces at most once a
+      // session — rate-limited here because the model can't count sessions, and never on a turn like this one.
+      plain ? "" : `your register here: ${stage.row.register}`,
+      plain || this.throwbacks > 0 ? "" : "you may let one clause of your own past show in this answer, if it fits the sentence you were already writing; don't add a sentence for it, and don't explain yourself",
       askedReady ? "answer with what's still missing and whether the load fits the player's free slots, both from the lines" : "",
       packing ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",
       stockLines.length ? "the stock line is a fresh read of what the player carries and what's in the containers they can see: answer from it, don't search, and don't explain how you looked" : "",
@@ -826,6 +839,8 @@ export class Agent {
             if (block) { text += block; this.deps.emit({ type: "token", text: block }); }
           }
           // What the answer says the player has or built, checked against their data (FC-140).
+          // Spend the session's one throwback only if he actually took it (FC-182).
+          if (!plain && this.throwbacks === 0 && tookAThrowback(text)) this.throwbacks++;
           const corrections = [...(await this.checkClaims(text, status)), ...arithmeticCorrections(text)];
           if (corrections.length) {
             const add = `\n\n${corrections.join(" ")}`;
