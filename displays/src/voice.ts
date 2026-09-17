@@ -483,12 +483,58 @@ export function speakable(text: string): string {
     .trim();
 }
 
+const FIGURE = /\d[\d,.]*/g;
+const figures = (text: string) => (text.match(FIGURE) ?? []).length;
+
+/**
+ * Is this line the *working* rather than the answer (FC-190)? Read aloud, "each makes 7.5 bioflux/min from 15 jelly
+ * + 15 yumako mash, so 8 × 7.5 = 60/min" is exhausting to listen to, and it's already on screen. A table row, a
+ * bullet carrying a figure, a chain of arithmetic, or any sentence with more than one number counts.
+ */
+export function working(line: string): boolean {
+  const text = line.trim();
+  if (!text) return false;
+  if (/^\|/.test(text) || /^[-|:\s]+$/.test(text)) return true; // a table row or its divider
+  if (/^([-*•]|\d+[.)])\s/.test(text) && figures(text) >= 1) return true; // a bullet of figures
+  if (/\d\s*[×x*+/=→-]\s*\d/.test(text)) return true; // arithmetic
+  return figures(text) > 1;
+}
+
+/** What to say instead of reading the detail out. Short on purpose: it's a pointer, not a summary. */
+export const POINTER = { chart: "The chart's in the app.", numbers: "The numbers are in the app." };
+
 /**
  * Splits a streaming answer into whole sentences, so speech can start before the answer is finished. Text inside
  * an unfinished chart block is held back until the block closes.
+ *
+ * It also decides what's worth hearing (FC-190, the player: the audio "rattling off the chart" doesn't sound
+ * great). The sentence that answers the question is always spoken — it's the one they asked for, numbers and all —
+ * and the working behind it is left on screen, with one short pointer at the end. The written answer is untouched.
  */
 export class SentenceQueue {
   private buffer = "";
+  private said = false;
+  private skipped = false;
+  private sawChart = false;
+
+  /** Drops the working from one chunk, keeping the first thing it says whatever that is. */
+  private worthHearing(raw: string): string {
+    const prose = raw.replace(/```[\s\S]*?```/g, () => {
+      this.sawChart = true;
+      this.skipped = true;
+      return "\n";
+    });
+    const kept: string[] = [];
+    for (const line of prose.split("\n")) {
+      const text = line.trim();
+      if (!text) continue;
+      // The answer itself is never dropped, however many numbers it carries.
+      if ((!this.said && !kept.length) || !working(text)) kept.push(text);
+      else this.skipped = true;
+    }
+    if (kept.length) this.said = true;
+    return kept.join(" ");
+  }
 
   push(delta: string): string[] {
     this.buffer += delta;
@@ -498,7 +544,7 @@ export class SentenceQueue {
       const safe = fences % 2 === 1 ? this.buffer.slice(0, this.buffer.lastIndexOf("```")) : this.buffer;
       const m = /[\s\S]*?(?:[.!?](?=\s)|\n\n)/.exec(safe);
       if (!m) break;
-      const sentence = speakable(m[0]);
+      const sentence = speakable(this.worthHearing(m[0]));
       this.buffer = this.buffer.slice(m[0].length);
       if (sentence) out.push(sentence);
     }
@@ -506,9 +552,14 @@ export class SentenceQueue {
   }
 
   end(): string[] {
-    const rest = speakable(this.buffer);
+    const rest = speakable(this.worthHearing(this.buffer));
     this.buffer = "";
-    return rest ? [rest] : [];
+    const out = rest ? [rest] : [];
+    if (this.skipped) out.push(this.sawChart ? POINTER.chart : POINTER.numbers);
+    this.said = false;
+    this.skipped = false;
+    this.sawChart = false;
+    return out;
   }
 }
 

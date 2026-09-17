@@ -199,7 +199,8 @@ test("FC-062: answers are read aloud sentence by sentence as they stream, withou
   onMessage({ type: "token", text: "jelly. Chart:\n```rate_chart\nitem=jelly surface=gleba window=30m\n``` It's " });
   onMessage({ type: "token", text: "steady." });
   onMessage({ type: "done", totalMs: 1 });
-  expect(synth.spoken).toEqual(["Gleba makes 1,493 per minute of jelly.", "Chart: It's steady."]);
+  // The third line is FC-190: the chart block is skipped, so the voice points at the screen instead of reciting it.
+  expect(synth.spoken).toEqual(["Gleba makes 1,493 per minute of jelly.", "Chart: It's steady.", voice.POINTER.chart]);
   expect(voice.pickVoice([{ name: "Cloud", lang: "en-US", localService: false, default: true }, { name: "Samantha", lang: "en-US", localService: true, default: false }], "en-US")?.name).toBe("Samantha");
 
   // Off: nothing is spoken; a new question or talking stops speech.
@@ -549,4 +550,45 @@ test("FC-173: a dangling ending can't hold the question forever", async () => {
   expect(said).toEqual(["the best way to get my"]);
   voice.stopTalking({ send: false });
   voice.setSilenceSeconds(2);
+});
+
+test("FC-190: the voice says the answer and points at the screen for the working", async () => {
+  const { SentenceQueue, POINTER } = await import("./voice");
+  // The player's own case: "how many biochambers for 60 bioflux per minute?"
+  const answer = "You'd need **8 biochambers**.\nEach makes 7.5 bioflux/min from 15 jelly + 15 yumako mash, so 8 × 7.5 = 60/min.\n\n- 120 jelly/min\n- 120 yumako mash/min\n\n```rate_chart\nitem=bioflux surface=gleba window=30m\n```\n";
+  const q = new SentenceQueue();
+  const spoken = [...answer.split(/(?<=\s)/).flatMap((part) => q.push(part)), ...q.end()];
+  expect(spoken[0]).toBe("You'd need 8 biochambers.");
+  expect(spoken.at(-1)).toBe(POINTER.chart);
+  // None of the working is read out.
+  expect(spoken.join(" ")).not.toContain("yumako mash");
+  expect(spoken.join(" ")).not.toContain("120");
+});
+
+test("FC-190: an ordinary answer is read in full, with nothing added", async () => {
+  const { SentenceQueue, POINTER } = await import("./voice");
+  const q = new SentenceQueue();
+  const spoken = [...q.push("Coal is 3.5 tiles away. Nothing is attacking you. "), ...q.end()];
+  expect(spoken).toEqual(["Coal is 3.5 tiles away.", "Nothing is attacking you."]);
+  expect(spoken).not.toContain(POINTER.numbers);
+
+  // A table is working, so it's pointed at rather than recited — and without a chart the pointer says so.
+  const table = new SentenceQueue();
+  const out = [...table.push("Here's the split.\n| item | rate |\n| --- | --- |\n| iron plate | 240/min |\n"), ...table.end()];
+  expect(out[0]).toBe("Here's the split.");
+  expect(out.at(-1)).toBe(POINTER.numbers);
+  expect(out.join(" ")).not.toContain("240");
+});
+
+test("FC-190: what counts as working, and what doesn't", async () => {
+  const { working } = await import("./voice");
+  expect(working("Each makes 7.5 bioflux/min from 15 jelly + 15 mash.")).toBe(true);
+  expect(working("| iron plate | 240/min |")).toBe(true);
+  expect(working("- 120 jelly/min")).toBe(true);
+  expect(working("8 × 7.5 = 60")).toBe(true);
+  // The answer, a caveat, and a single figure are all worth hearing.
+  expect(working("You'd need 8 biochambers.")).toBe(false);
+  expect(working("Research is already 50% done.")).toBe(false);
+  expect(working("Nothing is attacking you.")).toBe(false);
+  expect(working("- keep the labs fed")).toBe(false);
 });
