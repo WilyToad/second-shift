@@ -41,6 +41,11 @@
   - Acceptance: the picker says where the audio goes rather than which engine is better; browser-specific wording only where the state really is browser-specific (the SODA download note); existing assertions updated deliberately rather than loosened
   - Done: the option now reads "Your browser's speech service — the audio leaves your Mac", the network error names Brave as the browser that can't reach the service instead of prescribing Chrome, and the push-to-talk permission message is browser-neutral. The comment in `voice.ts` records why the accuracy claim went, and that one voice in one session isn't a measurement either
 
+- [x] FC-173 Hands-free cuts sentences off
+  - Notes: three of 24 spoken turns were sent mid-thought on the 2 s pause: "Keep running out of fuel up here what's the best way to get my", "I just spent how does this look", "Got10 red bottles to research automation". The answers coped, but the player had to re-explain twice. Pulled into S31 (2026-09-17) while the player plays, since it's the one that bites again every session
+  - Acceptance: when the heard text ends on a word that can't end a sentence (a preposition, conjunction, article or possessive), the console waits another pause before sending, with a cap so it can't hold forever; the picker's default stays as it is and the behaviour is off for typed questions; unit tests over these three sentences and over normal endings that must not be delayed
+  - Done: a dangling ending buys up to two extra pauses (6 s at the default) and then sends anyway. The word list is deliberately narrow — articles, possessives, conjunctions and the prepositions that always take an object — and demonstratives and pronouns are left out, because "what is this", "look at this" and "can you see it" are finished questions and delaying those would make every normal turn feel slow. Typed questions never touch this path. **Honest about the three examples:** only the first is a dangling ending. "I just spent how does this look" ends on a perfectly good word — it was two fragments joined, not a cut — and "Got10" was the engine's numeral formatting, now known to be Chrome's (Safari writes it correctly). So this fixes one of the three and the tests say which
+
 ## Notes
 
 ### FC-176: what the spike found

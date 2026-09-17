@@ -509,3 +509,44 @@ test("FC-186: the console says where the voice goes, and never which browser hea
   expect(voice.describeError("network")).toContain("Brave can't");
   expect(voice.describeError("network")).not.toContain("needs Chrome");
 });
+
+test("FC-173: a sentence that stops mid-thought gets another pause, a finished one doesn't wait", async () => {
+  const voice = await import("./voice");
+  // The player's own cut-off question, and the endings that must never be delayed.
+  expect(voice.endsDangling("keep running out of fuel up here what's the best way to get my")).toBe(true);
+  expect(voice.endsDangling("send 20 of")).toBe(true);
+  expect(voice.endsDangling("I just spent how does this look")).toBe(false);
+  expect(voice.endsDangling("what is this")).toBe(false);
+  expect(voice.endsDangling("look at this")).toBe(false);
+  expect(voice.endsDangling("can you see it")).toBe(false);
+  expect(voice.endsDangling("got 10 red bottles to research automation")).toBe(false);
+
+  const said: string[] = [];
+  const { ctor, made } = fakeRecognition("unavailable");
+  voice.setSilenceSeconds(0.06);
+  voice.startTalking((text) => said.push(text), ctor);
+  made[0].say([{ text: "what's the best way to get my", final: true }]);
+  // Still held after the first pause: the player is mid-sentence.
+  await new Promise((r) => setTimeout(r, 100));
+  expect(said).toEqual([]);
+  // They carry on, and the finished sentence goes out on the next pause.
+  made[0].say([{ text: "what's the best way to get my coal up here", final: true }]);
+  await new Promise((r) => setTimeout(r, 120));
+  expect(said).toEqual(["what's the best way to get my coal up here"]);
+  voice.stopTalking({ send: false });
+  voice.setSilenceSeconds(2);
+});
+
+test("FC-173: a dangling ending can't hold the question forever", async () => {
+  const voice = await import("./voice");
+  const said: string[] = [];
+  const { ctor, made } = fakeRecognition("unavailable");
+  voice.setSilenceSeconds(0.06);
+  voice.startTalking((text) => said.push(text), ctor);
+  made[0].say([{ text: "the best way to get my", final: true }]);
+  // Two extra pauses, then it sends what it has rather than sitting on it.
+  await new Promise((r) => setTimeout(r, 400));
+  expect(said).toEqual(["the best way to get my"]);
+  voice.stopTalking({ send: false });
+  voice.setSilenceSeconds(2);
+});

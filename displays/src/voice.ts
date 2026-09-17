@@ -172,6 +172,8 @@ let active: Run | null = null;
  * sentence was dropped in silence.
  */
 let carried = "";
+/** Extra pauses already granted to an unfinished sentence (FC-173). */
+let holds = 0;
 let onDevice: boolean | null = null;
 
 /**
@@ -373,6 +375,26 @@ function listen(): void {
 }
 
 /**
+ * Words that can't be the last word of a question (FC-173). Deliberately narrow: articles, possessives,
+ * conjunctions and prepositions that always take something after them. Demonstratives and pronouns stay out —
+ * "what is this", "look at this", "can you see it" and "tell me" are finished sentences, and delaying those would
+ * make every normal question feel slow.
+ */
+const DANGLING = new Set([
+  "a", "an", "the", "my", "your", "our", "their", "his", "her", "its",
+  "and", "or", "but", "because", "than",
+  "of", "to", "for", "with", "from", "into", "onto", "about",
+]);
+/** How many extra pauses a dangling ending may buy. At the default pause that's up to 6 s before it sends anyway. */
+const MAX_HOLDS = 2;
+
+/** Does this look like a sentence the player hadn't finished? */
+export function endsDangling(text: string): boolean {
+  const last = text.toLowerCase().replace(/[^a-z\s']/g, " ").trim().split(/\s+/).pop() ?? "";
+  return DANGLING.has(last);
+}
+
+/**
  * Arms the send for one pause's worth of quiet. The timer reads whichever recognition is current when it fires, so
  * the engine restarting in the meantime doesn't lose the sentence (FC-183).
  */
@@ -384,6 +406,14 @@ function armSend(): void {
     if (!session || !run) return;
     const text = run.pending();
     if (!text) return;
+    // A sentence that stops on "…the best way to get my" was cut off by the pause, not finished (FC-173): give the
+    // player another pause to carry on, but only a couple, so a real trailing word can't hold the question forever.
+    if (holds < MAX_HOLDS && endsDangling(text)) {
+      holds++;
+      armSend();
+      return;
+    }
+    holds = 0;
     detail = run.record(text);
     run.markSent();
     send(text);
@@ -410,6 +440,7 @@ function pauseForAnswer(): void {
 function endRecognition(): void {
   if (silence) { clearTimeout(silence); silence = null; }
   carried = "";
+  holds = 0;
   const run = active;
   active = null;
   if (run) { run.aborted = true; run.rec.abort(); }
