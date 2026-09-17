@@ -9,6 +9,7 @@ import { summarizePasted } from "./blueprint-review";
 import { blueprintsIn, decodeBlueprintString, encodeBlueprintString, type Blueprint } from "./blueprint";
 import { describeRow, productionRow, type RowBuild } from "./blueprint-template";
 import { stageFor, stageLines, tookAThrowback } from "./stages";
+import { nameCorrections } from "./names";
 import type { BlueprintCard } from "./messages";
 import { ChartBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
 import { pruneShots, waitForShot } from "./screenshots";
@@ -841,7 +842,8 @@ export class Agent {
           // What the answer says the player has or built, checked against their data (FC-140).
           // Spend the session's one throwback only if he actually took it (FC-182).
           if (!plain && this.throwbacks === 0 && tookAThrowback(text)) this.throwbacks++;
-          const corrections = [...(await this.checkClaims(text, status)), ...arithmeticCorrections(text)];
+          // A name this save doesn't have, said with confidence (FC-171), and sums the answer did in its head (FC-153).
+          const corrections = [...(await this.checkClaims(text, status)), ...arithmeticCorrections(text), ...nameCorrections(text, protos)];
           if (corrections.length) {
             const add = `\n\n${corrections.join(" ")}`;
             text += add;

@@ -906,3 +906,20 @@ test("FC-182: a turn the player acts on gets no register and no throwback at all
   await agent.ask("how many copper cables does a green circuit take?");
   expect(model.seen[1]!.at(-1)!.content as string).toContain("you may let one clause");
 });
+
+test("FC-171: an answer that names something the save lacks gets a correction, grounded ones don't", async () => {
+  const { game } = firstHourGame();
+  const protos = PrototypesSchema.parse(await Bun.file(new URL("../../data/captures/prototypes.json", import.meta.url)).json());
+  const shown: string[] = [];
+  const model = fakeModel([{ text: "Walls and turrets need the defensive-structures research first." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: (m) => { if (m.type === "token") shown.push(m.text); } });
+  await agent.ask("what do I need for walls?");
+  expect(shown.join("")).toContain('this save has no "defensive-structures"');
+
+  // A grounded answer is left alone.
+  const fine: string[] = [];
+  const good = fakeModel([{ text: "3 copper-cable and 1 iron-plate make an electronic-circuit." }]);
+  const other = new Agent({ model: good, game: firstHourGame().game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: (m) => { if (m.type === "token") fine.push(m.text); } });
+  await other.ask("what's in a green circuit?");
+  expect(fine.join("")).not.toContain("Correction:");
+});

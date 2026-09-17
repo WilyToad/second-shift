@@ -150,12 +150,18 @@ export function namesIn(text: string): string[] {
   return [...text.matchAll(/\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g)].map((m) => m[0]).filter((n) => !ENGLISH.has(n));
 }
 
+/** A technology's trigger names its item or entity either as a string or as `{ name }`, depending on the trigger. */
+function triggerName(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && typeof (value as { name?: unknown }).name === "string") return (value as { name: string }).name;
+  return null;
+}
+
 const triggersOf = (p: Prototypes) => {
   const names = new Set<string>();
   for (const tech of Object.values(p.technologies)) {
-    const trigger = (tech as { trigger?: { item?: string; entity?: string } }).trigger;
-    if (trigger?.item) names.add(trigger.item);
-    if (trigger?.entity) names.add(trigger.entity);
+    const trigger = (tech as { trigger?: { item?: unknown; entity?: unknown } }).trigger;
+    for (const named of [triggerName(trigger?.item), triggerName(trigger?.entity)]) if (named) names.add(named);
   }
   return names;
 };

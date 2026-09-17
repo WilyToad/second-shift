@@ -4,19 +4,12 @@
 import type { ServerMessage } from "../server/src/messages";
 import { encodeCommand, parseReply, PrototypesSchema } from "../interfaces/src/index";
 import { connectDevGame } from "./lib/devgame";
-import { namesIn } from "../server/src/stages";
+import { unknownNames } from "../server/src/names";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
 
 const dev = await connectDevGame();
 await dev.leaveRemoteView();
 const p = PrototypesSchema.parse(parseReply(await dev.rcon.exec(encodeCommand({ id: 1, action: "dump_prototypes", args: {} }))).reply.data);
-const triggers = new Set<string>();
-for (const tech of Object.values(p.technologies)) {
-  const t = (tech as { trigger?: { item?: string; entity?: string } }).trigger;
-  if (t?.item) triggers.add(t.item);
-  if (t?.entity) triggers.add(t.entity);
-}
-const inSave = (n: string) => Boolean(p.recipes[n] || p.items[n] || p.fluids[n] || p.technologies[n] || p.machines[n] || p.entities[n] || triggers.has(n));
 
 const ws = new WebSocket("ws://127.0.0.1:5170/ws");
 const got: ServerMessage[] = [];
@@ -55,9 +48,11 @@ try {
     const answer = await ask(c.ask);
     answers[c.name] = answer;
     console.log(`\n"${c.ask}"\n  → ${answer.replace(/\n+/g, " ")}\n`);
-    // The check that matters: nothing named that this save doesn't have (FC-171's shape).
-    const unknown = [...new Set(namesIn(answer))].filter((n) => !inSave(n));
+    // The check that matters, run through the product's own checker (FC-171) so the eval measures what the player
+    // would actually be told, not a cruder scan of its own.
+    const unknown = unknownNames(answer, p);
     check(`${c.name}: names only what the save has`, unknown.length === 0, unknown.join(", "));
+    check(`${c.name}: no correction line was needed`, !answer.includes("Correction:"), answer.slice(-120));
     if (c.stage) check(`${c.name}: answers for the stage it's in`, c.stage.test(answer), answer.slice(0, 200));
     // "the whole row won't fit" — the answer must still be an answer, not a recital of the table.
     if (c.stage) check(`${c.name}: doesn't recite the table`, !answer.includes("classic miss") && !answer.includes("[stage:"), "");
