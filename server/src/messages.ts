@@ -35,8 +35,9 @@ export type ServerMessage =
   | { type: "talk" }
   // The lists the companion keeps for the player (FC-163); the player can't edit them, so this is display only.
   | { type: "lists"; lists: Checklist[]; active?: string }
-  // Words from this save, so the console can pick the transcript that matches them (FC-175).
-  | { type: "vocabulary"; words: string[] };
+  // Words from this save, so the console can pick the transcript that matches them (FC-175), and phrases to bias
+  // the recognizer toward where the browser supports that (FC-177).
+  | { type: "vocabulary"; words: string[]; phrases?: string[] };
 
 export type ClientMessage =
   // `spoken` marks a question that came through speech recognition, which mis-hears words (FC-175).

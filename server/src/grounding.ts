@@ -123,6 +123,48 @@ export function vocabulary(p: Prototypes, max = 4000): string[] {
   return [...words].slice(0, max);
 }
 
+/**
+ * Phrases to bias the recognizer toward (FC-177): the names of things in this save, as a person says them, most
+ * talked-about first. Chrome takes a modest list, so the order matters more than the length.
+ *
+ * "Most talked-about" is measured, not guessed: how often a thing is an ingredient of a recipe or a technology the
+ * save has enabled, with a bonus for anything the player places. That puts iron gear wheel, stone furnace and the
+ * science packs near the top on any save, and leaves "space factory 3 instantiated" at the bottom — where taking
+ * the dump's own order had put chests and ducts ahead of the things a player says out loud.
+ */
+export function recognitionPhrases(p: Prototypes, max = 100): string[] {
+  const said = (name: string) => name.replace(/-/g, " ");
+  const score = new Map<string, number>();
+  const bump = (name: string, by: number) => score.set(name, (score.get(name) ?? 0) + by);
+  for (const [name, item] of Object.entries(p.items)) {
+    if (!item.place_result) continue;
+    bump(name, 5); // things the player builds get named far more often than things they only craft
+    if (p.machines[item.place_result]) bump(name, 3);
+  }
+  for (const recipe of Object.values(p.recipes)) {
+    if (recipe.enabled === false) continue;
+    for (const ing of recipe.ingredients) if (p.items[ing.name]) bump(ing.name, 1);
+  }
+  for (const tech of Object.values(p.technologies)) {
+    for (const ing of tech.ingredients ?? []) if (p.items[ing.name]) bump(ing.name, 1);
+  }
+  for (const name of Object.keys(p.fluids)) bump(name, 2);
+  // Words the player says that no prototype name supplies.
+  const extras = ["wire", "ore patch", "biter nest", "outpost", "smelter", "ghosts", "spidertron", "packing list"];
+  const ranked = [...score.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => said(name));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const phrase of [...extras, ...ranked]) {
+    const key = phrase.toLowerCase();
+    // Internal variants ("factory 2 instantiated") are never spoken and would spend the list.
+    if (key.length < 3 || key.endsWith(" instantiated") || seen.has(key)) continue;
+    seen.add(key);
+    out.push(phrase);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 export function formatMachines(p: Prototypes): string {
   return Object.entries(p.machines).sort(([a], [b]) => a.localeCompare(b)).map(([name, m]) => machineLine(name, m)).filter((line) => line !== null).join("\n");
 }

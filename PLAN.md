@@ -714,6 +714,43 @@ Until then voice goes to Chrome's speech service and the console says so, and th
 the cloud". Answers are read with a local voice (`localService`) sentence by sentence as they stream. The game's
 push-to-talk key (custom input `second-shift-talk`, Alt+V) reaches the console in ~80 ms through the event feed.
 
+**Transcription accuracy (S31, after the player's first long voice session):** three of 24 spoken turns came
+through wrong, and the diagnosis changed twice. The on-device model never finished downloading on this machine, so
+that session was already on Chrome's *online* service — the better of the two — and the engine choice (FC-174) is
+about honesty, not accuracy. Only one miss was acoustic (`wire → wine`); `"I've got 10" → "Got10"` and
+`"red dots up there" → "red darts of there"` are weak-text-prior and no-number-normalization failures, which says to
+shop for a strong text prior rather than a low word error rate. Two things ship against it: the console asks for four
+transcripts and keeps the one carrying this save's own words (FC-175, 555 words and 5.5 KB sent on connect, nothing
+in the prompt), and the recognizer is told which phrases to expect (FC-177) — Chrome shipped contextual biasing in
+desktop M140 as `SpeechRecognition.phrases` with `new SpeechRecognitionPhrase(phrase, boost)`, boost 0–10, and
+verified by hand in Chromium 153: the property exists, takes a plain array (`SpeechRecognitionPhraseList` is
+undefined), and rejects a boost over 10. The server sends 100 phrases, the save's own things said the way a player
+says them, at boost 3, ranked by how often each is an ingredient of an enabled recipe or technology with a bonus for
+anything the player places — 1.8 KB on the dev save, and the ranking matters: the dump's own order spent the list on
+chests and ducts and left out stone furnace, iron gear wheel and the science packs. **Unverified until the player's next session:** whether the engine applies the bias at all,
+and whether it does so outside `processLocally`. If it does, FC-175's re-ranking is dead code and comes out.
+
+**Local speech-to-text (S31, FC-176 spike, nothing installed):** the verdict was *not* "keep the browser engine" —
+but do the free Chrome check (FC-177) before building audio plumbing. Biasability discriminates the field more than
+word error rate does, because the player's misses are domain words: whisper.cpp `whisper-server` with
+large-v3-turbo (MIT, ~0.6–1.6 GB, `prompt` biasing) and mlx-whisper (`initial_prompt`) take a text prior;
+`parakeet-tdt-0.6b-v3` has the best local WER (6.34% on the Open ASR Leaderboard, against ~7.4% for Whisper
+large-v3) and real streaming but no hotword support; ElevenLabs Scribe v2 has keyterm prompting and sends the
+player's voice off the Mac, so it's a fallback behind the same opt-in as the ElevenLabs voices. Memory is a
+non-issue (128 GiB here, oMLX resident at ~69.5 GB, largest candidate ~1.6 GB) — keep the model loaded, because the
+cost is load time. Latency is the open number: Whisper's own `pad_or_trim` and `N_SAMPLES = 480000` mean a 4 s clip
+still pays a full 30 s encoder window, so a 3–6 s utterance is almost all fixed cost, estimated 0.3–1.0 s for
+turbo-class against today's ~1.5 s to first words, with no trustworthy short-clip measurement on M5-class silicon
+to lean on. If we build it: 16 kHz mono WAV from an `AudioWorklet` (`MediaRecorder` only gives Opus) to a `/stt`
+route mirroring `/tts`, proxied to a resident `whisper-server` with the vocabulary as `prompt` and `--vad`; Chrome
+keeps driving the live `heard` display and the local transcript is the authoritative one. Capture the player's audio
+with the chosen transcript into `data/captures/` *first* — it's their voice, so local-only — then measure accuracy
+against what they actually said versus Chrome on the same audio, delay p50/p95, resident memory beside oMLX with
+TTFT unchanged, and hallucination rate on short and near-silent clips. **Stop and keep the browser engine if** it
+invents text (Whisper's documented failure mode on short noisy audio, and worse than a mis-hear because it doesn't
+look wrong), delay exceeds ~1 s p95, FC-177 already fixes the acoustic misses, or the captured set shows no clear
+win.
+
 **ElevenLabs voices (S26, FC-148, player request):** opt-in online voices for reading answers. The server keeps
 `ELEVENLABS_API_KEY` (gitignored `.env`) and streams `eleven_flash_v2_5` audio per sentence through `/tts`, so the key
 never reaches the page; the picker labels them online.

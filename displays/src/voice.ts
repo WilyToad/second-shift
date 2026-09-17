@@ -41,6 +41,35 @@ export const ALTERNATIVES = 4;
 /** Singular and plural count as the same word: the player says "belts", the save calls it "belt". */
 const stem = (word: string) => (word.length > 3 && word.endsWith("s") ? word.slice(0, -1) : word);
 
+/**
+ * Phrases the recognizer is told to expect (FC-177). Chromium 153 takes an array of `SpeechRecognitionPhrase`
+ * with a boost of 0–10; biasing the engine beats re-ranking its guesses afterwards, and the two work together.
+ * Checked in Chromium 153: assignment takes a plain array, and a boost outside the range throws.
+ */
+export const phrases = signal<string[]>([]);
+/**
+ * How hard to tilt the engine. Unmeasured: the spike suggested ~5 of 10, but that was for a handful of terms and
+ * this list is 100, where a strong boost across all of them risks pulling ordinary words ("built") toward item
+ * names ("belt"). Middle setting until the player's next session says which way to move it.
+ */
+const PHRASE_BOOST = 3;
+
+export function setPhrases(list: string[]): void {
+  phrases.value = list;
+}
+
+/** Applies the phrases to one recognition, where the browser has the API. Never throws. */
+export function biasRecognition(rec: Recognition, list = phrases.value): number {
+  const Phrase = (globalThis as { SpeechRecognitionPhrase?: new (phrase: string, boost: number) => unknown }).SpeechRecognitionPhrase;
+  if (!Phrase || !list.length || !("phrases" in rec)) return 0;
+  try {
+    (rec as { phrases?: unknown }).phrases = list.map((phrase) => new Phrase(phrase, PHRASE_BOOST));
+    return list.length;
+  } catch {
+    return 0; // an older browser, or a list it won't take: the alternatives scoring still helps
+  }
+}
+
 export function setVocabulary(words: string[]): void {
   vocabulary.value = new Set(words.map((w) => stem(w.toLowerCase())).filter((w) => w.length > 2));
 }
@@ -253,6 +282,7 @@ function listen(): void {
   rec.interimResults = true;
   rec.maxAlternatives = ALTERNATIVES;
   if (onDevice) rec.processLocally = true;
+  biasRecognition(rec);
   if (onDevice === null) recognizedWhere.value = s.ctor.available ? "unknown" : "speech-service";
   const run = { rec, aborted: false };
   const current = () => active === run;

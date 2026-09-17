@@ -416,3 +416,29 @@ test("FC-174: the player picks the engine, and installing the on-device model co
   expect(voice.recognizedWhere.value).toBe("speech-service");
   voice.setPreferOnDevice(false);
 });
+
+test("FC-177: the recognizer is told which phrases to expect, and a browser without the API is unharmed", async () => {
+  const voice = await import("./voice");
+  // Chromium 153's shape: a constructor that checks the boost range, and a settable array on the recognition.
+  class FakePhrase {
+    constructor(public phrase: string, public boost: number) {
+      if (boost < 0 || boost > 10) throw new SyntaxError("boost value must be inside the range [0, 10]");
+    }
+  }
+  const rec: any = { phrases: [] };
+  voice.setPhrases(["transport belt", "iron gear wheel"]);
+  // No API in this browser: nothing set, nothing thrown.
+  expect(voice.biasRecognition(rec)).toBe(0);
+  Object.assign(globalThis, { SpeechRecognitionPhrase: FakePhrase });
+  try {
+    expect(voice.biasRecognition(rec)).toBe(2);
+    expect(rec.phrases.map((p: FakePhrase) => [p.phrase, p.boost])).toEqual([["transport belt", 3], ["iron gear wheel", 3]]);
+    // A recognition without the property is left alone, and so is an empty phrase list.
+    expect(voice.biasRecognition({} as any)).toBe(0);
+    voice.setPhrases([]);
+    expect(voice.biasRecognition(rec)).toBe(0);
+  } finally {
+    delete (globalThis as any).SpeechRecognitionPhrase;
+    voice.setPhrases([]);
+  }
+});

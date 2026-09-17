@@ -5,7 +5,7 @@ import { Agent, fileSession, mapSession, SELECTED_PREFIX, TOOLS } from "./agent"
 import { GameLink, type Snapshot } from "./game";
 import type { ClientMessage, ServerMessage } from "./messages";
 import { OmlxClient, readOmlxApiKey } from "./model";
-import { craftersByCategory, vocabulary } from "./grounding";
+import { craftersByCategory, recognitionPhrases, vocabulary } from "./grounding";
 import { alignToCacheBlock, buildMessages, systemPrompt, userTurn } from "./prompt";
 import { RecipeRetriever } from "./retrieval";
 import { buildSeries } from "./series";
@@ -113,7 +113,7 @@ const server = Bun.serve({
       if (transcript.length) ws.send(JSON.stringify({ type: "transcript", items: transcript } satisfies ServerMessage));
       // The save's own words, so the console can pick the transcript that matches them (FC-175).
       const protos = game.prototypes()?.data;
-      if (protos) ws.send(JSON.stringify({ type: "vocabulary", words: vocabulary(protos) } satisfies ServerMessage));
+      if (protos) ws.send(JSON.stringify({ type: "vocabulary", words: vocabulary(protos), phrases: recognitionPhrases(protos) } satisfies ServerMessage));
       // The lists the companion keeps, so a reloaded page shows the panel straight away (FC-163).
       const lists = agent.lists.all();
       if (lists.length) ws.send(JSON.stringify({ type: "lists", lists, ...(agent.lists.active()?.name ? { active: agent.lists.active()!.name } : {}) } satisfies ServerMessage));

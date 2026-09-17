@@ -15,10 +15,62 @@
   - Notes: we ask for `maxAlternatives = 1` and take the first guess. Chrome returns an N-best list; the alternative containing this save's own words is usually the right one ("belt" over "bolt", item names over near-homophones). The page has no prototype data, so the server sends a small vocabulary once per connection. Second half: the turn should know the question was spoken, so an odd word reads as a mis-hear rather than a fact
   - Acceptance: several alternatives requested and scored against a vocabulary the server sends on connect, best one used, engine order breaking ties; the vocabulary message is small (a few KB) and costs nothing in the prompt; a spoken question is marked as spoken in the turn; unit tests over the player's own examples and over sentences with no domain words (which must come through unchanged)
   - Done: the console asks for four transcripts instead of one and picks the one carrying the most words from this save, with the engine's own order breaking ties; singular and plural count as the same word. The server sends the vocabulary on connect — every word its prototype names are made of plus what players call things ("wire", "biter", "outpost") — measured at 555 words and 5.5 KB on the dev save, and it never touches the prompt. A spoken question is marked as spoken, and the turn says to read a nonsense word as a mis-hear. Unit tests use the player's own examples ("running wine" → "running wire", "red darts" → "red bottles") and check that a sentence with no save words comes through untouched. **Not yet confirmed against a real voice:** whether Chrome's online service returns useful alternatives for these cases needs the player's next session
-- [ ] FC-176 Local speech-to-text: spike
+- [x] FC-176 Local speech-to-text: spike
   - Notes: the real fix for accuracy may be a Whisper-class model on this machine — as accurate as the online service with nothing leaving the Mac, which is the project's stance. ElevenLabs Scribe is the online alternative once the audio plumbing exists (the key is already held server-side). Researched by a delegated pass, 2026-09-17
   - Acceptance: a written recommendation in the sprint notes and PLAN: the candidates with their accuracy, size, licence and streaming ability; what fits in memory beside oMLX's ~69.5 GB; the added latency for a 3–6 s utterance; how audio gets from the page to a transcriber and what happens to interim text; how each option can be biased toward the save's vocabulary; and a first slice with what to measure before committing — including "keep the browser engine" if the evidence says so
+  - Done: recommendation below ("FC-176: what the spike found"), also in PLAN §5. Verdict: **not** "keep the browser engine", but do the cheap Chrome check first — which became FC-177. Memory is a non-issue (128 GiB, the largest candidate ~1.6 GB); latency is the open number and the first slice exists to measure it
+- [x] FC-177 Tell the recognizer which words to expect
+  - Notes: came straight out of FC-176. Chrome shipped contextual biasing in desktop M140 (`SpeechRecognition.phrases`, `new SpeechRecognitionPhrase(phrase, boost)`, boost 0–10) and the player is on 153, so the vocabulary FC-175 already sends can bias the engine instead of only re-ranking guesses it already made. Cheapest thing on the spike's list by a wide margin
+  - Acceptance: the server sends a phrase list of the save's own things, said the way a player says them; the console sets it on each recognition where the browser has the API and is unharmed where it doesn't; unit tests for both
+  - Done: `recognitionPhrases()` sends 100 phrases, ranked by how much each thing is actually used — how often it's an ingredient of an enabled recipe or a technology, with a bonus for anything the player places — hyphens spelled out as spaces, on the same `vocabulary` message so it costs nothing extra and never touches the prompt. Measured on the dev save: 100 phrases in 1.8 KB, 7.3 KB for the whole message. **Taking the dump's own order first was wrong:** it spent the list on chests, ducts and "space factory 3 instantiated" and left out stone furnace, iron gear wheel and the science packs; ranking by use puts all of those in and drops the internal variants. `biasRecognition()` sets them with boost 3, feature-detected and wrapped, returning 0 on a browser without the API. **Verified by hand in Chromium 153:** `'phrases' in SpeechRecognition.prototype` is true, assignment takes a plain array (`SpeechRecognitionPhraseList` is undefined), and boost 11 throws `SyntaxError`. **Not verified:** whether the engine actually applies the bias, and whether it does so outside `processLocally` — the on-device explainer hints biasing may be on-device only, and SODA is still stuck "downloading" here. That needs the player's voice
 
 ## Notes
+
+### FC-176: what the spike found
+
+**Two facts reframed the item.** The player's spotty session was already on Chrome's *online* service (the
+on-device model never finished downloading), so switching engines can't be the fix. And only one of the three
+misses is acoustic: `wire → wine` is a near-homophone, but `"I've got 10" → "Got10"` is a dropped word plus a
+glued numeral and `"red dots up there" → "red darts of there"` is a function-word substitution. Those are
+weak-language-prior and no-inverse-text-normalization failures — which says to shop for a strong text prior,
+not just a low word error rate.
+
+**Candidates.** whisper.cpp `whisper-server` with large-v3-turbo (MIT, ~0.6–1.6 GB, clip-based, `prompt`
+biasing); mlx-whisper (same family, `initial_prompt`, more anti-hallucination knobs); parakeet-mlx with
+`parakeet-tdt-0.6b-v3` (best local WER at 6.34% on the Open ASR Leaderboard versus ~7.4% for Whisper
+large-v3, and genuinely streaming — but hotword biasing is listed as *Todo*, so it has none); ElevenLabs
+Scribe v2 (keyterm prompting, vendor-claimed ≤5% WER, but the voice leaves the Mac). **Biasability is the
+discriminator, and it beats raw WER here**, because the player's misses are domain words.
+
+**Memory is not a constraint.** 128 GiB physical, oMLX resident at ~69.5 GB, largest candidate ~1.6 GB.
+Keep the model loaded; the cost that matters is load time, not footprint.
+
+**Latency is the open number.** Verifiable from Whisper's own source: `N_SAMPLES = 480000` and `pad_or_trim`
+mean a 4 s clip still pays a full 30 s encoder window, so for 3–6 s utterances almost everything is fixed
+cost. Estimates only: 0.3–1.0 s for turbo-class on this machine, 0.1–0.3 s for Parakeet, against today's
+~1.5 s to first words. No trustworthy short-clip measurement on M5-class silicon exists; producing one is
+the point of the first slice.
+
+**Shape if we build it.** Capture 16 kHz mono WAV in the page through an `AudioWorklet` (`MediaRecorder`
+only gives Opus), post it to a `/stt` route mirroring `/tts`, proxy to a resident `whisper-server` with the
+vocabulary as `prompt` and `--vad` on. ffmpeg stays off the hot path. Interim text is the one real loss:
+keep Chrome driving the live `heard` display and let the local transcriber produce the authoritative text.
+
+**Recommendation: the cheap Chrome check first, and it is not "keep the browser engine".** Step 0 is
+FC-177 (done this sprint): bias the recognizer with the vocabulary we already ship. If that fixes the
+acoustic misses, a local transcriber may not be worth its latency — but it cannot fix `"Got10"`, which needs
+a model that normalizes numerals. Step 1, if we go on: capture the player's audio alongside the chosen
+transcript into `data/captures/` **first** (local-only; it's their voice), then `brew install whisper.cpp`
+(the player's install decision, ~0.6–1.6 GB) and the `/stt` route. Measure accuracy against what they
+actually said versus Chrome on the same audio, added delay p50/p95, resident memory beside oMLX with TTFT
+unchanged, and hallucination rate on short and near-silent clips. **Stop and keep the browser engine if**
+it invents text (Whisper's documented failure mode on short noisy audio, and worse than a mis-hear because
+it doesn't look wrong), delay exceeds ~1 s p95, FC-177 already fixes the acoustic misses, or the captured
+set shows no clear win. Scribe is the fallback once `/stt` exists, behind the same opt-in as the ElevenLabs
+voices.
+
+**One consequence to decide after the player's next session:** if biasing works, re-ranking four
+already-wrong guesses (FC-175) is dead code and should be removed rather than left beside it. Keeping both
+until there's evidence, since neither has been heard by a real voice yet.
 
 Opened at the player's request (2026-09-17) after an early-game session where three of 24 spoken turns came through wrong: "I'm running wire" → "running wine", "I've got 10 red bottles" → "Got10 red bottles", "a big red dots on the map up there" → "a big red darts on the map of there". FC-176 was delegated as a research pass; FC-173 (hands-free cutting sentences off) sits next to these in the backlog and wasn't pulled in.
