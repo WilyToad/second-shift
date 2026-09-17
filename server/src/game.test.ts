@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import type { GameEvent } from "@companion/interfaces";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
