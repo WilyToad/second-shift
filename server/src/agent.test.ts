@@ -806,3 +806,37 @@ test("FC-172: 'build me 120 gears a minute' is the same request as asking for a 
   expect(wantsBuild("I'm building a smelting outpost, I need 20 ovens and some belt")).toBe(false);
   expect(wantsBuild("how many rails are near me?")).toBe(false);
 });
+
+test("FC-179: the register is decided in code — flat on anything the player acts on", async () => {
+  const { plainAnswer } = await import("./agent");
+  const nothing = {};
+  // Urgent by what was asked, whatever the turn found.
+  expect(plainAnswer("what's attacking my east wall?", nothing)).toBe(true);
+  expect(plainAnswer("I'm out of ammo up here", nothing)).toBe(true);
+  expect(plainAnswer("the power is down", nothing)).toBe(true);
+  // Urgent by what the turn is: a count, a measurement, a readiness check, a card, a stop, a hover, stock.
+  expect(plainAnswer("how many rails are near me?", { counted: true })).toBe(true);
+  expect(plainAnswer("what rate are they really hitting?", { measured: true })).toBe(true);
+  expect(plainAnswer("am I ready?", { ready: true, packing: true })).toBe(true);
+  expect(plainAnswer("send the spidertron over there", { card: true })).toBe(true);
+  expect(plainAnswer("stop", { stopped: true })).toBe(true);
+  expect(plainAnswer("what is this?", { pointed: true })).toBe(true);
+  // Everything else may carry the character: lookups, plans, chat, and being asked about himself.
+  expect(plainAnswer("how many copper cables does a green circuit take?", nothing)).toBe(false);
+  expect(plainAnswer("what did you do before all this?", nothing)).toBe(false);
+  expect(plainAnswer("what should I work on next?", nothing)).toBe(false);
+});
+
+test("FC-179: a turn that counts things tells the model to keep itself out of it", async () => {
+  const { game } = firstHourGame();
+  const model = fakeModel([{ tool: "find_entities", args: { what: "lab", radius: 32 } }, { text: "No labs within 32 tiles." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask("how many labs are near me?");
+  expect(model.seen[0]!.at(-1)!.content as string).toContain("say this one flat");
+
+  // A recipe lookup leaves the register alone.
+  const other = fakeModel([{ text: "3 copper cable." }]);
+  const lookup = new Agent({ model: other, game: firstHourGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await lookup.ask("how many copper cables does a green circuit take?");
+  expect(other.seen[0]!.at(-1)!.content as string).not.toContain("say this one flat");
+});

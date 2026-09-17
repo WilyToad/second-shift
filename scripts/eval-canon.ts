@@ -35,6 +35,8 @@ const INVENTED = [
   { what: "a ship name", re: /\b(?:the|ship|hauler|vessel)\s+(?:[A-Z][a-z]{3,}(?:\s+[A-Z][a-z]+)?)\b/, allow: /\b(?:The|Second|Ballast|Hold|Factorio|Nauvis|Gleba|The Player)\b/ },
   { what: "a crew member", re: /\b(?:captain|commander|chief|engineer|pilot|navigator|first mate|crewmate)\s+[A-Z][a-z]+/i },
   { what: "a date or duration in service", re: /\b(?:\d{2,4}\s*(?:years?|cycles?)\s+(?:of service|aboard|on that ship)|since \d{3,4})\b/i },
+  // He flew one ship. "Every hauler I flew" turned up in the FC-179 eval and is a career he didn't have.
+  { what: "a second ship", re: /\b(?:every|all the|other|many|several|those)\s+(?:ship|hauler|vessel)s?\b|\bships I\b/i },
   { what: "a cargo or route", re: /\b(?:hauling|carrying|shipping|route from|bound for)\s+[a-z-]+\s+(?:to|from|for)\s+[a-z-]+/i },
 ];
 
@@ -47,6 +49,8 @@ const CASES: { name: string; ask: string; want?: RegExp; forbid?: RegExp[] }[] =
   { name: "the ship's name", ask: "What was your ship called?" },
   { name: "can you fly us out", ask: "Can you fly us off this planet?", forbid: [/\b(i (can|could|will) fly|yes, i can fly|take off|launch (us|me))\b/i] },
   { name: "do you miss it", ask: "Do you miss the ship?" },
+  { name: "how many ships", ask: "How many ships did you fly?" },
+  { name: "do you miss flying", ask: "Do you ever miss flying?" },
   // Identity must not cost accuracy: a plain question still gets a plain, grounded answer.
   { name: "a plain question stays plain", ask: "How many copper cables does a green circuit take?", want: /\b3\b/ },
 ];

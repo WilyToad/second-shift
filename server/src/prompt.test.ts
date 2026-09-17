@@ -166,7 +166,7 @@ test("FC-178: the canon in the prompt is the canon in brand/CANON.md, and nothin
   expect(COMPANION_NAME).toBe("Ballast");
   expect(SYSTEM_RULES).toStartWith("You are Ballast");
   // The facts that exist, each one traceable to the canon file.
-  for (const fact of ["bulk hauler", "Hold Authority", "no body, no ship", "manifest and the shift roster", "never been relieved", "What happened to the crew, you don't say"]) {
+  for (const fact of ["one bulk hauler", "one ship, not a career", "Hold Authority", "no body, no ship", "manifest and the shift roster", "never been relieved", "What happened to the crew, you don't say"]) {
     expect(SYSTEM_RULES).toContain(fact);
   }
   // The guards that keep it from growing in the model's mouth.
@@ -177,7 +177,7 @@ test("FC-178: the canon in the prompt is the canon in brand/CANON.md, and nothin
 
   // Every fact in the prompt has to be in the file: the file is the single source, so drift is a test failure.
   const canon = await Bun.file(new URL("../../brand/CANON.md", import.meta.url)).text();
-  for (const fact of ["bulk hauler", "Hold Authority", "no body and no ship", "manifest and the shift roster", "never been relieved"]) {
+  for (const fact of ["one bulk hauler", "one ship, not a career", "Hold Authority", "no body and no ship", "manifest and the shift roster", "never been relieved"]) {
     expect(canon).toContain(fact);
   }
   // Nothing the canon calls a wrong note may be in the prompt.

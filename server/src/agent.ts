@@ -377,6 +377,21 @@ export function wantsBlueprint(question: string): boolean {
   return rate && (/\b(blueprints?|layouts?|schematics?)\b/i.test(question) || BUILD.test(question) || ASKED_TO_BUILD.test(question));
 }
 
+/** Questions where something is happening to the player right now, and a remark would be an obstacle. */
+const URGENT = /\b(attack\w*|attacked|biters?|pentapods?|wriggler\w*|demolisher\w*|under fire|raid\w*|alarm|alert\w*|brownout|power (is )?(out|down|failing)|no power|out of ammo|low ammo|breach\w*|dying|destroyed|on fire|leak\w*|spoil\w*|starv\w*|help me|hurry|quick)\b/i;
+
+/**
+ * Should this answer be said flat, with no character in it at all (FC-179)?
+ *
+ * The player's rule: dry everywhere, flat when it counts. "When it counts" is anything they're about to act on —
+ * an attack, a count, a readiness check, a card waiting for a confirm, a measurement, what they're pointing at,
+ * what they're carrying. A wry line costs nothing on a recipe lookup and costs real time when it's read aloud
+ * while a wall is being chewed on, so the tier is decided here rather than left to the model's judgement.
+ */
+export function plainAnswer(question: string, turn: { counted?: boolean; measured?: boolean; ready?: boolean; card?: boolean; stopped?: boolean; pointed?: boolean; stock?: boolean; packing?: boolean }): boolean {
+  return URGENT.test(question) || Boolean(turn.counted || turn.measured || turn.ready || turn.card || turn.stopped || turn.pointed || turn.stock || turn.packing);
+}
+
 /**
  * Is the player asking for something to be built that isn't a row at a rate (FC-172)? Asked to "build a line up to
  * my metal", the answer was "I can only do what a player could do — I can't build belts or place entities for you",
@@ -636,7 +651,14 @@ export class Agent {
     // Tools are ruled out only when the retrieved data answers the question; a question nothing matched
     // gets no note, so "I just built something" is free to look (S22).
     const answeredFromData = Boolean(found?.lines.length || playerLines.length);
+    // Register, decided in code (FC-179): flat on anything the player is about to act on, dry everywhere else.
+    const plain = plainAnswer(question, {
+      counted: Boolean(found?.lines.length) || world, measured: Boolean(measuredLine), ready: askedReady,
+      card: Boolean(sendLine?.startsWith("An approval card")), stopped: Boolean(stopLine), pointed: Boolean(pointed),
+      stock: stockLines.length > 0, packing: Boolean(packing),
+    });
     const notes = [
+      plain ? "say this one flat: the facts, the numbers, or what to confirm, and nothing about yourself — no aside, no remark, no mention of the ship or the manifest" : "",
       world || !answeredFromData ? "" : "no tool call is needed",
       // With a fresh look already in the lines, the model still searched twice, narrating "let me scan wider" (S22 eval).
       around && !searchAgain ? "the surroundings lines are a fresh look, so don't search again unless the player asks for a wider search" : "",
