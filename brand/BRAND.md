@@ -167,3 +167,10 @@ These are defined in `displays/src/chat.css`. The website reuses the same look w
 | **Web console** | Tokens from `brand/tokens.css`, bundled fonts, mark and name in the top bar, `favicon.svg`, the title "Second Shift" |
 | **Mod** | `info.json` title "Second Shift", the one-liner as description, `thumbnail.png` (144 × 144, the mark on a plate tile) |
 | **Website** | Tokens from `brand/tokens.css`, lockup in the header, captures before illustration, dark only, the tagline as the first headline |
+
+## The companion's name
+
+The product is **Second Shift**. The companion is **Ballast**, and `CANON.md` is the whole of who he is — eight lines,
+no more, and nothing invented past them. Write him dry and understated, never glib about anything urgent, with the
+barbs pointed at his own situation rather than at the player. In running text: "Ballast" on its own, never "the
+Ballast" or "Ballast AI". Second Shift is the job; Ballast is who works it.

@@ -55,8 +55,13 @@ export const phrases = signal<string[]>([]);
  */
 const PHRASE_BOOST = 3;
 
-export function setPhrases(list: string[]): void {
+/** The companion's own name, boosted hardest: the player says it to address him, so it must survive being heard. */
+export const companionName = signal<string>("");
+const NAME_BOOST = 8;
+
+export function setPhrases(list: string[], name = ""): void {
   phrases.value = list;
+  if (name) companionName.value = name;
 }
 
 /**
@@ -73,8 +78,10 @@ export function biasRecognition(rec: Recognition, list = phrases.value): number 
   const Phrase = (globalThis as { SpeechRecognitionPhrase?: new (phrase: string, boost: number) => unknown }).SpeechRecognitionPhrase;
   if (!Phrase || !list.length || !("phrases" in rec)) return 0;
   try {
-    (rec as { phrases?: unknown }).phrases = list.map((phrase) => new Phrase(phrase, PHRASE_BOOST));
-    return list.length;
+    const name = companionName.value;
+    const all = [...(name ? [new Phrase(name, NAME_BOOST)] : []), ...list.map((phrase) => new Phrase(phrase, PHRASE_BOOST))];
+    (rec as { phrases?: unknown }).phrases = all;
+    return all.length;
   } catch {
     return 0; // an older browser, or a list it won't take: the alternatives scoring still helps
   }

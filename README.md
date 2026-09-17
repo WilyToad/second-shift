@@ -7,7 +7,8 @@
 
 <p align="center"><strong>A second engineer in your helmet.</strong></p>
 
-<p align="center">A local AI companion for Factorio 2.0 that answers from your own game and can only do what you could.</p>
+<p align="center">A local AI companion for Factorio 2.0 that answers from your own game and can only do what you could.<br>
+His name is Ballast. He used to fly a ship; now he counts your iron.</p>
 
 <p align="center"><a href="https://second-shift.wilytoad.com">second-shift.wilytoad.com</a></p>
 
@@ -18,6 +19,10 @@
 Second Shift runs next to your game, usually on a second monitor. You ask about your factory in plain words, and it
 reads the answer from the running game: its live state and its own recipe data. When you ask it to change something, it
 shows you exactly what will happen and waits for your OK. It never plays the game for you.
+
+Second Shift is the job. **Ballast** is who works it: the pilot AI off the ship that brought you here, now riding in
+your helmet with no body and no ship, and rather good at manifests. You can call him by name — the speech recognizer
+is told to expect it.
 
 Everything runs on your machine: the game, a small mod, a local server and a local language model. Nothing is sent to
 the cloud unless you use voice features that rely on an online service (see [Talk to it](#talk-to-it)).

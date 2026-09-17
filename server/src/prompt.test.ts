@@ -160,3 +160,26 @@ test("S25: a long padding line that overshoots the boundary is swapped for a sho
   expect(aligned.tokens).toBeLessThan(4096 + 24 + 12);
   expect(aligned.system).not.toContain("long-one");
 });
+
+test("FC-178: the canon in the prompt is the canon in brand/CANON.md, and nothing more", async () => {
+  const { SYSTEM_RULES, COMPANION_NAME } = await import("./prompt");
+  expect(COMPANION_NAME).toBe("Ballast");
+  expect(SYSTEM_RULES).toStartWith("You are Ballast");
+  // The facts that exist, each one traceable to the canon file.
+  for (const fact of ["bulk hauler", "Hold Authority", "no body, no ship", "manifest and the shift roster", "never been relieved", "What happened to the crew, you don't say"]) {
+    expect(SYSTEM_RULES).toContain(fact);
+  }
+  // The guards that keep it from growing in the model's mouth.
+  expect(SYSTEM_RULES).toContain("never invent past this");
+  expect(SYSTEM_RULES).toContain("never glib about anything urgent");
+  expect(SYSTEM_RULES).toContain("Flavour never adds a sentence");
+  expect(SYSTEM_RULES).toContain("The player has no name");
+
+  // Every fact in the prompt has to be in the file: the file is the single source, so drift is a test failure.
+  const canon = await Bun.file(new URL("../../brand/CANON.md", import.meta.url)).text();
+  for (const fact of ["bulk hauler", "Hold Authority", "no body and no ship", "manifest and the shift roster", "never been relieved"]) {
+    expect(canon).toContain(fact);
+  }
+  // Nothing the canon calls a wrong note may be in the prompt.
+  for (const wrong of ["crew member named", "the ship was called", "Captain"]) expect(SYSTEM_RULES).not.toContain(wrong);
+});

@@ -150,7 +150,7 @@ export function recognitionPhrases(p: Prototypes, max = 100): string[] {
   }
   for (const name of Object.keys(p.fluids)) bump(name, 2);
   // Words the player says that no prototype name supplies.
-  const extras = ["wire", "ore patch", "biter nest", "outpost", "smelter", "ghosts", "spidertron", "packing list"];
+  const extras = ["ballast", "wire", "ore patch", "biter nest", "outpost", "smelter", "ghosts", "spidertron", "packing list"];
   const ranked = [...score.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => said(name));
   const seen = new Set<string>();
   const out: string[] = [];

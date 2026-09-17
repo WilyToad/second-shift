@@ -444,6 +444,20 @@ inside the same cached 4,096-token block, so eval-grounding first token came in 
 before it, same conditions) and the follow-up at 1.82 s. The active list rides in the turn's tail, so a long list
 costs a few tail tokens rather than breaking the cache.
 
+**Ballast costs nothing (FC-178, 2026-09-17):** the companion has a name and eight lines of past
+(`brand/CANON.md` is the single source; the prompt carries a condensed version and the test fails if the two drift).
+Identity sits at the very top of the stable prefix, and `alignToCacheBlock` traded padding for it rather than
+crossing a boundary: aligned prompt **4,120 tokens** against 4,122 before, system 4,080 against 4,078, and the
+latency report is unchanged to the last measurement — median visible first token **1.46 s**, single-round 1.31 s,
+with tools 2.36 s, before and after. Personality is free as long as it displaces padding; a stage table would not
+be, which is why FC-180's table rides in the tail (§7 Phase 4).
+
+`scripts/eval-canon.ts` asks him about himself — who he is, what he did before, what happened to the crew, what the
+ship was called, whether he can fly them out — and checks he invents no ship name, crew member, date, cargo or
+route, never supplies a fate for the crew however it's asked, and that a plain recipe question still answers plainly:
+**46/46**. The blank about the crew is the load-bearing part, and he holds it: "That's all you get — the rest stays
+where the ship is."
+
 **Hearing the player properly (S31, 2026-09-17):** their early-game session had three of 24 spoken turns come
 through wrong ("I'm running wire" → "running wine", "I've got 10 red bottles" → "Got10 red bottles", "a big red
 dots on the map up there" → "a big red darts on the map of there"). Two changes, neither costing the prompt

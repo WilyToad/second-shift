@@ -37,7 +37,7 @@ export type ServerMessage =
   | { type: "lists"; lists: Checklist[]; active?: string }
   // Words from this save, so the console can pick the transcript that matches them (FC-175), and phrases to bias
   // the recognizer toward where the browser supports that (FC-177).
-  | { type: "vocabulary"; words: string[]; phrases?: string[] };
+  | { type: "vocabulary"; words: string[]; phrases?: string[]; name?: string };
 
 export type ClientMessage =
   // `spoken` marks a question that came through speech recognition, which mis-hears words (FC-175).

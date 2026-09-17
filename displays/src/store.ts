@@ -129,7 +129,7 @@ export function onMessage(m: ServerMessage): void {
       break;
     case "vocabulary":
       setVocabulary(m.words);
-      setPhrases(m.phrases ?? []);
+      setPhrases(m.phrases ?? [], m.name);
       break;
     case "lists":
       lists.value = { lists: m.lists, ...(m.active ? { active: m.active } : {}) };

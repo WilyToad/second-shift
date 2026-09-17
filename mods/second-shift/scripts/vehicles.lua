@@ -75,7 +75,7 @@ local function clear_order(reason)
   end
   feed.push({ kind = "control_stopped", severity = "info", control = control.kind, reason = reason, entity = control.name })
   if player and reason ~= "arrived" then
-    player.print({ "", "[Second Shift] stopped: ", control.name, " (", reason, ")" })
+    player.print({ "", "[Ballast] stopped: ", control.name, " (", reason, ")" })
   end
   return control
 end
@@ -87,7 +87,7 @@ function M.register(handlers)
   script.on_event("second-shift-stop", function(e)
     local player = companion_player()
     if not (player and player.index == e.player_index) then return end
-    if order() then clear_order("stop_key") else player.print({ "", "[Second Shift] nothing to stop" }) end
+    if order() then clear_order("stop_key") else player.print({ "", "[Ballast] nothing to stop" }) end
   end)
 
   -- The player taking the spidertron back, any way they can: driving it, sending it with their own remote, or

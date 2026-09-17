@@ -56,7 +56,7 @@ function M.register(handlers)
     local s = state()
     s.shown = not s.shown
     draw(player)
-    if not s.shown then player.print({ "", "[Second Shift] list hidden (press again to show it)" }) end
+    if not s.shown then player.print({ "", "[Ballast] list hidden (press again to show it)" }) end
   end)
 
   -- The server pushes the active list here whenever it changes (FC-163).

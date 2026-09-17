@@ -29,7 +29,7 @@ function Header() {
   const model = s?.model.state ?? "loading";
   return (
     <header class="topbar">
-      <strong class="brand"><Mark />Second Shift</strong>
+      <strong class="brand"><Mark />Second Shift<span class="who"> · Ballast</span></strong>
       <span class="status">
         <span class={`pill ${game.cls}`}>{game.text}</span>
         <span class={`pill ${model === "ready" ? "ok" : model === "error" ? "crit" : "warn"}`}>model: {model}</span>
