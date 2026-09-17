@@ -1,6 +1,7 @@
 // Streaming client for the local oMLX server (OpenAI-compatible chat completions).
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { toolCallsFromText } from "./tool-text";
 
 export type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 export type ChatMessage =
@@ -96,6 +97,10 @@ export class OmlxClient implements ChatModel {
         onToken?.(token);
       }
     }
-    return { text, toolCalls: calls.filter(Boolean), usage, ttftMs, totalMs: performance.now() - started };
+    // A call the model wrote as text instead of sending as one (FC-184): recover it, and never leave the markup
+    // in the answer. Only when nothing was parsed for us, so a well-behaved round is untouched.
+    const parsed = calls.filter(Boolean);
+    const fromText = parsed.length ? { calls: [], text } : toolCallsFromText(text);
+    return { text: fromText.text, toolCalls: [...parsed, ...fromText.calls], usage, ttftMs, totalMs: performance.now() - started };
   }
 }

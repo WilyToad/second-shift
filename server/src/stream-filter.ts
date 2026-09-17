@@ -1,52 +1,69 @@
-// Removes rate_chart blocks from a streamed answer when the turn doesn't allow charts (FC-111). The model is told
-// "no chart block" but sometimes writes one anyway; the page would draw it, so code enforces the rule.
-const OPEN = "```rate_chart";
+// Removes blocks from a streamed answer that the player must never see: a rate_chart block on a turn that doesn't
+// allow charts (FC-111, the model is told "no chart block" but sometimes writes one anyway and the page would draw
+// it), and a tool call the model wrote as text (FC-184, which reached one player as their entire answer).
 const FENCE = "```";
+type Block = { open: string; close: string };
+const BLOCKS: Block[] = [
+  { open: "```rate_chart", close: FENCE },
+  { open: "<tool_call>", close: "</tool_call>" },
+];
 
 export class ChartBlockFilter {
   private pending = "";
-  private inBlock = false;
+  private inBlock: Block | null = null;
+
+  /** How much of the tail could still grow into an opening marker, and so has to wait for the next token. */
+  private held(): number {
+    let keep = 0;
+    for (const block of BLOCKS) {
+      for (let k = Math.min(block.open.length - 1, this.pending.length); k > keep; k--) {
+        if (this.pending.slice(-k) === block.open.slice(0, k)) { keep = k; break; }
+      }
+    }
+    return keep;
+  }
 
   /** Text that is safe to show now. Anything that might still turn into a chart block is held back. */
   push(text: string): string {
     let out = "";
     this.pending += text;
-    while (this.pending) {
+    for (;;) {
       if (this.inBlock) {
-        const end = this.pending.indexOf(FENCE);
+        const close = this.inBlock.close;
+        const end = this.pending.indexOf(close);
         if (end < 0) {
-          this.pending = this.pending.slice(-(FENCE.length - 1)); // a closing fence may be split across tokens
+          this.pending = this.pending.slice(-(close.length - 1)); // a closing marker may be split across tokens
           return out;
         }
-        this.pending = this.pending.slice(end + FENCE.length);
-        this.inBlock = false;
+        this.pending = this.pending.slice(end + close.length);
+        this.inBlock = null;
         continue;
       }
-      const tick = this.pending.indexOf("`");
-      if (tick < 0) {
-        out += this.pending;
-        this.pending = "";
-        break;
+      let at = -1;
+      let hit: Block | null = null;
+      for (const block of BLOCKS) {
+        const i = this.pending.indexOf(block.open);
+        if (i >= 0 && (at < 0 || i < at)) { at = i; hit = block; }
       }
-      out += this.pending.slice(0, tick);
-      this.pending = this.pending.slice(tick);
-      if (this.pending.startsWith(OPEN)) {
-        this.pending = this.pending.slice(OPEN.length);
-        this.inBlock = true;
+      if (hit) {
+        out += this.pending.slice(0, at);
+        this.pending = this.pending.slice(at + hit.open.length);
+        this.inBlock = hit;
         continue;
       }
-      if (OPEN.startsWith(this.pending)) break; // could still become a chart block: wait for more
-      out += this.pending[0];
-      this.pending = this.pending.slice(1);
+      const keep = this.held();
+      out += this.pending.slice(0, this.pending.length - keep);
+      this.pending = this.pending.slice(this.pending.length - keep);
+      return out;
     }
-    return out;
   }
 
-  /** What's left when the answer ends; an unfinished chart block is dropped. */
+  /** What's left when the answer ends; an unfinished block is dropped. A bare marker prefix can no longer grow
+   * into one, so it's ordinary text and passes through (an answer really can end on a backtick). */
   end(): string {
     const rest = this.inBlock ? "" : this.pending;
     this.pending = "";
-    this.inBlock = false;
+    this.inBlock = null;
     return rest;
   }
 }

@@ -45,3 +45,15 @@ test("FC-130: restating the first words briefly isn't a repeat, and nothing is l
   expect(shown).toBe(text);
   expect(f.repeated).toBe(false);
 });
+
+test("FC-184: a tool call written as text never reaches the player, however it's split", () => {
+  const answer = "Looking.\n<tool_call>\n<function=find_entities>\n<parameter=what>\nenemy\n</parameter>\n</function>\n</tool_call>\nFound none.";
+  for (let i = 1; i < answer.length; i++) {
+    expect(streamed([answer.slice(0, i), answer.slice(i)])).toBe("Looking.\n\nFound none.");
+  }
+  expect(streamed([...answer])).toBe("Looking.\n\nFound none.");
+  // Cut off mid-block (the model stopped, or the round ended): the markup is dropped, not shown.
+  expect(streamed(["<tool_call>\n<function=find_ent"])).toBe("");
+  // Prose that merely names a tool is untouched.
+  expect(streamed(["I'd use find_entities for that."])).toBe("I'd use find_entities for that.");
+});

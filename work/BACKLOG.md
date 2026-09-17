@@ -40,6 +40,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 ## Tech debt and risks
 
 
+- [ ] FC-187 A follow-up question can drift onto the wrong subject
+  - Notes: same session as FC-184 (2026-09-17). The player asked about a red dot on the map ("that must be monsters"), whose turn was lost to FC-184; the next thing they said was "A bit further", and the answer searched 128 tiles north for **labs and assembling machines** and reported 0 of each — it had carried "10 of them" from two turns earlier ("I built 10 of them") as the subject. The enemy search the player wanted never ran. Worth watching rather than guessing at: it may partly be FC-184's lost turn leaving a hole in the history where the subject should be
+  - Acceptance: a short follow-up ("a bit further", "what about over there") resolves to the subject of the *last* question that actually got an answer, and says what it searched for so a wrong guess is visible; unit tests over this session's three-turn sequence; no change to turns that name their own subject
+
 - [ ] FC-172 It undersells what it can build
   - Notes: player asked "build a line up to my metal" (a belt run from the coal drills to the furnaces) and the answer said "I can only do what a player could do — I can't build belts or place entities for you", then planned it in words. That's more modest than the truth: it can build a blueprint in code and paste it as ghosts behind a card, which is how the player's own robots build. What it can't do is place by hand — and early game, with no construction robots, ghosts would sit unbuilt, which is the part worth saying
   - Acceptance: a build request gets the accurate answer — what it can paste, that the player confirms it, and that ghosts need construction robots (so early game it's a plan, not a paste); the template library's limits (single production rows, no belt runs between two points yet) are stated plainly rather than as "I can't place entities"; unit test over the session's wording
