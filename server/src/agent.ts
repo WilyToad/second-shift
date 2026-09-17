@@ -8,6 +8,7 @@ import type { ActionArgs, ActionData, ActionName, Digest, EntityRef, FindEntitie
 import { summarizePasted } from "./blueprint-review";
 import { blueprintsIn, decodeBlueprintString, encodeBlueprintString, type Blueprint } from "./blueprint";
 import { describeRow, productionRow, type RowBuild } from "./blueprint-template";
+import { stageFor, stageLines } from "./stages";
 import type { BlueprintCard } from "./messages";
 import { ChartBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
 import { pruneShots, waitForShot } from "./screenshots";
@@ -632,12 +633,17 @@ export class Agent {
     const protos = this.deps.prototypes();
     const measuredLine = !pasted.summaries.length && wantsMeasuredOutput(question) ? await this.measuredOutput() : null;
     const askedBuild = !pasted.summaries.length && wantsBuild(question);
+    // Where they are in the game and what to push for there (FC-180's authored table, FC-181). Only on a "what
+    // should I do" turn, and only the matched row: the whole table is ~2,650 tokens and the cached prefix has no
+    // room for it. Costs nothing on every other turn.
+    const stage = start ? stageFor(protos, snap?.digest ?? null) : null;
     const playerLines = [
       ...(status ? formatPlayerStatus(status, { builds: start || /\b(buil\w*|plac\w*|made)\b/i.test(intent) }) : []),
       ...(around ? formatSurroundings(around) : []),
       ...(pointed ? formatPointedAt(pointed, (name) => (protos ? entityFacts(name, protos) : null)) : []),
       ...(contentsLine ? [contentsLine] : []),
       ...(measuredLine ? [measuredLine] : []),
+      ...(stage ? stageLines(stage) : []),
       ...stockLines,
       ...this.lists.format(),
       ...packingLines,
@@ -665,7 +671,7 @@ export class Agent {
       lootNote(status, around),
       chart ? "" : "no chart block",
       searchAgain ? "call find_entities again for this question, even if an earlier result looks similar" : "",
-      start ? "base next steps only on the inventory, hand-craftable, recipe, surroundings and research lines; name no item, building or technology that isn't in them"
+      start ? "base next steps only on the stage, inventory, hand-craftable, recipe, surroundings and research lines; name no item, building or technology that isn't in them"
         : playerLines.length ? "name no item, building or technology that isn't in the lines above" : "",
       // "That's 50 iron plates from the debris" with 1 in the inventory (FC-140).
       status?.character ? "any count of what the player has comes from the inventory line, exactly" : "",
@@ -684,6 +690,8 @@ export class Agent {
       // "I can't build belts or place entities for you" for a belt run, then a plan in words anyway (FC-172).
       askedBuild ? "the player is asking for something to be built: say what you can actually do — build a blueprint in code for one production row (machines for a single item, with inserters, an input belt, an output belt and poles) and offer to paste it as ghosts where they stand, on a card they confirm — rather than saying you can't place anything" : "",
       askedBuild ? "and the real limits: there's no template for a belt run between two points or a mixed layout, and ghosts are built by construction robots, so before robots a paste would sit unbuilt and a plan in words is the honest offer" : "",
+      stage ? `say which stage you think they're in ("${stage.row.id}") so they can tell you if you've got it wrong, then give the stage's own next steps in your words, shortest first — the whole row won't fit, so drop the last goal before you drop the first` : "",
+      stage ? `your register here: ${stage.row.register}` : "",
       askedReady ? "answer with what's still missing and whether the load fits the player's free slots, both from the lines" : "",
       packing ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",
       stockLines.length ? "the stock line is a fresh read of what the player carries and what's in the containers they can see: answer from it, don't search, and don't explain how you looked" : "",

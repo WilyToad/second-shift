@@ -458,6 +458,23 @@ route, never supplies a fate for the crew however it's asked, and that a plain r
 **46/46**. The blank about the crew is the load-bearing part, and he holds it: "That's all you get — the rest stays
 where the ship is."
 
+**Direction costs only the turns that ask for it (FC-181, 2026-09-17):** the stage table is authored text
+(`server/src/stages.ts`, from FC-180's spike), and only the matched row rides in the tail of a "what should I do"
+turn. Measured on the dev save: **107–164 tokens** per row (Gleba widest at 164, Nauvis lightest at 107, platform
+121), against the whole table's ~2,650 — which is why it can't live in the cached prefix. At PLAN's suffix-prefill
+rate of ~1 ms per uncached tail token that's ~0.16 s on those turns, and **nothing at all on every other turn**:
+the lookup turns in the same run recorded zero player-line tokens, unchanged.
+
+The row is chosen from what the save proves — the character's surface first (someone standing on Gleba with a silo
+at home wants Gleba advice; remote view doesn't move them), then two planets producing, then the technology gates
+from the most advanced down — and a row whose own names aren't in the save's dump is **withheld rather than
+shipped wrong**, which is FC-171's lesson applied at load time. A modded planet with no row (maraxsis, cerys) and
+an unrecognised technology tree both fall through to a row that asks instead of guessing. `scripts/eval-stages.ts`
+**8/8**: the answer names nothing outside the dump, answers for the stage it's in, doesn't recite the table, and a
+recipe lookup gets no direction at all. It also names the stage so the player can disagree, which they should: on
+the dev save it said "Gleba, I'd say — though your view says otherwise… So I may have the stage wrong; tell me if
+so."
+
 **Hearing the player properly (S31, 2026-09-17):** their early-game session had three of 24 spoken turns come
 through wrong ("I'm running wire" → "running wine", "I've got 10 red bottles" → "Got10 red bottles", "a big red
 dots on the map up there" → "a big red darts on the map of there"). Two changes, neither costing the prompt

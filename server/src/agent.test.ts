@@ -840,3 +840,23 @@ test("FC-179: a turn that counts things tells the model to keep itself out of it
   await lookup.ask("how many copper cables does a green circuit take?");
   expect(other.seen[0]!.at(-1)!.content as string).not.toContain("say this one flat");
 });
+
+test("FC-181: 'what should I do' carries the stage and its goals; other turns carry neither", async () => {
+  const { game } = firstHourGame();
+  const protos = PrototypesSchema.parse(await Bun.file(new URL("../../data/captures/prototypes.json", import.meta.url)).json());
+  const model = fakeModel([{ text: "Get two drills on coal." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {} });
+  await agent.ask("what should I do next?");
+  const turn = model.seen[0]!.at(-1)!.content as string;
+  expect(turn).toContain("[stage:");
+  expect(turn).toContain("classic miss:");
+  // The player is told which stage it picked, so they can say it's wrong.
+  expect(turn).toContain("say which stage you think they're in");
+  // The note that lists what next steps may come from has to include the stage, or the model is told to ignore it.
+  expect(turn).toContain("base next steps only on the stage, inventory");
+
+  const other = fakeModel([{ text: "3 copper cable." }]);
+  const plain = new Agent({ model: other, game: firstHourGame().game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {} });
+  await plain.ask("how many copper cables does a green circuit take?");
+  expect(other.seen[0]!.at(-1)!.content as string).not.toContain("[stage:");
+});
