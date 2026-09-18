@@ -22,6 +22,7 @@ import { nameCorrections } from "./names";
 import { existsSync } from "node:fs";
 
 export type { ClientMessage, ServerMessage } from "./messages";
+import { parseClientMessage } from "@companion/interfaces";
 
 const PORT = Number(process.env.COMPANION_PORT ?? 5170);
 const MODEL = process.env.COMPANION_MODEL ?? "Qwen3.8-Flash-Next-oQ4e-mtp";
@@ -195,7 +196,10 @@ const server = Bun.serve({
       if (recent.length) ws.send(JSON.stringify({ type: "events", events: recent, replay: true } satisfies ServerMessage));
     },
     message(_ws, raw) {
-      const msg = JSON.parse(String(raw)) as ClientMessage;
+      // A malformed message is dropped and logged rather than reaching the agent (FC-200).
+      const parsed = parseClientMessage(String(raw));
+      if (!parsed.message) { console.warn(`Dropped a console message (${parsed.reason})`); return; }
+      const msg = parsed.message;
       if (msg.type === "ask" && msg.text.trim()) busy = busy.then(async () => {
         asking++;
         // One line per spoken question, so a good transcript can be attributed afterwards (FC-185).

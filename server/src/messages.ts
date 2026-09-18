@@ -42,14 +42,5 @@ export type ServerMessage =
   | { type: "note"; text: string; at: number; sinceMs: number }
   | { type: "watching"; on: boolean };
 
-export type ClientMessage =
-  // `spoken` marks a question that came through speech recognition, which mis-hears words (FC-175).
-  // `heard` is the diagnostic record of a spoken question (FC-185): what the engine offered, what was picked and
-  // whether the phrases were accepted. Logged, never put in the prompt.
-  | { type: "watch"; on: boolean }
-  | { type: "ask"; text: string; thinking?: boolean; spoken?: boolean; heard?: { first: string; picked: string; alternatives: number; offered: string[]; phrases: number; where: string; carried: boolean } }
-  | { type: "approve"; id: string }
-  | { type: "decline"; id: string }
-  | { type: "reset" }
-  // The player is talking or typing a question: keep the model awake (FC-158).
-  | { type: "wake" };
+// What the console may send, validated on arrival (FC-200): the schema lives in `interfaces/` beside the game's.
+export type { ClientMessage } from "@companion/interfaces";
