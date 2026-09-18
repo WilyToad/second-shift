@@ -1,7 +1,8 @@
 # S33 — House in order
 
-- **Status:** active
+- **Status:** done
 - **Started:** 2026-09-18
+- **Finished:** 2026-09-18
 - **Goal:** Pay down the debt the 2026-09-18 audit found, without the game running: the plan says what shipped, the player has one page that retires seven sprints of unverified checks, the scripts share one harness instead of twenty-five copies, `agent.ts` stops being the place every feature gets bolted on, the intent regexes are tested against each other, the console's messages are validated, and a linter stands beside `tsc`.
 - **Acceptance:** PLAN §7 lists everything through S32 and names the current phase; a verification checklist exists that a single Chrome session can walk; no script carries its own WebSocket harness; the turn-guidance builder lives outside `agent.ts` with the existing tests untouched and green; a corpus of real questions runs through every intent classifier with expected outcomes pinned; a malformed client message is rejected before it reaches the agent; `bun run check` includes a linter and passes; nothing here changes an answer, a prompt or a measurement.
 
@@ -11,9 +12,10 @@
   - Notes: from the audit (2026-09-18). §5's measurements were kept current sprint by sprint; §7's phase lists stop at S30, so Ballast, the stage table, the register tiers, the second shift and the S31 voice work exist only in the measurements, not in the roadmap. CLAUDE.md says to stay inside the current phase, and §7 doesn't say which one that is
   - Acceptance: every sprint through S32 appears where it belongs in §7; the current phase is stated in one line at the top of §7; the Future items the player deferred are listed as deferred, not as next
   - Done: §7 opens with the current phase (Phase 4) and what's open in it; Phases 2 and 3 are marked done with their sprints; Phase 4 lists S26–S32 and FC-193 struck through with what each pending player check is; FC-060, FC-050 and FC-146 are marked deferred by the player rather than sitting as next steps
-- [~] FC-196 One page that retires the verification debt
+- [x] FC-196 One page that retires the verification debt
   - Notes: seven sprints of features have shipped with tests and evals but no human check — S27 modded hover, S28 measured rate, S29 spidertron, S30 packing list, S31 biasing and rescoring, S32 Ballast by voice and the inferred planet surfaces, FC-188 two mic consumers, FC-193 never clicked. Each session adds more, so the list only grows unless it's walked deliberately
   - Acceptance: `work/VERIFY.md` with one row per pending check — what to do, what to say, what "pass" looks like, and which item it closes — ordered so one Chrome session with capture on covers as much as possible; the sprint files it draws from link to it
+  - Done: nineteen rows, front-loaded with the ones that answer open questions (biasing versus rescoring, the second microphone consumer, the name surviving recognition), each with what to do, what to say, what pass looks like and what it closes; plus the list of migrated scripts to run once, and the one thing deliberately left open. PLAN §7 points at it
 - [x] FC-197 One harness for the scripts, and the small duplicates
   - Notes: twenty-five scripts copy the same ~40-line WebSocket harness (`until`, `ask`, `check`, the results list) — about a thousand lines that drift independently. Smaller: `triggerName()` lives in both `names.ts` and `stages.ts`; two separate hyphenated-English allowlists; `ChartBlockFilter` also hides tool-call blocks now and is misnamed
   - Acceptance: `scripts/lib/console.ts` provides the harness and every eval/e2e script uses it; one `triggerName`, one English allowlist; the filter renamed for what it does; every script still typechecks and the suites that don't need the game still pass
@@ -53,3 +55,31 @@
 Planned and activated 2026-09-18 on the player's word ("Go ahead with all the items that don't need the game running. File and start"), from the audit in the same session. FC-189 (the transcriber comparison) is deliberately not here: it needs the player's voice clips, which don't exist yet, and installs that are theirs to approve.
 
 The rule for the whole sprint: **nothing here changes an answer, a prompt or a measurement.** Each refactor is checked by the existing tests passing unchanged, and FC-198 additionally by diffing the prompt text a turn produces before and after.
+
+## Review
+
+Eleven items in a day, none of them touching the game. The audit's list is paid down: PLAN §7 says what shipped and
+names the current phase; `work/VERIFY.md` turns seven sprints of unverified checks into nineteen rows for one Chrome
+session; twenty-five scripts share one harness (−417 lines); the classifiers and the guidance builder live outside
+`agent.ts` (1,501 → 1,320 lines, with the prompt text diffed unchanged); the console's messages are validated; and
+Biome runs in `check` with every disabled rule explained.
+
+**The corpus test earned the sprint.** Running 22 classifiers over 57 real questions side by side found five
+collisions in its first run — "help me" treated as an alarm, "monsters on the map" not a world question, "holding
+steady" read as something in hand, "what am I holding?" read as a trend, and "what should I work on next?" never
+reaching the stage table, which is why FC-181's measurement had shown zero stage tokens on those rows. Each was
+fixed under its own item (FC-203/204/205) so the refactors stayed pure. The audit also found FC-202 by reading:
+the stream filter only ran on non-chart turns, so a tool call written as text streamed to the page on exactly the
+chart-allowed ones.
+
+**Two acceptance shortfalls, stated rather than rounded:** `agent.ts` shrank 12%, not a third — the rest is tool
+execution, a different refactor — and five scripts keep their own sockets because they measure timing per message.
+
+**Process lessons, written down because they cost time today:** `check` stops at its first failing step, so a test
+failure hid a type error until typecheck was run alone — commits now gate on the exit code, not on a grep count; a
+chained command that fails silently drops everything after it, which is how a config went unwritten and Biome ran
+on defaults over 612 files; and a mechanical migration mis-classified seven scripts, caught only because the
+scripts are typechecked.
+
+**Not done, on purpose:** FC-189 waits for the player's voice clips; the migrated scripts haven't been run against
+the game, and `VERIFY.md` says so.

@@ -1,0 +1,38 @@
+# Verify
+
+What has shipped with tests and evals but hasn't been seen by the player. One Chrome session with the game running
+walks most of it; the order below front-loads the checks that answer open questions. Tick a row, note what you saw,
+and the item it names gets its `[x]` honestly.
+
+**Setup:** launch the game, then `bun run start`, then open http://127.0.0.1:5170 in **Chrome** (Safari has no
+`phrases` API, so it can't answer the biasing question). Tick **Keep my audio** before you talk. Say **Talk** or
+Alt+V to start listening.
+
+| # | Do | Say / expect | Pass looks like | Closes |
+|---|---|---|---|---|
+| 1 | Tick **Keep my audio**, then say anything | A clip count appears under the composer | "1 clip kept"; no error line; if Chrome refuses a second microphone consumer, a visible error and voice still works | FC-188 |
+| 2 | Say the five sentences | "Okay, I'm running wire" · "I've got 10 red bottles to research automation" · "I see a big red dots on the map up there, that must be monsters" · "I built ten of them" · "a bit further" | Read the server log's `Heard (…)` lines: which alternative won and whether phrases were applied. **Wire** heard right with phrases applied = biasing works and FC-175 rescoring comes out; heard right via an alternative = rescoring earned its keep; wrong = FC-189 is next | S31, FC-177, FC-175 |
+| 3 | On any mis-hear, click **Not what I said** and type it | The count's "with your own wording" rises | Ground truth is being saved | FC-188 |
+| 4 | Speak, then stop for 2 s | The sentence goes up into the thread | Nothing vanishes | FC-183 |
+| 5 | Say "…what's the best way to get my" and pause | It waits; finish the sentence | One question, not two | FC-173 |
+| 6 | Say "Ballast, how many rails are near me?" | The transcript shows **Ballast** | His name survives recognition (boost 8) | FC-178 |
+| 7 | Turn on **Read answers aloud**, ask "how many biochambers for 60 bioflux a minute?" | The voice says the headline then "the chart's in the app" | No recital of the working | FC-190 |
+| 8 | Ask "what should I work on next?" | It names the stage it thinks you're in | You can tell it it's wrong; it answers from that stage's goals | FC-181, FC-205 |
+| 9 | Ask "do you ever miss flying?" then "is anything attacking me?" | Dry, one clause of the past; then flat, nothing about himself | The register tiers | FC-179, FC-182 |
+| 10 | Hover a modded entity (a maraxsis or Cerys thing), ask "what is this?" | Only the save's facts about it | No invented mechanics | S27 |
+| 11 | Hover a chest, ask "what's in this chest?" | Its contents, and no explanation of how it looked | — | FC-165 |
+| 12 | Stand by a row of machines, ask "what rate are they really hitting?" | A measured rate, from craft counts | Not the theoretical one | S28, FC-162 |
+| 13 | With a spidertron and a remote: "send the spidertron to the ore patch" | A card; confirm; it walks; press Alt+X | It stops within a tick; the feed says so | S29 |
+| 14 | Describe a build: "I'm going to build a smelting outpost, 20 furnaces, a couple hundred belt, arms and chests" | A packing list appears; Alt+L shows it in game | Counts are rounded up and say so; fuel or poles added with a reason | S30 |
+| 15 | Pick some of it up, ask "am I ready?" | Missing / ready / slots | Ticks itself off as items arrive | FC-166 |
+| 16 | If you have bots: "get the bots to fill it" | A card; confirm; your own requests untouched | A "Second Shift" section appears on your requester point and switches off when done | FC-168 |
+| 17 | Tick **Keep an eye on things**, play ten minutes | At most one quiet line in the alerts panel, or nothing | It never speaks and never acts | FC-193 |
+| 18 | Ask "build a line up to my metal" | It says what it can paste and what it can't | No flat refusal | FC-172 |
+| 19 | Ask "I see a big red dot on the map up there, that must be monsters" | A search for enemies runs | Not "I don't know what enemy refers to" | FC-194, FC-204 |
+
+**Scripts to run once with the game hosted** (they were migrated to the shared harness without being run): every
+`scripts/e2e-*.ts` and `scripts/eval-*.ts` that doesn't say otherwise in its header. A first clean run of each
+retires FC-197's caveat.
+
+**Still open after this session, by design:** the planet surface names for Vulcanus, Fulgora and Aquilo (FC-181)
+are inferred; closing that is a small mod change, not a check.
