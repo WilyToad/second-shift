@@ -14,7 +14,7 @@ test("FC-200: every well-formed console message parses, with its optional parts"
   for (const m of good) {
     const parsed = parseClientMessage(JSON.stringify(m));
     expect(parsed.reason).toBeUndefined();
-    expect(parsed.message).toEqual(m);
+    expect(parsed.message as unknown).toEqual(m);
   }
 });
 
