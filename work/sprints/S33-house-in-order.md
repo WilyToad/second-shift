@@ -1,0 +1,37 @@
+# S33 — House in order
+
+- **Status:** active
+- **Started:** 2026-09-18
+- **Goal:** Pay down the debt the 2026-09-18 audit found, without the game running: the plan says what shipped, the player has one page that retires seven sprints of unverified checks, the scripts share one harness instead of twenty-five copies, `agent.ts` stops being the place every feature gets bolted on, the intent regexes are tested against each other, the console's messages are validated, and a linter stands beside `tsc`.
+- **Acceptance:** PLAN §7 lists everything through S32 and names the current phase; a verification checklist exists that a single Chrome session can walk; no script carries its own WebSocket harness; the turn-guidance builder lives outside `agent.ts` with the existing tests untouched and green; a corpus of real questions runs through every intent classifier with expected outcomes pinned; a malformed client message is rejected before it reaches the agent; `bun run check` includes a linter and passes; nothing here changes an answer, a prompt or a measurement.
+
+## Items
+
+- [x] FC-195 PLAN §7 says what shipped, and which phase is current
+  - Notes: from the audit (2026-09-18). §5's measurements were kept current sprint by sprint; §7's phase lists stop at S30, so Ballast, the stage table, the register tiers, the second shift and the S31 voice work exist only in the measurements, not in the roadmap. CLAUDE.md says to stay inside the current phase, and §7 doesn't say which one that is
+  - Acceptance: every sprint through S32 appears where it belongs in §7; the current phase is stated in one line at the top of §7; the Future items the player deferred are listed as deferred, not as next
+  - Done: §7 opens with the current phase (Phase 4) and what's open in it; Phases 2 and 3 are marked done with their sprints; Phase 4 lists S26–S32 and FC-193 struck through with what each pending player check is; FC-060, FC-050 and FC-146 are marked deferred by the player rather than sitting as next steps
+- [ ] FC-196 One page that retires the verification debt
+  - Notes: seven sprints of features have shipped with tests and evals but no human check — S27 modded hover, S28 measured rate, S29 spidertron, S30 packing list, S31 biasing and rescoring, S32 Ballast by voice and the inferred planet surfaces, FC-188 two mic consumers, FC-193 never clicked. Each session adds more, so the list only grows unless it's walked deliberately
+  - Acceptance: `work/VERIFY.md` with one row per pending check — what to do, what to say, what "pass" looks like, and which item it closes — ordered so one Chrome session with capture on covers as much as possible; the sprint files it draws from link to it
+- [ ] FC-197 One harness for the scripts, and the small duplicates
+  - Notes: twenty-five scripts copy the same ~40-line WebSocket harness (`until`, `ask`, `check`, the results list) — about a thousand lines that drift independently. Smaller: `triggerName()` lives in both `names.ts` and `stages.ts`; two separate hyphenated-English allowlists; `ChartBlockFilter` also hides tool-call blocks now and is misnamed
+  - Acceptance: `scripts/lib/console.ts` provides the harness and every eval/e2e script uses it; one `triggerName`, one English allowlist; the filter renamed for what it does; every script still typechecks and the suites that don't need the game still pass
+- [ ] FC-198 Turn guidance moves out of `agent.ts`
+  - Notes: 1,501 lines, and `ask()` decides register, stage, build offers, packing, spidertron, lists, stock, pointing, measurement, follow-up carry and throwbacks as a growing `notes[]` of ternaries. It works and it's tested, and it's where the next feature will be bolted on
+  - Acceptance: the guidance builder is a pure function in its own module, taking what the turn found and returning the notes; the intent classifiers (`URGENT`, `SPATIAL`, `BARE_FOLLOWUP`, `plainAnswer`, `wantsBuild`, …) move with it; `agent.ts` shrinks by a third or more; every existing test passes unchanged, and no prompt text changes (diffed)
+- [ ] FC-199 The intent classifiers are tested against each other
+  - Notes: each regex was added when a session exposed a miss and each is tested alone; FC-182's test caught FC-179 misfiring by accident. A corpus of real questions from the session logs, run through every classifier at once with the expected tier and intent pinned, catches the next collision on purpose
+  - Acceptance: a corpus test with at least forty real questions from `data/sessions/` and the eval scripts, each with its expected classification across all classifiers; it fails on any change that flips one; adding a classifier means adding a column
+- [ ] FC-200 The console's messages are validated before they reach the agent
+  - Notes: `JSON.parse(String(raw)) as ClientMessage` — a cast, not a check. Low severity because the server binds 127.0.0.1, but a malformed `ask`, `watch` or `approve` currently reaches the agent unchecked, and zod is already in the project for the prototypes
+  - Acceptance: a `ClientMessageSchema` in `interfaces/`; the server drops and logs anything that fails it; unit tests for a well-formed and a malformed message of each type; `ServerMessage` gets the same treatment on the console side only if it's cheap
+- [ ] FC-201 A linter beside `tsc`
+  - Notes: `tsc --noEmit` is the only static gate. A linter catches the class of thing `tsc` can't — unused imports, accidental `any`, floating promises — and the choice is made once
+  - Acceptance: Biome (one binary, fast, formats too) in `bun run check`, with a deliberately small rule set that passes on the current code; every rule turned off is turned off in the config with a reason; no formatting churn committed alongside logic
+
+## Notes
+
+Planned and activated 2026-09-18 on the player's word ("Go ahead with all the items that don't need the game running. File and start"), from the audit in the same session. FC-189 (the transcriber comparison) is deliberately not here: it needs the player's voice clips, which don't exist yet, and installs that are theirs to approve.
+
+The rule for the whole sprint: **nothing here changes an answer, a prompt or a measurement.** Each refactor is checked by the existing tests passing unchanged, and FC-198 additionally by diffing the prompt text a turn produces before and after.

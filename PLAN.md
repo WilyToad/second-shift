@@ -700,6 +700,11 @@ median 1.72 s / p90 2.30 s. The system prompt is now 4,121 tokens. Conversation 
 Phases are the roadmap. Day-to-day work is tracked as goal-based sprints in `work/`
 (`bun run board`); each sprint pulls items from `work/BACKLOG.md`, which is grouped by phase.
 
+**Current phase (2026-09-18): Phase 4, voice and extras.** Phases 1–3 are done. Phase 5 has its first action
+(the spidertron, S29) and the rest is deferred by the player; Phase 6 is a spike plus a deferred implementation.
+What's open in Phase 4 is verification by the player (`work/VERIFY.md`) and the local transcriber comparison
+(FC-189); S33 is paying down debt across all of it without the game running.
+
 **Phase 1 — vertical slice (target: one evening)**
 
 Setup decisions (2026-09-13): git with small commits; RCON keys in the real `config.ini`;
@@ -738,7 +743,7 @@ the stall, cited "nothing researching" and the 10-hour averages. First token 2.1
 232-token answer took 7.1 s at ~45 tok/s, so long answers exceed 5 s total. Keep answers short or
 judge by time to first token.
 
-**Phase 2 — make it useful, and let it act**
+**Phase 2 — make it useful, and let it act** — done (S02–S08)
 - Prototype dump + grounding
 - Prefix-cache-aware prompt assembly (§5) — verify the ~2 s warm path holds
 - Tier-1 alerts firing from Lua, no inference, shown in the web app's alert feed
@@ -750,7 +755,7 @@ judge by time to first token.
 - *Success:* "how many rails are near me on the right?" → "mark them for deconstruction" →
   preview → confirm → bots remove them → Ctrl+Z restores them
 
-**Phase 3 — make it pleasant**
+**Phase 3 — make it pleasant** — done (S04, S13–S25)
 - Full web console per the mockup (§3): live state rail, visual component library
 - More planning actions: `place_blueprint`, `mark_upgrade`, entity settings, `queue_research`,
   map tags, `camera_to`
@@ -775,10 +780,18 @@ the list is done rather than deleting it, and never writes `trash_not_requested`
 2026-09-15). Sorting chests (FC-169) was dropped: storage filters only place *incoming* items, and once chests are
 on the network `get_supply_counts` already says which one holds what.
 
-**Phase 4 — voice and extras**
-- Voice in/out in the web console, using the browser's own speech features (Chrome, Safari) first
-- In-game UI (mod GUI chat panel / hotkey popup)
-- Lists the agent keeps, with a read-only in-game panel (S30)
+**Phase 4 — voice and extras** — current
+- ~~Voice in/out in the web console, using the browser's own speech features~~ done in S26; heard properly in S31
+  (engine choice, N-best rescoring, contextual biasing, a local-transcriber spike, and six fixes from the player's
+  own sessions) — **pending the player's Chrome check** of whether biasing works and whether rescoring stays
+- ~~What the player is looking at~~ done in S27 (pointing, container contents, hover facts, the wake ping)
+- ~~Numbers and facts you can lean on~~ done in S28 (throughput model, measured machine output, entity facts)
+- ~~Lists the agent keeps, with a read-only in-game panel~~ done in S30, with the packing list and bots (FC-168)
+- ~~The companion is somebody~~ done in S32: Ballast, eight lines of canon, dry everywhere and flat when it counts,
+  direction from an authored stage table, the arc, and the invented-name check (FC-171) — measured free
+- ~~A background pass while the player plays~~ done as FC-193 after FC-192 showed the cache survives concurrency
+- Local speech-to-text comparison on the player's own clips (FC-188 built, FC-189 waiting on the clips)
+- In-game UI (mod GUI chat panel / hotkey popup) — deferred by the player (FC-060)
 - ~~Background Factorio test instance for measuring blueprints~~ dropped (see Blueprints): better estimates and measuring builds in the player's game instead
 - ~~Session memory across play sessions~~ done in S18 (FC-063) and per map in S22 (FC-137)
 
@@ -834,11 +847,11 @@ never reaches the page; the picker labels them online.
 - ~~Stop hotkey first; decide how agent control and the player's own inputs interact (§8 Q11)~~ done in S29
   (FC-051), with the spidertron (FC-144): one order at a time, Alt+X or "stop" cancels it, and the player taking
   over ends it by itself
-- `mine_by_hand`, `craft`, `transfer_items`, each with a confirm
-- Spidertron autopilot on request
+- ~~Spidertron autopilot on request~~ done in S29 (FC-144) — pending the player's own send
+- `mine_by_hand`, `craft`, `transfer_items`, each with a confirm — deferred by the player (FC-050)
 - No `walk_to`: walking stays the player's (decided by the player 2026-09-15)
 
-**Phase 6 — car and tank driving**
+**Phase 6 — car and tank driving** — spike done, implementation deferred by the player (FC-146)
 - Spike done (FC-145, 2026-09-15): `work/spikes/FC-145-driving.md`. Route-finding for a car-sized box is in the
   engine after all — `request_path` documents "emulate pathing behavior by script for non-unit entities, such as
   vehicles" and takes a free-form bounding box and collision mask — while throttle and steering are only
