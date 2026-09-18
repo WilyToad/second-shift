@@ -444,6 +444,22 @@ inside the same cached 4,096-token block, so eval-grounding first token came in 
 before it, same conditions) and the follow-up at 1.82 s. The active list rides in the turn's tail, so a long list
 costs a few tail tokens rather than breaking the cache.
 
+**Concurrency is cheap, not fast (FC-192, 2026-09-18):** oMLX 0.7.0.dev4 keeps Lightning MTP on across concurrent
+requests, so a background pass is finally affordable — but not for the reason the release note gives.
+`scripts/probe-concurrency.ts`, against the real aligned prefix: **the cached prefix survives everything** — a
+concurrent request sharing our system prompt, one with an unrelated 4,534-token prefix, and three at once all left
+a lone request reporting `cached 4096`, with the stranger holding its own 4,096 blocks at the same time. First
+token moved 0.59 → 0.74 s with a job alongside, inside FC-191's run-to-run spread. Decode halves (45.4 tok/s alone,
+27.4 each with one alongside, 14.8 each with three), which the player won't feel: 27 tok/s is ~20 words a second,
+five times reading speed and six times what the voice speaks.
+
+**The throughput claim doesn't transfer and shouldn't be repeated.** The release measured +34% and a local run
+measured 1.6× total on long generations; at our 85–110 token answers, three concurrent gave ~44 tok/s total against
+45.4 alone — no gain, the same work spread thinner. Memory peaked at 83 GiB footprint against the 118 GB guard
+(and `ps` RSS is useless here: ~5 GiB for a model holding ~69 GB, because MLX weights aren't resident).
+Write-up, including the five ways the probe measured the wrong thing before it measured the right one, in
+`work/spikes/FC-192-batch-mtp.md`.
+
 **Re-baselined on oMLX 0.7.0.dev4 (FC-191, 2026-09-18):** the runtime changed under us — Lightning MTP now stays
 on across concurrent requests — so every figure below was re-measured rather than assumed. **Nothing moved beyond
 run-to-run noise.** Block alignment is unchanged (aligned prompt **4,121 tokens**, boundary 4,096, against 4,120–4,122

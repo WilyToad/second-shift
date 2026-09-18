@@ -174,6 +174,7 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun scripts/eval-voice-session.ts` (server and dev save running, resets the conversation) replays the first voice session and checks its odd replies stay gone (S27).
 - `bun scripts/e2e-pointing.ts` (server and dev save running, resets the conversation) asks "what is this?" and "what's in this chest?" with the mouse on a test chest (FC-151, FC-152).
 - `bun scripts/e2e-wake.ts` (server and dev save running, resets the conversation) A/B-tests keeping the model awake while the player talks (FC-158).
+- `bun scripts/probe-concurrency.ts` (oMLX running) measures what a concurrent request does to the cached prefix, the decode rate and oMLX's memory (FC-192). Run it after an oMLX upgrade, and before anything that would add a second client.
 - `bun scripts/eval-grounding.ts` (server running) runs the 10-question grounding check. Run it
   after any change to retrieval, prompt wording or sampling; results land in `data/eval/`.
 
