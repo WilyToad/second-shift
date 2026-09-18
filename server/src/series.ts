@@ -6,7 +6,7 @@ export type Point = { t: number; v: number };
 /** Keys look like "gleba/produced/bioflux" or "nauvis/science/automation-science-pack". */
 export type SeriesMap = Record<string, Point[]>;
 
-export function pointsFrom(digest: Digest, t: number): Record<string, number> {
+export function pointsFrom(digest: Digest, _t: number): Record<string, number> {
   const out: Record<string, number> = {};
   for (const s of digest.surfaces) {
     for (const r of s.produced) out[`${s.name}/produced/${r.name}`] = r.per_minute;

@@ -11,7 +11,7 @@ const dev = await connectDevGame();
 await dev.leaveRemoteView();
 const p = PrototypesSchema.parse(parseReply(await dev.rcon.exec(encodeCommand({ id: 1, action: "dump_prototypes", args: {} }))).reply.data);
 
-const { ws, got, until, ask, check, results, answers } = await openConsole({ reset: true });
+const { ws, ask, check, results, answers } = await openConsole({ reset: true });
 
 
 // The dev save is deep into Space Age on Gleba, so the expected row is the Gleba one; the other questions check the

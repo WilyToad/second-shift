@@ -42,7 +42,7 @@ try {
   const truthPerMinute = ((after.total - before.total) * 3600) / (after.tick - before.tick);
   const second = await ask("And now? What rate are they really hitting?");
   answers["second ask"] = second.answer;
-  const said = [...second.answer.matchAll(/([\d][\d,\.]*)\s*(?:crafts?|items?|magazines?|per minute|\/min| a minute)/gi)].map((m) => Number(m[1]!.replace(/,/g, "")));
+  const said = [...second.answer.matchAll(/([\d][\d,.]*)\s*(?:crafts?|items?|magazines?|per minute|\/min| a minute)/gi)].map((m) => Number(m[1]!.replace(/,/g, "")));
   const close = said.some((n) => Math.abs(n - truthPerMinute) <= Math.max(5, truthPerMinute * 0.25));
   check("the answer gives the measured rate from the game", close, `answer numbers ${said.join(", ") || "none"}; the game made ${truthPerMinute.toFixed(1)}/min over ${((after.tick - before.tick) / 60).toFixed(0)} s (fed ${fed.fed} machines)`);
   check("it says the number was measured, not estimated", /measur\w+|craft counts|over the last/i.test(second.answer), second.answer.slice(0, 200));

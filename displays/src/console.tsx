@@ -118,7 +118,7 @@ export function LivePanel() {
         <div class="panel-head"><span class="label">Live state</span><span class="label-sub num">tick {d.tick.toLocaleString()}</span></div>
         <div class="surface-tabs" role="tablist">
           {surfaces.map((s) => (
-            <button key={s.name} role="tab" aria-selected={s === current} onClick={() => (chosen.value = s.name)}>{s.platform ? <RichName text={s.platform} /> : words(s.name)}</button>
+            <button type="button" key={s.name} role="tab" aria-selected={s === current} onClick={() => (chosen.value = s.name)}>{s.platform ? <RichName text={s.platform} /> : words(s.name)}</button>
           ))}
         </div>
         {current && (

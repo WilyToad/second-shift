@@ -116,7 +116,7 @@ export class GameLink {
    * or the whole force (~1.3 ms, on connect). A full dump costs ~26 ms, a dropped frame. */
   private async patchResearch(technologies?: string[]): Promise<void> {
     if (!this.loaded) return this.syncPrototypes(true);
-    let state;
+    let state: ActionData<"research_state">;
     try {
       state = await this.call("research_state", technologies ? { technologies } : {});
     } catch (e) {

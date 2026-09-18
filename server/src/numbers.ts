@@ -4,7 +4,7 @@
 
 const NUM = String.raw`(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)`;
 const OP = String.raw`(×|x|\*|times|\+|plus|÷|/|divided by)`;
-const IS = String.raw`(?:=|equals|is|are|makes|gives|comes to|→)`;
+const IS = "(?:=|equals|is|are|makes|gives|comes to|→)";
 const EXPR = new RegExp(String.raw`(?<![\w.,-])${NUM}\s*${OP}\s*${NUM}\s*${IS}\s*(about |roughly |around |~|≈)?${NUM}(?![\d,]*\.\d)`, "gi");
 
 const value = (s: string) => Number(s.replace(/,/g, ""));

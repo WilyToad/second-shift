@@ -216,7 +216,7 @@ export function formatPointedAt(p: PointedAt, facts?: (name: string) => string |
   lines.push(`in hand: ${p.hand ? `${p.hand.name} ${p.hand.count}` : p.hand_ghost ? `${p.hand_ghost} (ghost cursor, none carried)` : "nothing"}`);
   const o = p.opened;
   lines.push(`open window: ${!o ? "none" : o.entity ? seen(o.entity) : o.item ? `the ${o.item} item` : o.kind === "controller" ? "the player's inventory screen" : `the ${o.kind.replace(/_/g, " ")} screen`}`);
-  if (!p.selected && !(last && last.still_there && last.ago_ticks <= HOVER_FRESH_TICKS) && !o?.entity) {
+  if (!p.selected && !(last?.still_there && last.ago_ticks <= HOVER_FRESH_TICKS) && !o?.entity) {
     lines.push("nothing is pointed at: if they ask what \"this\" is, say you can't tell and ask them to hover over it");
   }
   if (facts) {

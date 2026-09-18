@@ -3,7 +3,7 @@ import chatPage from "../../displays/src/chat.html";
 import { DigestSchema } from "@companion/interfaces";
 import { Agent, fileSession, mapSession, SELECTED_PREFIX, TOOLS } from "./agent";
 import { GameLink, type Snapshot } from "./game";
-import type { ClientMessage, ServerMessage } from "./messages";
+import type { ServerMessage } from "./messages";
 import { OmlxClient, readOmlxApiKey } from "./model";
 import { craftersByCategory, recognitionPhrases, vocabulary } from "./grounding";
 import { VoiceClips } from "./voice-clips";

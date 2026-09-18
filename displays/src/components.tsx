@@ -172,7 +172,7 @@ export function BlueprintView({ card }: { card: BlueprintCard }) {
       </div>
       <div class="vis-note">{card.summary}</div>
       <div class="bp-actions">
-        <button onClick={copy}>{copied.value === "copied" ? "Copied" : "Copy blueprint string"}</button>
+        <button type="button" onClick={copy}>{copied.value === "copied" ? "Copied" : "Copy blueprint string"}</button>
         {copied.value === "select" && <textarea class="bp-string" readOnly rows={3} value={card.string} onFocus={(e) => (e.target as HTMLTextAreaElement).select()} />}
       </div>
     </figure>

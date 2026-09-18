@@ -11,8 +11,8 @@ export async function withRange(request: Request, response: Response): Promise<R
   const body = await response.arrayBuffer();
   const size = body.byteLength;
   // "bytes=500-" from 500 to the end; "bytes=-500" the last 500 bytes.
-  let start = m[1] === "" ? Math.max(0, size - Number(m[2])) : Number(m[1]);
-  let end = m[1] === "" || m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
+  const start = m[1] === "" ? Math.max(0, size - Number(m[2])) : Number(m[1]);
+  const end = m[1] === "" || m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
   const headers = new Headers(response.headers);
   headers.set("accept-ranges", "bytes");
   if (start >= size || start > end) {

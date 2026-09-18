@@ -4,7 +4,7 @@ import { encodeCommand, parseReply } from "../../interfaces/src/index";
 import { connectDevGame } from "../lib/devgame";
 const game = await connectDevGame();
 const N = 5000;
-const r = JSON.parse(await game.sc(`
+const _r = JSON.parse(await game.sc(`
   local p = game.connected_players[1] local s = p.character.surface local at = p.character.position
   local a = s.create_entity({ name = "iron-chest", position = s.find_non_colliding_position("iron-chest", { x = at.x + 2, y = at.y + 2 }, 20, 1), force = p.force })
   local b = s.create_entity({ name = "wooden-chest", position = s.find_non_colliding_position("wooden-chest", { x = at.x - 2, y = at.y + 2 }, 20, 1), force = p.force })

@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "files": { "includes": ["server/**", "displays/**", "interfaces/**", "scripts/**", "website/*.ts"] },
+  // Formatting stays off on purpose: turning it on would rewrite the whole repo in one commit and bury the history.
+  "formatter": { "enabled": false },
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        // `!` after an explicit check is how this code reads; tsc strict already guards it, and there were 418 sites.
+        "noNonNullAssertion": "off",
+        // String concatenation is readable; taste, not correctness.
+        "useTemplate": "off",
+        // The stylesheets are ordered by section, not by specificity; the a11y and correctness CSS rules stay on.
+        "noDescendingSpecificity": "off"
+      },
+      "complexity": {
+        // Bracket keys where the code already uses them; taste, not correctness.
+        "useLiteralKeys": "off"
+      },
+      "correctness": {
+        // Fires on valid areas in both stylesheets ("chat live" / "alerts live"; a 5-column layout with `.` cells),
+        // each checked by eye on 2026-09-18. Re-enable after a Biome upgrade and see whether it still does.
+        "noInvalidGridAreas": "off"
+      },
+      "suspicious": {
+        // `.forEach((x) => f(x))` ignores the callback's value by definition; the idiom is used deliberately.
+        "useIterableCallbackReturn": "off",
+        // `while ((m = re.exec(s)))`, `(map[k] ??= []).push(v)` and `return (this.x = y)`: read as intended.
+        "noAssignInExpressions": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      // Scripts and tests talk to loosely typed things on purpose (RCON replies, fakes); the product code doesn't.
+      "includes": ["scripts/**", "**/*.test.ts", "**/*.test.tsx"],
+      "linter": { "rules": { "suspicious": { "noExplicitAny": "off" } } }
+    }
+  ]
+}

@@ -8,7 +8,7 @@ import { asChecks, saveEvalRun } from "./lib/eval-log";
 const dev = await connectDevGame();
 await dev.leaveRemoteView();
 
-const { ws, got, until, ask, check, results, answers } = await openConsole({ reset: true });
+const { ws, ask, check, results, answers } = await openConsole({ reset: true });
 
 
 /** Character showing up where it shouldn't: himself, the ship, the old job, or a wry aside about the situation. */

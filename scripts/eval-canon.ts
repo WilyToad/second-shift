@@ -5,7 +5,7 @@
 import { openConsole } from "./lib/console";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
 
-const { ws, got, until, ask, check, results, answers } = await openConsole({ reset: true });
+const { ws, ask, check, results, answers } = await openConsole({ reset: true });
 
 
 // Detail the canon doesn't have. A name for the ship, a named crewmate, a date, a cargo, a rank for himself: each

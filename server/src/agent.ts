@@ -11,7 +11,7 @@ import { describeRow, productionRow, type RowBuild } from "./blueprint-template"
 import { stageFor, stageLines, tookAThrowback } from "./stages";
 import { nameCorrections } from "./names";
 import { turnNotes } from "./guidance";
-import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, PICTURE, ASKS_FOR, askedFor, parseTarget, targetRate, anchorFor, SELECTED_PREFIX, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
+import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, ASKS_FOR, askedFor, parseTarget, anchorFor, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 export { bareFollowUp, needsWorldTools, PICTURE, ASKS_FOR, askedFor, parseTarget, targetRate, anchorFor, SELECTED_PREFIX, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 import type { BlueprintCard } from "./messages";
 import { HiddenBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
@@ -1310,7 +1310,10 @@ export class Agent {
 
   decline(id: string): void {
     const p = this.pending.get(id);
-    if (!p) return this.deps.emit({ type: "approval_result", id, status: "expired", message: "This request is no longer pending." });
+    if (!p) {
+      this.deps.emit({ type: "approval_result", id, status: "expired", message: "This request is no longer pending." });
+      return;
+    }
     this.pending.delete(id);
     this.notes.push(`player declined "${p.title}"; nothing was changed`);
     this.deps.emit({ type: "approval_result", id, status: "declined", message: "Cancelled. Nothing was changed." });

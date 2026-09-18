@@ -62,8 +62,8 @@ function Item({ item }: { item: ThreadItem }) {
           <div class="approval-detail">{item.detail}</div>
           {item.status.value === null ? (
             <div class="row">
-              <button class="confirm" onClick={() => send({ type: "approve", id: item.id })}>Confirm</button>
-              <button class="cancel" onClick={() => send({ type: "decline", id: item.id })}>Cancel</button>
+              <button type="button" class="confirm" onClick={() => send({ type: "approve", id: item.id })}>Confirm</button>
+              <button type="button" class="cancel" onClick={() => send({ type: "decline", id: item.id })}>Cancel</button>
             </div>
           ) : (
             <div class="approval-result">{item.result}</div>

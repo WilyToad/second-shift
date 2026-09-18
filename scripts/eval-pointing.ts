@@ -11,7 +11,7 @@ const dev = await connectDevGame();
 await dev.leaveRemoteView();
 const p = PrototypesSchema.parse(parseReply(await dev.rcon.exec(encodeCommand({ id: 1, action: "dump_prototypes", args: {} }))).reply.data);
 
-const { ws, got, until, ask, check, results, answers } = await openConsole({ reset: true });
+const { ws, ask, check, results, answers } = await openConsole({ reset: true });
 
 // Claims about how a thing behaves. The save's own facts (type, logistic job, stacks, fluid, speed) are fine; these
 // verbs are how the model states mechanics nobody asked about, which is what FC-160 is about.
@@ -45,7 +45,7 @@ try {
     // Numbers the save knows: if the answer gives one, it must be the save's.
     const facts = p.entities[c.name];
     if (facts?.fluid_capacity) {
-      const said = answer.match(/([\d][\d,\.]*)\s*(?:units? of )?(?:fluid|liquid)/i)?.[1]?.replace(/[,\.]/g, "");
+      const said = answer.match(/([\d][\d,.]*)\s*(?:units? of )?(?:fluid|liquid)/i)?.[1]?.replace(/[,.]/g, "");
       check(`${c.name}: any fluid capacity is the save's ${facts.fluid_capacity}`, !said || Number(said) === facts.fluid_capacity, said ? `said ${said}` : "gave no number");
     }
     if (facts?.inventory_size) {
