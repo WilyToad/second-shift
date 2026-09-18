@@ -2,6 +2,7 @@
 // Needs bun run start + the dev save hosted.
 import { blueprintsIn, decodeBlueprintString, encodeBlueprintString } from "../server/src/blueprint";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
+import { openConsole } from "./lib/console";
 import type { ServerMessage } from "../server/src/messages";
 import { connectDevGame } from "./lib/devgame";
 
@@ -27,20 +28,7 @@ const dup = ents.find((e: any) => e.name === "steel-chest") ?? ents.find((e: any
 ents.push({ ...dup, entity_number: next + 1 });
 const brokenString = encodeBlueprintString(broken);
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-await until((m) => m.type === "status" && m.model.state === "ready", 120_000);
-const results: [string, boolean, string][] = [];
-const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
-check("re-encoded blueprint imports in-game with the same entity count", importedCount === bp.entities.length, `${importedCount}/${bp.entities.length}`);
-
+const { ws, got, until, check, results } = await openConsole();
 const ask = async (text: string) => {
   ws.send(JSON.stringify({ type: "reset" }));
   await until((m) => m.type === "reset", 5000, got.length);
@@ -50,6 +38,8 @@ const ask = async (text: string) => {
   const user = got.slice(from).find((m) => m.type === "user") as Extract<ServerMessage, { type: "user" }> | undefined;
   return { answer: got.slice(from).filter((m) => m.type === "token").map((m: any) => m.text).join(""), user: user?.text ?? "", done };
 };
+check("re-encoded blueprint imports in-game with the same entity count", importedCount === bp.entities.length, `${importedCount}/${bp.entities.length}`);
+
 
 const good = await ask(`Review this blueprint: ${original}`);
 check("original: the chat shows a placeholder, not the raw string", !good.user.includes(original.slice(0, 40)), good.user);

@@ -1,7 +1,7 @@
 // S27 acceptance: the player's first voice session (2026-09-15) replayed through the real server on the dev save, with
 // the game set up where it matters (a red chest under the mouse, storage tanks in the inventory). Checks that none of
 // the odd replies found in it come back. Server and dev save running; resets the conversation. Test setup uses /sc.
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 import { encodeCommand } from "../interfaces/src/index";
 import { connectDevGame } from "./lib/devgame";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
@@ -10,18 +10,7 @@ const game = await connectDevGame();
 await game.leaveRemoteView();
 const exec = (action: string, args: Record<string, unknown> = {}) => game.rcon.exec(encodeCommand({ id: Date.now(), action, args }));
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-await until((m) => m.type === "status" && m.model.state === "ready", 120_000);
-ws.send(JSON.stringify({ type: "reset" }));
-await until((m) => m.type === "reset", 5000);
+const { ws, got, until, results } = await openConsole({ reset: true });
 
 type Turn = { q: string; answer: string; tools: string[]; cards: number; ttftMs: number };
 const turns: Turn[] = [];
@@ -39,7 +28,6 @@ const ask = async (q: string): Promise<Turn> => {
   console.log(`\n> ${q}  [first words ${(turn.ttftMs / 1000).toFixed(2)} s]\n${turn.answer}${turn.tools.length ? `\n  tools: ${turn.tools.join(" | ")}` : ""}`);
   return turn;
 };
-const results: [string, boolean, string][] = [];
 const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`); };
 const compass = (text: string) => /\b(north-east|north-west|south-east|south-west|north|south|east|west)\b/i.exec(text)?.[1]?.toLowerCase();
 

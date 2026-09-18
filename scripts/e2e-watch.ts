@@ -1,19 +1,9 @@
 // FC-193: the background pass runs while the player asks their own questions, says at most one quiet line, and
 // costs them nothing they'd notice. Checks the behaviour end to end and re-measures the cache with it running.
 // Usage (server started with COMPANION_WATCH_MS=10000, dev save hosted): bun scripts/e2e-watch.ts
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(100); }
-  return null;
-};
-const results: [string, boolean, string][] = [];
-const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
+const { ws, got, until, check, results } = await openConsole({ ready: false });
 
 await until((m) => m.type === "status", 30_000);
 check("off until it's turned on", got.some((m) => m.type === "watching" && !m.on), "");

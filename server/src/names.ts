@@ -11,7 +11,7 @@
 import type { Prototypes } from "@companion/interfaces";
 
 /** Hyphenated English that will never be a prototype name. A false correction is worse than a missed one. */
-const ENGLISH = new Set([
+export const ENGLISH = new Set([
   "hand-carrying", "hand-crafting", "hand-craft", "hand-crafted", "hand-feeding", "hand-fed", "dead-end", "dead-ends",
   "on-device", "read-only", "long-term", "short-term", "double-check", "well-known", "up-to-date", "so-called",
   "left-hand", "right-hand", "one-off", "half-empty", "half-full", "high-level", "low-level", "north-east",
@@ -23,7 +23,7 @@ const ENGLISH = new Set([
 const NAME = /\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g;
 
 /** A technology's trigger names its item or entity either as a string or as `{ name }`, depending on the trigger. */
-function triggerName(value: unknown): string | null {
+export function triggerName(value: unknown): string | null {
   if (typeof value === "string") return value;
   if (value && typeof value === "object" && typeof (value as { name?: unknown }).name === "string") return (value as { name: string }).name;
   return null;

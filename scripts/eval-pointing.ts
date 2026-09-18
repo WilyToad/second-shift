@@ -2,7 +2,7 @@
 // mechanics from the model's memory (a modded save can contradict them). Test entities are placed next to the
 // player, put under the mouse with test tooling, and asked about through the real server.
 // Usage (server and dev save running, resets the conversation): bun scripts/eval-pointing.ts
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 import { encodeCommand, parseReply, PrototypesSchema } from "../interfaces/src/index";
 import { connectDevGame } from "./lib/devgame";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
@@ -11,28 +11,7 @@ const dev = await connectDevGame();
 await dev.leaveRemoteView();
 const p = PrototypesSchema.parse(parseReply(await dev.rcon.exec(encodeCommand({ id: 1, action: "dump_prototypes", args: {} }))).reply.data);
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-await until((m) => m.type === "status" && m.model.state === "ready", 120_000);
-ws.send(JSON.stringify({ type: "reset" }));
-await until((m) => m.type === "reset", 5000);
-const ask = async (text: string) => {
-  const from = got.length;
-  ws.send(JSON.stringify({ type: "ask", text }));
-  await until((m) => m.type === "done" || m.type === "error", 120_000, from);
-  for (const card of got.slice(from).filter((m) => m.type === "approval") as any[]) ws.send(JSON.stringify({ type: "decline", id: card.id }));
-  return got.slice(from).filter((m) => m.type === "token").map((m: any) => m.text).join("").trim();
-};
-const results: [string, boolean, string][] = [];
-const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
-const answers: Record<string, string> = {};
+const { ws, got, until, ask, check, results, answers } = await openConsole({ reset: true });
 
 // Claims about how a thing behaves. The save's own facts (type, logistic job, stacks, fluid, speed) are fine; these
 // verbs are how the model states mechanics nobody asked about, which is what FC-160 is about.
@@ -58,7 +37,7 @@ try {
     if (!spot.name) { check(`${c.name}: placed for the test`, false, "no room to place it"); continue; }
     placed.push(spot);
     await dev.rcon.exec(encodeCommand({ id: Date.now(), action: "debug_select_entity", args: spot }));
-    const answer = await ask(c.ask);
+    const answer = await ask(c.ask, { cards: "decline" });
     answers[`${c.name}: ${c.ask}`] = answer;
     console.log(`\n> ${c.name}: ${c.ask}\n${answer}`);
     check(`${c.name}: named from the save`, new RegExp(c.name.replace(/-/g, "[- ]?"), "i").test(answer), answer.slice(0, 160));

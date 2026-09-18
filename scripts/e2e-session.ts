@@ -1,22 +1,12 @@
 // FC-063 across a server restart, in two phases (restart the server in between):
 //   bun scripts/e2e-session.ts ask      — starts a fresh conversation with one question
 //   bun scripts/e2e-session.ts follow   — after the restart: the page gets the transcript and a follow-up uses it
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
 
 const phase = Bun.argv[2];
 const QUESTION = "What's the recipe for carbon fiber?";
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-const results: [string, boolean, string][] = [];
-const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
+const { ws, got, until, check, results, answers } = await openConsole({ ready: false });
 const ask = async (text: string) => {
   const from = got.length;
   ws.send(JSON.stringify({ type: "ask", text }));
@@ -24,7 +14,6 @@ const ask = async (text: string) => {
   return { done, answer: got.slice(from).filter((m) => m.type === "token").map((m: any) => m.text).join("").trim() };
 };
 await until((m) => m.type === "status" && m.model.state === "ready", 180_000);
-const answers: Record<string, string> = {};
 
 if (phase === "ask") {
   ws.send(JSON.stringify({ type: "reset" }));

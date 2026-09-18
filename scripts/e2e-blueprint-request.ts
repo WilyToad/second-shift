@@ -1,7 +1,7 @@
 // FC-108 through the real server: blueprint requests are built in code, shown with a copyable string, and can be
 // pasted through the approval card. Needs bun run start + the dev save hosted. Pasted ghosts are removed afterwards.
 import { decodeBlueprintString, blueprintsIn } from "../server/src/blueprint";
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 import { connectDevGame } from "./lib/devgame";
 
 const REQUESTS = [
@@ -9,18 +9,7 @@ const REQUESTS = [
   { text: "Can you design a blueprint for 30 automation science packs per minute?", item: "automation-science-pack" },
 ];
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-await until((m) => m.type === "status" && m.model.state === "ready", 120_000);
-const results: [string, boolean, string][] = [];
-const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
+const { ws, got, until, check, results } = await openConsole();
 const ask = async (text: string, reset = true) => {
   if (reset) { ws.send(JSON.stringify({ type: "reset" })); await until((m) => m.type === "reset", 5000, got.length); }
   const from = got.length;

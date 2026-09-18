@@ -1,6 +1,6 @@
 // FC-086: diagnosis scenario on the hosted dev save, through the real server (bun run start).
 // Builds starved and output-blocked assemblers near the player, then asks why they're stuck.
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
 import { connectDevGame } from "./lib/devgame";
 
@@ -40,18 +40,7 @@ try {
   const statuses = await dev.sc(`local c = {} for _, e in pairs(storage.diag or {}) do if e.valid then local st for k, v in pairs(defines.entity_status) do if v == e.status then st = k end end c[st or "?"] = (c[st or "?"] or 0) + 1 end end rcon.print(helpers.table_to_json(c))`);
   console.log(`in-game statuses: ${statuses}`);
 
-  const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-  const got: ServerMessage[] = [];
-  ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-  await new Promise((r) => (ws.onopen = r));
-  const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-    const end = performance.now() + ms;
-    while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-    return null;
-  };
-  await until((m) => m.type === "status" && m.model.state === "ready" && m.game.connected, 60_000);
-  ws.send(JSON.stringify({ type: "reset" }));
-  await until((m) => m.type === "reset", 5000);
+  const { ws, got, until } = await openConsole({ ready: "game", reset: true });
   const ask = async (text: string) => {
     const from = got.length;
     ws.send(JSON.stringify({ type: "ask", text }));

@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { ChartBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
+import { HiddenBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
 
 const streamed = (tokens: string[]) => {
-  const f = new ChartBlockFilter();
+  const f = new HiddenBlockFilter();
   return tokens.map((t) => f.push(t)).join("") + f.end();
 };
 
@@ -56,4 +56,15 @@ test("FC-184: a tool call written as text never reaches the player, however it's
   expect(streamed(["<tool_call>\n<function=find_ent"])).toBe("");
   // Prose that merely names a tool is untouched.
   expect(streamed(["I'd use find_entities for that."])).toBe("I'd use find_entities for that.");
+});
+
+test("FC-202: a chart-allowed turn still hides a tool call written as text, and lets the chart through", () => {
+  const f = new HiddenBlockFilter({ charts: true });
+  const answer = "Steady.\n```rate_chart\nitem=jelly surface=gleba window=30m\n```\n<tool_call>\n<function=find_entities>\n</function>\n</tool_call>\nDone.";
+  let out = "";
+  for (const ch of answer) out += f.push(ch);
+  out += f.end();
+  expect(out).toContain("```rate_chart");
+  expect(out).not.toContain("<tool_call>");
+  expect(out).toContain("Done.");
 });

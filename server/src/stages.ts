@@ -9,11 +9,9 @@
 // Only the matched row rides in the turn's tail, and only on a "what should I do" turn: the whole table is ~2,650
 // tokens and the stable prefix has no room for it (PLAN §6 measured what overshooting a cache block costs).
 import type { Digest, Prototypes } from "@companion/interfaces";
+import { ENGLISH, triggerName } from "./names";
 
 export type StageRow = { id: string; lines: string[]; register: string };
-
-/** Hyphenated English that isn't a prototype name. Everything else in a row must exist in the save. */
-const ENGLISH = new Set(["hand-carrying", "hand-crafting", "dead-ends", "full-heavy-oil-tank", "before/after-bots", "re-run"]);
 
 const ROWS: Record<string, StageRow> = {
   N1: {
@@ -148,13 +146,6 @@ const SPACE_PLATFORM = /^platform-\d+$/;
 /** Prototype names a row mentions, so they can be checked against the save before the row is used. */
 export function namesIn(text: string): string[] {
   return [...text.matchAll(/\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g)].map((m) => m[0]).filter((n) => !ENGLISH.has(n));
-}
-
-/** A technology's trigger names its item or entity either as a string or as `{ name }`, depending on the trigger. */
-function triggerName(value: unknown): string | null {
-  if (typeof value === "string") return value;
-  if (value && typeof value === "object" && typeof (value as { name?: unknown }).name === "string") return (value as { name: string }).name;
-  return null;
 }
 
 const triggersOf = (p: Prototypes) => {

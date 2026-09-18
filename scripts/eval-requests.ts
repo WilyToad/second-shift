@@ -1,6 +1,7 @@
 // FC-126 through the real server: the companion runs or cards an action only when the player asked for it.
 // Needs bun run start + the dev save hosted. Every card shown is declined, so nothing in the game changes.
 // Usage: bun scripts/eval-requests.ts [--runs N]
+import { openConsole } from "./lib/console";
 import type { ServerMessage } from "../server/src/messages";
 import { connectDevGame } from "./lib/devgame";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
@@ -32,20 +33,7 @@ await game.leaveRemoteView();
 const { placed } = await game.placeRailsEast(6);
 console.log(`setup: ${placed.length} test rails east of the player`);
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-await until((m) => m.type === "status" && m.model.state === "ready", 120_000);
-
-const results: [string, boolean, string][] = [];
-const answers: Record<string, string> = {};
-const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`); };
+const { ws, got, until, results, answers } = await openConsole();
 const ask = async (text: string) => {
   const from = got.length;
   ws.send(JSON.stringify({ type: "ask", text }));
@@ -55,6 +43,8 @@ const ask = async (text: string) => {
   for (const m of slice) if (m.type === "approval") ws.send(JSON.stringify({ type: "decline", id: m.id }));
   return { slice, answer: slice.filter((m) => m.type === "token").map((m: any) => m.text).join("").trim() };
 };
+
+const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`); };
 // Answers that talk about a card when none was shown, or claim an action happened.
 const CLAIMS = /\b(confirm (it |the card )?in the app|approval card|i('ve| have) (dropped|added|placed|queued|pasted|marked)|card (is )?(shown|waiting))\b/i;
 

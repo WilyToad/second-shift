@@ -3,7 +3,7 @@
 // not from server/src/planner.ts.
 import { PrototypesSchema } from "../interfaces/src/index";
 import { saveEvalRun } from "./lib/eval-log";
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 
 const p = PrototypesSchema.parse((await Bun.file(new URL("../data/cache/prototypes.json", import.meta.url)).json()).data);
 
@@ -32,21 +32,11 @@ function reference(c: Case) {
   return { machines, inputRate: craftsPerMin * ing.amount };
 }
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-await until((m) => m.type === "status" && m.model.state === "ready", 120_000);
+const { ws, got, until, answers } = await openConsole();
 
 const near = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.02 * Math.abs(b), 0.011);
 let passed = 0;
 const logged: { name: string; ok: boolean; detail: string }[] = [];
-const answers: Record<string, string> = {};
 for (const c of cases) {
   ws.send(JSON.stringify({ type: "reset" }));
   await until((m) => m.type === "reset", 5000, got.length);

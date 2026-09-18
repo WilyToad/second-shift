@@ -1,7 +1,7 @@
 // FC-181: "what should I do?" answers from the authored stage table (FC-180) and names nothing this save doesn't
 // have. The names check is FC-171's shape, run over the answer: every hyphenated name must be in the dump.
 // Usage (server and dev save running, resets the conversation): bun scripts/eval-stages.ts
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 import { encodeCommand, parseReply, PrototypesSchema } from "../interfaces/src/index";
 import { connectDevGame } from "./lib/devgame";
 import { unknownNames } from "../server/src/names";
@@ -11,29 +11,8 @@ const dev = await connectDevGame();
 await dev.leaveRemoteView();
 const p = PrototypesSchema.parse(parseReply(await dev.rcon.exec(encodeCommand({ id: 1, action: "dump_prototypes", args: {} }))).reply.data);
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-await until((m) => m.type === "status" && (m as { model: { state: string } }).model.state === "ready", 120_000);
-ws.send(JSON.stringify({ type: "reset" }));
-await until((m) => m.type === "reset", 5000);
-const ask = async (text: string) => {
-  const from = got.length;
-  ws.send(JSON.stringify({ type: "ask", text }));
-  await until((m) => m.type === "done" || m.type === "error", 120_000, from);
-  for (const card of got.slice(from).filter((m) => m.type === "approval") as { id: string }[]) ws.send(JSON.stringify({ type: "decline", id: card.id }));
-  return got.slice(from).filter((m) => m.type === "token").map((m) => (m as { text: string }).text).join("").trim();
-};
+const { ws, got, until, ask, check, results, answers } = await openConsole({ reset: true });
 
-const results: [string, boolean, string][] = [];
-const answers: Record<string, string> = {};
-const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
 
 // The dev save is deep into Space Age on Gleba, so the expected row is the Gleba one; the other questions check the
 // direction doesn't leak onto turns that didn't ask for it.
@@ -45,7 +24,7 @@ const CASES: { name: string; ask: string; stage?: RegExp; noStage?: boolean }[] 
 
 try {
   for (const c of CASES) {
-    const answer = await ask(c.ask);
+    const answer = await ask(c.ask, { cards: "decline" });
     answers[c.name] = answer;
     console.log(`\n"${c.ask}"\n  → ${answer.replace(/\n+/g, " ")}\n`);
     // The check that matters, run through the product's own checker (FC-171) so the eval measures what the player

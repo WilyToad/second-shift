@@ -1,7 +1,7 @@
 // FC-093 through the real server: find assemblers, ask to change their recipe, approve, check the game.
 // Needs bun run start + the dev save hosted. Test tooling moves the player to open ground, builds three
 // assemblers there, and puts everything back afterwards.
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 import { connectDevGame } from "./lib/devgame";
 
 const dev = await connectDevGame();
@@ -17,22 +17,11 @@ const setup = JSON.parse(await dev.sc(`local p = game.connected_players[1] local
   out.to = p.position
   rcon.print(helpers.table_to_json(out))`)) as { from: { x: number; y: number }; to: { x: number; y: number }; machines: { name: string; x: number; y: number }[] };
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-const results: [string, boolean, string][] = [];
-const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
+const { ws, got, until, check, results } = await openConsole();
 const recipes = async () => JSON.parse(await dev.sc(`local s = game.connected_players[1].surface local out = {} for _, r in pairs(helpers.json_to_table([=[${JSON.stringify(setup.machines)}]=])) do local e = s.find_entity(r.name, r) out[#out + 1] = e and e.get_recipe() and e.get_recipe().name or "none" end rcon.print(helpers.table_to_json(out))`)) as string[];
 
 try {
-  await until((m) => m.type === "status" && m.model.state === "ready", 120_000);
-  await until((m) => m.type === "digest" && Math.abs((m.digest.player?.position.x ?? 0) - setup.to.x) < 1, 10_000, got.length);
+    await until((m) => m.type === "digest" && Math.abs((m.digest.player?.position.x ?? 0) - setup.to.x) < 1, 10_000, got.length);
   check("setup: three gear assemblers next to the player", setup.machines.length === 3, JSON.stringify(setup.machines));
   ws.send(JSON.stringify({ type: "reset" }));
   await until((m) => m.type === "reset", 5000, got.length);

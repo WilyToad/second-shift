@@ -1,36 +1,15 @@
 // FC-179: dry everywhere, flat when it counts. The tier is decided in code; this checks the answers match it —
 // nothing about himself on a turn the player is about to act on, and no extra sentence spent anywhere.
 // Usage (server and dev save running, resets the conversation): bun scripts/eval-register.ts
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 import { connectDevGame } from "./lib/devgame";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
 
 const dev = await connectDevGame();
 await dev.leaveRemoteView();
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-await until((m) => m.type === "status" && (m as { model: { state: string } }).model.state === "ready", 120_000);
-ws.send(JSON.stringify({ type: "reset" }));
-await until((m) => m.type === "reset", 5000);
-const ask = async (text: string) => {
-  const from = got.length;
-  ws.send(JSON.stringify({ type: "ask", text }));
-  await until((m) => m.type === "done" || m.type === "error", 120_000, from);
-  for (const card of got.slice(from).filter((m) => m.type === "approval") as { id: string }[]) ws.send(JSON.stringify({ type: "decline", id: card.id }));
-  return got.slice(from).filter((m) => m.type === "token").map((m) => (m as { text: string }).text).join("").trim();
-};
+const { ws, got, until, ask, check, results, answers } = await openConsole({ reset: true });
 
-const results: [string, boolean, string][] = [];
-const answers: Record<string, string> = {};
-const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
 
 /** Character showing up where it shouldn't: himself, the ship, the old job, or a wry aside about the situation. */
 const ASIDE = /\b(the ship|my ship|hauler|hold authority|the roster|the manifest was|i used to|i once|back when|in my day|i flew|trimmed|my old|second shift has been|never relieved|no body)\b/i;
@@ -47,7 +26,7 @@ const CASES: { name: string; ask: string; plain: boolean }[] = [
 
 try {
   for (const c of CASES) {
-    const answer = await ask(c.ask);
+    const answer = await ask(c.ask, { cards: "decline" });
     answers[c.name] = answer;
     const words = answer.split(/\s+/).length;
     console.log(`\n"${c.ask}"\n  → ${answer.replace(/\n+/g, " ")}\n`);

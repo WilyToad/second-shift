@@ -1,6 +1,6 @@
 // S08 acceptance through the real server and model (bun run start + dev save hosted).
 import { encodeBlueprintString } from "../server/src/blueprint";
-import type { ServerMessage } from "../server/src/messages";
+import { openConsole } from "./lib/console";
 import { connectDevGame } from "./lib/devgame";
 
 const dev = await connectDevGame();
@@ -8,18 +8,8 @@ await dev.leaveRemoteView();
 const sc = dev.sc;
 const originalQueue = await sc(`local q = {} for _, t in pairs(game.forces.player.research_queue or {}) do q[#q+1] = t.name end rcon.print(helpers.table_to_json(q))`);
 const { placed: rails } = await dev.placeRailsEast(6);
-const results: [string, boolean, string][] = [];
-const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `\n      ${detail}` : ""}`); };
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
+const { ws, got, until, check, results } = await openConsole({ ready: "game" });
 const ask = async (text: string) => {
   const from = got.length;
   ws.send(JSON.stringify({ type: "ask", text }));
@@ -34,8 +24,7 @@ const approve = async (card: any) => {
 };
 
 try {
-  await until((m) => m.type === "status" && m.model.state === "ready" && m.game.connected, 120_000);
-  ws.send(JSON.stringify({ type: "reset" }));
+    ws.send(JSON.stringify({ type: "reset" }));
   await until((m) => m.type === "reset", 5000);
 
   // 1. Research: pick and queue.

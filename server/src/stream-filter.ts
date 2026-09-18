@@ -3,19 +3,27 @@
 // it), and a tool call the model wrote as text (FC-184, which reached one player as their entire answer).
 const FENCE = "```";
 type Block = { open: string; close: string };
-const BLOCKS: Block[] = [
-  { open: "```rate_chart", close: FENCE },
-  { open: "<tool_call>", close: "</tool_call>" },
-];
+const CHART: Block = { open: "```rate_chart", close: FENCE };
+const TOOL_CALL: Block = { open: "<tool_call>", close: "</tool_call>" };
 
-export class ChartBlockFilter {
+export class HiddenBlockFilter {
   private pending = "";
   private inBlock: Block | null = null;
+  private readonly blocks: Block[];
+
+  /**
+   * A tool-call block is always hidden. A chart block is hidden unless the turn allows charts — before this took an
+   * option, a chart-allowed turn ran no filter at all, so a tool call written as text streamed straight to the
+   * page on exactly those turns (FC-202, found by the 2026-09-18 audit).
+   */
+  constructor(opts: { charts?: boolean } = {}) {
+    this.blocks = opts.charts ? [TOOL_CALL] : [CHART, TOOL_CALL];
+  }
 
   /** How much of the tail could still grow into an opening marker, and so has to wait for the next token. */
   private held(): number {
     let keep = 0;
-    for (const block of BLOCKS) {
+    for (const block of this.blocks) {
       for (let k = Math.min(block.open.length - 1, this.pending.length); k > keep; k--) {
         if (this.pending.slice(-k) === block.open.slice(0, k)) { keep = k; break; }
       }
@@ -41,7 +49,7 @@ export class ChartBlockFilter {
       }
       let at = -1;
       let hit: Block | null = null;
-      for (const block of BLOCKS) {
+      for (const block of this.blocks) {
         const i = this.pending.indexOf(block.open);
         if (i >= 0 && (at < 0 || i < at)) { at = i; hit = block; }
       }
@@ -69,7 +77,7 @@ export class ChartBlockFilter {
 }
 
 export function stripChartBlocks(text: string): string {
-  const filter = new ChartBlockFilter();
+  const filter = new HiddenBlockFilter();
   return (filter.push(text) + filter.end()).replace(/\n{3,}/g, "\n\n").trimEnd();
 }
 

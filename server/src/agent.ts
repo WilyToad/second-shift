@@ -11,7 +11,7 @@ import { describeRow, productionRow, type RowBuild } from "./blueprint-template"
 import { stageFor, stageLines, tookAThrowback } from "./stages";
 import { nameCorrections } from "./names";
 import type { BlueprintCard } from "./messages";
-import { ChartBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
+import { HiddenBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
 import { pruneShots, waitForShot } from "./screenshots";
 import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
 import type { Snapshot } from "./game";
@@ -809,8 +809,9 @@ export class Agent {
     try {
       for (let round = 0; ; round++) {
         const tools = round < MAX_TOOL_ROUNDS ? TOOLS : undefined;
-        // Turns without charts drop any chart block the model writes anyway (FC-111).
-        const filter = chart ? null : new ChartBlockFilter();
+        // Turns without charts drop any chart block the model writes anyway (FC-111); a tool call written as text is
+        // dropped on every turn (FC-184, FC-202).
+        const filter = new HiddenBlockFilter({ charts: chart });
         const show = (text: string) => {
           if (!text) return;
           ttftMs ??= performance.now() - started;
@@ -827,7 +828,7 @@ export class Agent {
             tools,
             signal: stop.signal,
             onToken: (text) => {
-              show(repeat.push(filter ? filter.push(text) : text));
+              show(repeat.push(filter.push(text)));
               if (repeat.repeated && !stop.signal.aborted) stop.abort();
             },
           });
@@ -835,7 +836,7 @@ export class Agent {
           if (!repeat.repeated) throw e;
           result = { text: repeat.text(), toolCalls: [], totalMs: performance.now() - roundStarted };
         }
-        if (filter && !repeat.repeated) show(repeat.push(filter.end()));
+        if (!repeat.repeated) show(repeat.push(filter.end()));
         show(repeat.end());
         if (repeat.repeated) {
           record.repeated = true;

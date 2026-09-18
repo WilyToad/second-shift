@@ -1,22 +1,12 @@
 // FC-042 check through the real server: a trend question gets a rate_chart block naming an item and
 // surface the page has recorded history for. Needs bun run start + the dev save hosted.
 import { parseSpec } from "../displays/src/components";
+import { openConsole } from "./lib/console";
 import type { ServerMessage } from "../server/src/messages";
 
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-await until((m) => m.type === "status" && m.model.state === "ready" && m.game.connected, 120_000);
+const { ws, got, until } = await openConsole({ ready: "game", reset: true });
 const series = (await until((m) => m.type === "series", 5000)) as Extract<ServerMessage, { type: "series" }> | null;
 const keys = new Set(Object.keys(series?.series ?? {}));
-ws.send(JSON.stringify({ type: "reset" }));
-await until((m) => m.type === "reset", 5000);
 
 let failures = 0;
 for (const question of ["How is my science doing? Show me a chart.", "Is my iron plate production on the factory floor holding steady?"]) {

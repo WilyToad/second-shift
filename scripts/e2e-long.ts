@@ -1,4 +1,5 @@
 // FC-076: a long conversation through the real server; follow-ups should stay fast as history grows.
+import { openConsole } from "./lib/console";
 import type { ServerMessage } from "../server/src/messages";
 
 const questions = [
@@ -7,18 +8,7 @@ const questions = [
   "What does a foundry craft?", "What makes holmium plates?", "What's the recipe for carbon fiber?", "How many copper cables in a green circuit?",
   "What does a biochamber need to run?", "What spoils fastest in my save?", "What makes sulfuric acid?", "Summarize what we talked about in one sentence.",
 ];
-const ws = new WebSocket("ws://127.0.0.1:5170/ws");
-const got: ServerMessage[] = [];
-ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
-await new Promise((r) => (ws.onopen = r));
-const until = async (pred: (m: ServerMessage) => boolean, ms: number, from = 0) => {
-  const end = performance.now() + ms;
-  while (performance.now() < end) { const hit = got.slice(from).find(pred); if (hit) return hit; await Bun.sleep(50); }
-  return null;
-};
-await until((m) => m.type === "status" && m.model.state === "ready", 120_000);
-ws.send(JSON.stringify({ type: "reset" }));
-await until((m) => m.type === "reset", 5000);
+const { ws, got, until } = await openConsole({ reset: true });
 const startedAt = new Date().toISOString();
 
 const ttfts: number[] = [];
