@@ -31,9 +31,9 @@ export function correctedRequest(question: string, lastQuestion: string | undefi
   return CORRECTION.test(q) || /^\s*no[,.]?\s+the\b/i.test(q) ? lastQuestion.trim() : null;
 }
 
-const START = /\b(what (should|do|can) i do|what (should|do|can) i (build|make|craft|place|set up) (next|now|first)|what to build (next|first)|help me|i need help|get(ting)? started|where (do|should) i (start|begin)|what now|what next|what'?s next|next steps?|first steps?|just (started|landed|crashed|spawned)|new (game|map)|how do i (start|begin))\b|^\s*help\b/i;
+const START = /\b(what (should|do|can) i do|what (should|do|can) i (build|make|craft|place|set up|work on|focus on) (next|now|first)|what to build (next|first)|help me|i need help|get(ting)? started|where (do|should) i (start|begin)|what now|what next|what'?s next|next steps?|first steps?|just (started|landed|crashed|spawned)|new (game|map)|how do i (start|begin))\b|^\s*help\b/i;
 // "How do I craft X?" is a recipe question; only what the player can craft or has counts here.
-const CARRY = /\b(inventory|carrying|holding|in my hands?|what do i have|have on me|what (can|could|should) i (hand ?)?(craft|make)|can i (hand ?)?craft|craftable|craft (right )?now|pick(ed)? up|debris|wreck\w*|materials)\b/i;
+const CARRY = /\b(inventory|carrying|holding(?! (steady|stable|up|on|back|out))|in my hands?|what do i have|have on me|what (can|could|should) i (hand ?)?(craft|make)|can i (hand ?)?craft|craftable|craft (right )?now|pick(ed)? up|debris|wreck\w*|materials)\b/i;
 const BUILT = /\b(i (just |have |'ve )?(built|placed|put down|set up)|what (did|have) i (just )?(build|built|place|placed|make|made)|what you('ve| have)? ?(just )?(built|placed|made)|my (last|latest|new|recent) builds?|i just (made|build) (something|a|an|some))\b/i;
 const LOOK = /\b(scan\w*|search (wider|further|around|for (ore|resources?|coal|iron|copper|stone|trees))|look (further|wider|farther)|look around|look at (this|here|what)|what'?s (around|nearby|here|near me)|what is (around|nearby|here|near me)|around (me|here)|what do you see|what can you see|can you see|see what|surroundings|found (some |an? |the )?[\w -]{0,24}\b(ore|resources?|patch|water|oil|coal|stone|trees|rocks)|where('?s| is| are| can i find) (the |some )?(nearest |closest )?[\w -]{0,24}\b(ore|resources?|water|coal|stone|oil)\b|explore)\b/i;
 
@@ -178,7 +178,7 @@ export function claimCorrections(text: string, status: PlayerStatus, known: Set<
 }
 
 // "What is this?", "what am I holding?", "can you see what I have highlighted?" (FC-151).
-const POINTING = /\b(what('?s| is| are) (this|that|these|those|it)\b|what am i (looking at|pointing at|pointing to|hovering( over)?|holding|selecting|carrying in my hand)|(under|at) (my|the) (cursor|mouse)|highlight\w*|hover\w*|selected|select\w* (this|that)|this (thing|building|machine|entity|chest|box|container|one|item)|that (thing|building|machine|entity|chest|box|container|one)|in my hands?|holding|(have|got) open|this (window|screen|menu)|what do i have open)\b/i;
+const POINTING = /\b(what('?s| is| are) (this|that|these|those|it)\b|what am i (looking at|pointing at|pointing to|hovering( over)?|holding|selecting|carrying in my hand)|(under|at) (my|the) (cursor|mouse)|highlight\w*|hover\w*|selected|select\w* (this|that)|this (thing|building|machine|entity|chest|box|container|one|item)|that (thing|building|machine|entity|chest|box|container|one)|in my hands?|holding(?! (steady|stable|up|on|back|out))|(have|got) open|this (window|screen|menu)|what do i have open)\b/i;
 // "What's in this chest?", "what does that wagon hold?" (FC-152).
 const CONTENTS = /\b(what('?s| is)? in(side)? (it|this|that|there|the)\b|contents?|what does (it|this|that|the [\w -]{1,24}) (have|hold|contain|store)|how (much|many) [\w -]{1,30} (is |are )?in (it|this|that|there|the))/i;
 

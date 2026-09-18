@@ -26,12 +26,16 @@ export function bareFollowUp(question: string): boolean {
  */
 export function needsWorldTools(question: string, hasLastResult: boolean): boolean {
   const q = question.toLowerCase();
-  if (/\b(near|nearby|around me|next to me|close to me|here|to my|on my|of me|in view|on screen|visible)\b/.test(q)) return true;
+  if (/\b(near|nearby|around me|next to me|close to me|here|to my|on my|of me|in view|on screen|visible|on the map)\b/.test(q)) return true;
+  // "A big red dot on the map up there, that must be monsters" wasn't a world question at all, so the search it
+  // wanted wasn't allowed (FC-204, found by the FC-199 corpus).
+  if (/\b(monsters?|enem(?:y|ies)|biters?|spitters?|pentapods?|nests?|worms?|demolishers?)\b/.test(q)) return true;
   // Looking around and the player's own builds are world questions too (S22: "yeah, look around" got "I can't see").
   if (/\b(show me the way|which way|point me|guide me|how do i get to)\b/.test(q)) return true;
   if (/\b(look around|look at (this|here|that)|what'?s around|what do you see|what can you see|surroundings|explore|scan\w*|search wider|look (further|wider|farther))\b/.test(q)) return true;
   if (/\b(i (just |have |'ve )?(built|placed|put down)|what (did|have) i (just )?(build|built|place|placed|make|made))\b/.test(q)) return true;
-  if (/\b(find|search|look for|highlight|show me|where are|count|which)\b/.test(q)) return true;
+  // "What's the nearest coal?" and "where is the rocket silo?" are looks, and neither word was here (FC-204).
+  if (/\b(find|search|look for|highlight|show me|where('?s| is| are)|nearest|closest|count|which)\b/.test(q)) return true;
   if (/\b(mark|unmark|deconstruct\w*|remove|delete|clear|cancel|upgrade\w*|queue|start research\w*|research it|tag|pin|camera|jump|take me|paste|place|build it)\b/.test(q)) return true;
   if (/\b(set|switch|change)\b.*\b(to|recipe)\b/.test(q)) return true;
   if (/\b(screenshot|picture|photo|what does .+ look like)\b/.test(q)) return true;
@@ -111,7 +115,9 @@ export function wantsBlueprint(question: string): boolean {
  */
 export const SPATIAL = /\b(near me|nearby|near here|around me|around here|to my (left|right|north|south|east|west)|on the map|how many [^?]*\b(near|around|here|there|left|right|north|south|east|west)\b|what'?s (around|nearby|here)|nearest|closest)\b/i;
 /** Questions where something is happening to the player right now, and a remark would be an obstacle. */
-export const URGENT = /\b(attack\w*|attacked|biters?|pentapods?|wriggler\w*|demolisher\w*|under fire|raid\w*|alarm|alert\w*|brownout|power (is )?(out|down|failing)|no power|out of ammo|low ammo|breach\w*|dying|destroyed|on fire|leak\w*|spoil\w*|starv\w*|help me|hurry|quick)\b/i;
+// "help me… what do I do?" is a start question, not an alarm, and "quick question" isn't urgent: both used to be
+// answered flat (FC-203, found by the FC-199 corpus). Monsters and enemies are threats and weren't listed.
+export const URGENT = /\b(attack\w*|attacked|biters?|pentapods?|wriggler\w*|demolisher\w*|under fire|raid\w*|alarm|alert\w*|brownout|power (is )?(out|down|failing)|no power|out of ammo|low ammo|breach\w*|dying|destroyed|on fire|leak\w*|spoil\w*|starv\w*|monsters?|enem(?:y|ies)|nests?|hurry)\b/i;
 /**
  * Should this answer be said flat, with no character in it at all (FC-179)?
  *
@@ -135,5 +141,5 @@ export function wantsBuild(question: string): boolean {
 }
 /** Is the player asking about a trend over time, where a rate_chart helps? */
 export function wantsChart(question: string): boolean {
-  return /\b(chart|graph|plot|trend\w*|over time|history|holding|steady|stable|drop\w*|fall\w*|ris\w*|increas\w*|decreas\w*|slow\w* down|how('s| is) .+ doing)\b/i.test(question);
+  return /\b(chart|graph|plot|trend\w*|over time|history|holding (steady|stable|up)|steady|stable|drop\w*|fall\w*|ris\w*|increas\w*|decreas\w*|slow\w* down|how('s| is) .+ doing)\b/i.test(question);
 }

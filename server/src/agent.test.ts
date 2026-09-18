@@ -210,7 +210,9 @@ test("planning tools: explicit research runs now, unprompted is offered in words
   const agent = new Agent({ model, game, system: () => "rules", retriever: () => retriever, prototypes: () => prototypes, emit: (m) => events.push(m) });
 
   await agent.ask("queue the research for fast belts");
-  const acts = () => calls.filter((c) => c.action !== "research_options"); // research turns also fetch the options list
+  // Looks aren't actions: research turns fetch the options list, and a start question (FC-205 made "what should I
+  // work on next?" one) looks at the player's status and surroundings. What this counts is things *done*.
+  const acts = () => calls.filter((c) => !["research_options", "player_status", "surroundings"].includes(c.action));
   expect(acts()).toEqual([{ action: "queue_research", args: { technology: "logistics" } }]);
   expect(model.seen[0]!.at(-1)!.content).toContain("researchable now (1, cheapest first): logistics 10×automation");
 
