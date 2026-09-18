@@ -444,6 +444,20 @@ inside the same cached 4,096-token block, so eval-grounding first token came in 
 before it, same conditions) and the follow-up at 1.82 s. The active list rides in the turn's tail, so a long list
 costs a few tail tokens rather than breaking the cache.
 
+**The second shift itself (FC-193, 2026-09-18):** the background pass the name has promised since S01, now that
+FC-192 has shown it's affordable. It is off until the player turns it on, looks every five minutes, and writes at
+most one line into the console's feed — never spoken, never acted on, and nothing at all when the factory is fine.
+The findings are computed in code (the turn's own `diagnose()` rules plus anything down more than 30% since the last
+look, and only for lines above 10 a minute); the model is asked exactly one thing, which is which single finding is
+worth a line and how to say it flat. A note that would need a grounding correction (FC-171) is dropped rather than
+shown, because a claim nobody asked for is the easiest place for an invented name to hide.
+
+Two rules keep it tolerable to leave on: the same finding stays quiet for 30 minutes, and **nothing at all is said
+within two look intervals of the last note** — without that floor, a factory that dips and recovers produces a new
+finding every look, never repeating itself and still chattering. **Re-measured with the real pass running** every 10
+seconds rather than every five minutes: a lone request still reported `cached 4096` throughout, first token 0.63–0.68 s,
+memory peaking at 83 GiB — so FC-192's conclusion holds for the actual feature and not just for the probe.
+
 **Concurrency is cheap, not fast (FC-192, 2026-09-18):** oMLX 0.7.0.dev4 keeps Lightning MTP on across concurrent
 requests, so a background pass is finally affordable — but not for the reason the release note gives.
 `scripts/probe-concurrency.ts`, against the real aligned prefix: **the cached prefix survives everything** — a

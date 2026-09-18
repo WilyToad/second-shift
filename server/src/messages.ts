@@ -37,12 +37,16 @@ export type ServerMessage =
   | { type: "lists"; lists: Checklist[]; active?: string }
   // Words from this save, so the console can pick the transcript that matches them (FC-175), and phrases to bias
   // the recognizer toward where the browser supports that (FC-177).
-  | { type: "vocabulary"; words: string[]; phrases?: string[]; name?: string };
+  | { type: "vocabulary"; words: string[]; phrases?: string[]; name?: string }
+  // One quiet line from the background pass (FC-193): never spoken, never acted on, at most one per look.
+  | { type: "note"; text: string; at: number; sinceMs: number }
+  | { type: "watching"; on: boolean };
 
 export type ClientMessage =
   // `spoken` marks a question that came through speech recognition, which mis-hears words (FC-175).
   // `heard` is the diagnostic record of a spoken question (FC-185): what the engine offered, what was picked and
   // whether the phrases were accepted. Logged, never put in the prompt.
+  | { type: "watch"; on: boolean }
   | { type: "ask"; text: string; thinking?: boolean; spoken?: boolean; heard?: { first: string; picked: string; alternatives: number; offered: string[]; phrases: number; where: string; carried: boolean } }
   | { type: "approve"; id: string }
   | { type: "decline"; id: string }

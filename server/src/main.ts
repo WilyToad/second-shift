@@ -17,6 +17,8 @@ import { SHOT_NAME } from "./screenshots";
 import { ElevenLabs, elevenLabsKey } from "./tts";
 import { SOUND_NAMES, type SoundName } from "./sfx";
 import { ModelWaker } from "./wake";
+import { howLongAgo, Watcher } from "./watch";
+import { nameCorrections } from "./names";
 import { existsSync } from "node:fs";
 
 export type { ClientMessage, ServerMessage } from "./messages";
@@ -62,6 +64,39 @@ const SOUNDS_DIR = new URL("../../data/sounds", import.meta.url).pathname;
 
 // ElevenLabs voices (FC-148), only when the player has put a key in the environment or .env.
 const tts = elevenLabsKey() ? new ElevenLabs({ key: elevenLabsKey()!, model: process.env.ELEVENLABS_MODEL, defaultVoice: process.env.ELEVENLABS_VOICE_ID }) : null;
+
+/**
+ * The second shift (FC-193): a quiet look while the player plays. Off until they turn it on. The model round uses
+ * the same system prompt as a turn, so it shares the cached blocks rather than competing for them — FC-192 measured
+ * that a concurrent request leaves `cached 4096` intact and costs the player ~0.15 s of first token.
+ */
+const watcher = new Watcher({
+  digest: () => game.latest()?.digest,
+  say: async (found, sinceMs) => {
+    const protos = game.prototypes()?.data ?? null;
+    const lines = found.map((f) => `- ${f.line}`).join("\n");
+    const turn = userTurn(`You looked at the factory ${howLongAgo(sinceMs)} and nobody asked you anything. These are the only things worth saying, computed from the game's own data:\n${lines}\n\nPick the single one that matters most and say it in one sentence, under 25 words, flat and plain — no aside, nothing about yourself, no advice unless it fits in the same sentence. Name nothing that isn't in the lines above. If none of it is worth interrupting for, reply with exactly: nothing.`);
+    try {
+      const result = await model.stream(buildMessages(system, [], turn), { maxTokens: 60 });
+      const text = result.text.trim();
+      if (!text || /^nothing\b/i.test(text)) return null;
+      // A background claim nobody asked for is the easiest place for an invented name to hide (FC-171), so a note
+      // that would need a correction isn't shown at all.
+      if (nameCorrections(text, protos).length) {
+        console.log(`Dropped a background note that named something the save lacks: ${text}`);
+        return null;
+      }
+      return text;
+    } catch (e) {
+      console.warn("Background look failed:", (e as Error).message);
+      return null;
+    }
+  },
+  emit: (note) => {
+    console.log(`Second shift (looked ${howLongAgo(note.sinceMs)}): ${note.text}`);
+    broadcast({ type: "note", text: note.text, at: note.at, sinceMs: note.sinceMs });
+  },
+});
 
 const clips = new VoiceClips(join(import.meta.dir, "..", "..", "data", "captures", "voice"));
 
@@ -139,6 +174,7 @@ const server = Bun.serve({
     open(ws) {
       ws.subscribe("chat");
       ws.send(JSON.stringify(statusMessage()));
+      ws.send(JSON.stringify({ type: "watching", on: watcher.on } satisfies ServerMessage));
       // The conversation so far, so a reloaded page (or a restarted server) shows where things stand (FC-063).
       const transcript = agent.transcript();
       if (transcript.length) ws.send(JSON.stringify({ type: "transcript", items: transcript } satisfies ServerMessage));
@@ -174,6 +210,11 @@ const server = Bun.serve({
           asking--;
         }
       });
+      if (msg.type === "watch") {
+        // COMPANION_WATCH_MS shortens the interval for the e2e check; play uses the five-minute default.
+        if (msg.on) watcher.start(Number(process.env.COMPANION_WATCH_MS) || undefined); else watcher.stop();
+        broadcast({ type: "watching", on: watcher.on });
+      }
       if (msg.type === "wake") waker.wake();
       if (msg.type === "reset") busy = busy.then(() => agent.reset());
       // Approvals don't wait for the model: the player is waiting on them.

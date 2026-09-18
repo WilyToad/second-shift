@@ -3,7 +3,7 @@ import type { GameEvent } from "@companion/interfaces";
 import { useSignal } from "@preact/signals";
 import type { Point } from "../../server/src/series";
 import { RichName } from "./rich-text";
-import { digest, droppedEvents, events, series, lists } from "./store";
+import { digest, droppedEvents, events, notes, send, series, lists, watching } from "./store";
 
 const round = (n: number) => (n >= 100 ? Math.round(n).toLocaleString() : String(Math.round(n * 10) / 10));
 const words = (s: string) => s.replace(/[-_]/g, " ");
@@ -62,6 +62,17 @@ export function AlertFeed() {
   return (
     <aside class="col-alerts panel" aria-label="Alerts">
       <div class="panel-head"><span class="label">Alerts</span><span class="label-sub">{active.length ? `${active.reduce((n, a) => n + a.count, 0)} active` : "none active"}</span></div>
+      {/* The second shift (FC-193): quiet, off by default, and it only ever says things — it never acts. */}
+      <label class="watch-toggle" title="Ballast looks at the factory every few minutes while you play and writes at most one line here. He never acts on what he finds.">
+        <input type="checkbox" id="watching" checked={watching.value} onChange={(e) => send({ type: "watch", on: e.currentTarget.checked })} />
+        Keep an eye on things
+      </label>
+      {notes.value.slice().reverse().map((n) => (
+        <div class="note" key={n.at}>
+          <div class="alert-meta"><span>second shift</span><span class="num">{new Date(n.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>
+          <div class="alert-text">{n.text}</div>
+        </div>
+      ))}
       {droppedEvents.value > 0 && <div class="notice">{droppedEvents.value} older events were missed</div>}
       <ul class="alert-list">
         {list.length === 0 && <li class="empty">Urgent alerts and finished research show up here as they happen.</li>}

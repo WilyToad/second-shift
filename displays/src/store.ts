@@ -25,6 +25,9 @@ export const events = signal<GameEvent[]>([]);
 /** The lists the companion keeps (FC-163). Display only: the player asks the companion to change them. */
 export const lists = signal<{ lists: Checklist[]; active?: string }>({ lists: [] });
 export const droppedEvents = signal(0);
+/** Quiet lines from the background pass (FC-193), newest last. Never spoken, never acted on. */
+export const notes = signal<{ text: string; at: number; sinceMs: number }[]>([]);
+export const watching = signal(false);
 export const digest = signal<{ digest: Digest; receivedAt: number } | null>(null);
 export const series = signal<SeriesMap>({});
 
@@ -96,6 +99,13 @@ export function onMessage(m: ServerMessage): void {
       // (FC-170). New ones arrive as the game reports them.
       events.value = [];
       droppedEvents.value = 0;
+      notes.value = [];
+      break;
+    case "note":
+      notes.value = [...notes.value, { text: m.text, at: m.at, sinceMs: m.sinceMs }].slice(-20);
+      break;
+    case "watching":
+      watching.value = m.on;
       break;
     case "events": {
       const seen = new Set(events.value.map((e) => e.seq));

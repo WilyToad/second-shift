@@ -20,6 +20,11 @@ Second Shift runs next to your game, usually on a second monitor. You ask about 
 reads the answer from the running game: its live state and its own recipe data. When you ask it to change something, it
 shows you exactly what will happen and waits for your OK. It never plays the game for you.
 
+There's a switch in the alerts panel called **Keep an eye on things**. With it on, Ballast looks at the factory every
+few minutes while you play and writes at most one quiet line — idle labs, a production line that's fallen away — into
+the feed. He never acts on what he finds, never speaks it aloud, and says nothing at all when the factory is fine,
+which is most of the time. It's off until you turn it on.
+
 Second Shift is the job. **Ballast** is who works it: the pilot AI off the ship that brought you here, now riding in
 your helmet with no body and no ship, and rather good at manifests. You can call him by name — the speech recognizer
 is told to expect it.

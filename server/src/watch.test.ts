@@ -1,0 +1,112 @@
+import { expect, test } from "bun:test";
+import { DigestSchema } from "@companion/interfaces";
+import { findings, howLongAgo, LOOK_EVERY_MS, REPEAT_AFTER_MS, Watcher } from "./watch";
+
+const digest = (opts: { produced?: Record<string, number>; idleLabs?: number; researching?: string } = {}) =>
+  DigestSchema.parse({
+    tick: 1, alerts: [],
+    research: { progress: 0, queue: [], ...(opts.researching ? { current: opts.researching } : {}) },
+    surfaces: [{ name: "nauvis", produced: Object.entries(opts.produced ?? {}).map(([name, per_minute]) => ({ name, per_minute })), consumed: [], science: [], age_ticks: 0 }],
+    machines: {
+      progress: { machines: 100, scanned: true, refresh_ticks: 60 },
+      stuck: opts.idleLabs ? [{ surface: "nauvis", recipes: [{ recipe: "(research)", stuck: opts.idleLabs, total: opts.idleLabs, statuses: { no_research_in_progress: opts.idleLabs } }] }] : [],
+    },
+  });
+
+test("FC-193: it notices a real drop and idle labs, and stays quiet when nothing changed", () => {
+  const before = digest({ produced: { "iron-plate": 240, "copper-plate": 120 } });
+  // A third off is worth a line; a few per cent isn't.
+  expect(findings(digest({ produced: { "iron-plate": 100, "copper-plate": 118 } }), before).map((f) => f.kind)).toEqual(["drop:iron-plate"]);
+  expect(findings(digest({ produced: { "iron-plate": 235, "copper-plate": 119 } }), before)).toEqual([]);
+  // Small numbers don't count: a line that falls from 8 to 2 a minute isn't news.
+  expect(findings(digest({ produced: { tungsten: 2 } }), digest({ produced: { tungsten: 8 } }))).toEqual([]);
+  // The turn's own root-cause rules come along.
+  expect(findings(digest({ idleLabs: 47 }), null).map((f) => f.line)[0]).toContain("research has stopped");
+  // Nothing at all on a healthy factory, which is most of the time.
+  expect(findings(digest({ produced: { "iron-plate": 240 } }), digest({ produced: { "iron-plate": 240 } }))).toEqual([]);
+});
+
+test("FC-193: at most one note per look, and it doesn't say the same thing twice", async () => {
+  let now = 1_000_000;
+  const notes: string[] = [];
+  const asked: number[] = [];
+  const watcher = new Watcher({
+    digest: () => digest({ idleLabs: 47 }),
+    say: async (fresh) => { asked.push(fresh.length); return "Your labs are idle."; },
+    emit: (n) => notes.push(n.text),
+    now: () => now,
+  });
+  expect(await watcher.look()).not.toBeNull();
+  expect(notes).toEqual(["Your labs are idle."]);
+
+  // Same finding, ten minutes later: nothing said, and the model isn't even asked.
+  now += 10 * 60 * 1000;
+  expect(await watcher.look()).toBeNull();
+  expect(asked).toHaveLength(1);
+
+  // After the quiet period it may say it again, because it's still true and they've been away from it.
+  now += REPEAT_AFTER_MS + 1000;
+  expect(await watcher.look()).not.toBeNull();
+  expect(notes).toHaveLength(2);
+});
+
+test("FC-193: nothing to say means no model round at all, and no game means no look", async () => {
+  let asked = 0;
+  const quiet = new Watcher({ digest: () => digest({ produced: { "iron-plate": 240 } }), say: async () => { asked++; return "x"; }, emit: () => {} });
+  expect(await quiet.look()).toBeNull();
+  expect(asked).toBe(0);
+
+  const offline = new Watcher({ digest: () => undefined, say: async () => { asked++; return "x"; }, emit: () => {} });
+  expect(await offline.look()).toBeNull();
+  expect(asked).toBe(0);
+
+  // The model can decline to say anything, and then nothing is emitted.
+  const notes: unknown[] = [];
+  const declining = new Watcher({ digest: () => digest({ idleLabs: 5 }), say: async () => null, emit: (n) => notes.push(n) });
+  expect(await declining.look()).toBeNull();
+  expect(notes).toEqual([]);
+});
+
+test("FC-193: it won't chatter, even when every look finds something new", async () => {
+  let now = 1_000_000;
+  // A different item collapses each look, so every finding is a new kind and the repeat rule never fires — which
+  // is what makes this a test of the quiet floor rather than of the repeat rule.
+  const items = ["iron-plate", "copper-plate", "steel-plate", "plastic-bar", "sulfur"];
+  let look = 0;
+  const notes: string[] = [];
+  const watcher = new Watcher({
+    digest: () => {
+      const produced = Object.fromEntries(items.map((name, i) => [name, i === look - 1 ? 40 : 240]));
+      look++;
+      return digest({ produced });
+    },
+    say: async (fresh) => fresh[0]!.line,
+    emit: (n) => notes.push(n.text),
+    now: () => now,
+  });
+  watcher.start(60_000); // a minute between looks, so the floor is two minutes
+  await watcher.look();
+  await watcher.look();
+  expect(notes).toHaveLength(1); // the second look found something new and still kept quiet
+  now += 60_000;
+  await watcher.look();
+  expect(notes).toHaveLength(1);
+  now += 61_000; // past two looks' worth of quiet
+  await watcher.look();
+  expect(notes).toHaveLength(2);
+  watcher.stop();
+});
+
+test("FC-193: it's off until it's turned on, and says how long ago it looked", () => {
+  const watcher = new Watcher({ digest: () => digest(), say: async () => "x", emit: () => {} });
+  expect(watcher.on).toBe(false);
+  watcher.start(LOOK_EVERY_MS);
+  expect(watcher.on).toBe(true);
+  watcher.stop();
+  expect(watcher.on).toBe(false);
+
+  expect(howLongAgo(20_000)).toBe("just now");
+  expect(howLongAgo(60_000)).toBe("a minute ago");
+  expect(howLongAgo(5 * 60_000)).toBe("5 minutes ago");
+  expect(howLongAgo(60 * 60_000)).toBe("an hour ago");
+});
