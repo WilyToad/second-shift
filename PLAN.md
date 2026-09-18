@@ -818,6 +818,30 @@ never reaches the page; the picker labels them online.
 3. ~~**Display surface.**~~ Decided: local web app on the 2nd monitor, in-game UI as a stretch goal (§3).
 4. **Model choice.** Flash-Next for quality (82.3%). Ornith-1.5 is 2.2x faster prefill at
    72.3% — possibly worth it for cheap/frequent queries if we ever split by query class.
+5. ~~**Structured-decision models (TypeSafe "System One" / Jev).**~~ Looked at 2026-09-18, not adopted.
+   Verified from their blog and repo: Jev doesn't generate text at all ("gives up string generation"),
+   answers typed questions sampled in parallel rather than token by token, is trained with RLCD for
+   calibrated confidence, claims 70–500 ms end to end, demos Doom and Wikiracing, caps choice
+   cardinality at 255, and is **cloud API only behind a waitlist with no weights** — which is the whole
+   of the answer for a project whose premise is that nothing leaves the machine. `system-one-adapter-python`
+   is real and MIT-licensed and does run the same typed interface over any OpenAI-compatible endpoint
+   (`base_url`), so the shape can be borrowed today; it exposes no temperature control, and its
+   `normalize_probabilities` only rescales a distribution to sum to 1, which is mathematical validity
+   and not calibration.
+
+   **Why we're not building a "Tier 1.5" of typed model questions for routing:** a routing call pays a
+   full first token, 1.3–2.4 s on our own measurements, to decide something our regexes decide in
+   microseconds — and a local run of the adapter against Flash-Next took 2.7–4.0 s and got a
+   power-deficit question right twice in four tries, on arithmetic a two-line Lua rule gets right every
+   time. That is the two-tier split in CLAUDE.md working as designed, and S32 is the same lesson three
+   more times: the register tier (FC-179), the stage row (FC-181) and the invented-name check (FC-171)
+   are all decided in code precisely because a round costs a first token. Self-reported probabilities
+   are a hint, never a threshold.
+
+   **Where the shape could still earn its keep:** inside work we're already paying for — a background
+   pass (FC-193) asking "which of these forty alerts is worth mentioning", where no code rule expresses
+   the judgement and the latency is nobody's wait. Revisit Jev itself only if TypeSafe ships local
+   weights; that single change is what would reopen this.
 5. ~~**Transport: RCON or UDP?**~~ **Decided 2026-09-13: RCON**, after testing and prior-art
    research. The player accepted the multiplayer-hosting trade-offs below. The RCON keys go in
    the player's real `config.ini` (set by `scripts/setup-rcon.ts` with the game closed).
