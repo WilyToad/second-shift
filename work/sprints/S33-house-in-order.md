@@ -11,7 +11,7 @@
   - Notes: from the audit (2026-09-18). §5's measurements were kept current sprint by sprint; §7's phase lists stop at S30, so Ballast, the stage table, the register tiers, the second shift and the S31 voice work exist only in the measurements, not in the roadmap. CLAUDE.md says to stay inside the current phase, and §7 doesn't say which one that is
   - Acceptance: every sprint through S32 appears where it belongs in §7; the current phase is stated in one line at the top of §7; the Future items the player deferred are listed as deferred, not as next
   - Done: §7 opens with the current phase (Phase 4) and what's open in it; Phases 2 and 3 are marked done with their sprints; Phase 4 lists S26–S32 and FC-193 struck through with what each pending player check is; FC-060, FC-050 and FC-146 are marked deferred by the player rather than sitting as next steps
-- [ ] FC-196 One page that retires the verification debt
+- [~] FC-196 One page that retires the verification debt
   - Notes: seven sprints of features have shipped with tests and evals but no human check — S27 modded hover, S28 measured rate, S29 spidertron, S30 packing list, S31 biasing and rescoring, S32 Ballast by voice and the inferred planet surfaces, FC-188 two mic consumers, FC-193 never clicked. Each session adds more, so the list only grows unless it's walked deliberately
   - Acceptance: `work/VERIFY.md` with one row per pending check — what to do, what to say, what "pass" looks like, and which item it closes — ordered so one Chrome session with capture on covers as much as possible; the sprint files it draws from link to it
 - [x] FC-197 One harness for the scripts, and the small duplicates
@@ -43,7 +43,7 @@
   - Notes: `JSON.parse(String(raw)) as ClientMessage` — a cast, not a check. Low severity because the server binds 127.0.0.1, but a malformed `ask`, `watch` or `approve` currently reaches the agent unchecked, and zod is already in the project for the prototypes
   - Acceptance: a `ClientMessageSchema` in `interfaces/`; the server drops and logs anything that fails it; unit tests for a well-formed and a malformed message of each type; `ServerMessage` gets the same treatment on the console side only if it's cheap
   - Done: `interfaces/src/console.ts` holds the zod schema and `parseClientMessage()`, which never throws and returns a reason the server logs ("Dropped a console message (ask: text Required)"); `ClientMessage` is now inferred from it, so the type and the check can't drift. Question text is capped at 8,000 characters and card ids at 64. Tests cover every message type well-formed and nine malformed shapes including non-JSON, a wrong field type, an unknown type and an oversized question. `ServerMessage` was left alone: the page trusts its own server, and validating there would cost a bundle dependency for no defence
-- [ ] FC-201 A linter beside `tsc`
+- [~] FC-201 A linter beside `tsc`
   - Notes: `tsc --noEmit` is the only static gate. A linter catches the class of thing `tsc` can't — unused imports, accidental `any`, floating promises — and the choice is made once
   - Acceptance: Biome (one binary, fast, formats too) in `bun run check`, with a deliberately small rule set that passes on the current code; every rule turned off is turned off in the config with a reason; no formatting churn committed alongside logic
 

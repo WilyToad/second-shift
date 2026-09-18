@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { parseClientMessage } from "./console";
 
 test("FC-200: every well-formed console message parses, with its optional parts", () => {
-  const good = [
+  const good: unknown[] = [
     { type: "ask", text: "how many rails are near me?" },
     { type: "ask", text: "okay I'm running wire", thinking: false, spoken: true, heard: { first: "okay I'm running wine", picked: "okay I'm running wire", alternatives: 2, offered: ["okay I'm running wine", "okay I'm running wire"], phrases: 100, where: "speech-service", carried: false } },
     { type: "approve", id: "card_12" },
