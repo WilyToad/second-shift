@@ -444,6 +444,20 @@ inside the same cached 4,096-token block, so eval-grounding first token came in 
 before it, same conditions) and the follow-up at 1.82 s. The active list rides in the turn's tail, so a long list
 costs a few tail tokens rather than breaking the cache.
 
+**Re-baselined on oMLX 0.7.0.dev4 (FC-191, 2026-09-18):** the runtime changed under us — Lightning MTP now stays
+on across concurrent requests — so every figure below was re-measured rather than assumed. **Nothing moved beyond
+run-to-run noise.** Block alignment is unchanged (aligned prompt **4,121 tokens**, boundary 4,096, against 4,120–4,122
+before), so FC-178's "personality is free" and FC-181's "the table rides in the tail" both still hold. Twenty
+eval-grounding turns on the new build: visible first token median **1.26 s**, single-round 1.25 s, with tools 2.31 s,
+against 1.46 / 1.31 / 2.36 s from the whole prior history.
+
+The honest comparison is eval-grounding against itself, and it says the same thing: three runs on the old build gave
+medians of 1.13, 1.39 and 1.79 s; two on the new build gave 1.53 and 1.21 s. **The run-to-run spread is larger than
+any difference between builds**, which is worth remembering whenever a single latency run is quoted as evidence.
+Single-request decode is unchanged as expected — single-request MTP was already on — at a median **52.1 tok/s** over
+23 turns against 49.3 tok/s over 116 turns on the old build. That is the baseline FC-192's concurrency numbers get
+compared against.
+
 **Ballast costs nothing (FC-178, 2026-09-17):** the companion has a name and eight lines of past
 (`brand/CANON.md` is the single source; the prompt carries a condensed version and the test fails if the two drift).
 Identity sits at the very top of the stable prefix, and `alignToCacheBlock` traded padding for it rather than
