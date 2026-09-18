@@ -132,6 +132,22 @@ export function compactHistory(history: ChatMessage[], budgetTokens = HISTORY_BU
 const RESULT_TTL_MS = 10 * 60_000;
 /** A follow-up that points back instead of naming things: "what do I use these for?" (FC-153). */
 const REFERENCE = /\b(these|those|them|they|that one|this one)\b|\b(use|make|need|craft|do with|build|place|put|feed) (it|that)\b/i;
+
+/**
+ * A follow-up that names nothing of its own — "a bit further", "what about over there", "and to the left?" — which
+ * only means something in terms of the last thing that was looked for (FC-187).
+ *
+ * The player asked about a red dot on the map, that turn was lost to FC-184, and their next words were "A bit
+ * further". The answer searched 128 tiles north for labs and assembling machines, which nobody had mentioned for
+ * two turns, and reported 0 of each. Anchored end to end on purpose: "further north, how many labs?" names its own
+ * subject and must not be caught by this.
+ */
+const BARE_FOLLOWUP = /^\s*(?:and\s+|ok(?:ay)?[,.]?\s+|so\s+|hmm[,.]?\s+)?(?:(?:a|just a)\s+(?:bit|little)\s+)?(?:what about\s+|how about\s+|try\s+|now\s+)?(?:further|farther|wider|more|again|out|over there|up there|down there|back there|(?:to the\s+)?(?:left|right|north|south|east|west)|keep (?:looking|going)|look again|search again|try again)\b(?:\s+(?:out|again|please|a bit|a little|now))?[\s?.!]*$/i;
+
+/** Does this question lean entirely on the last search for its meaning? */
+export function bareFollowUp(question: string): boolean {
+  return BARE_FOLLOWUP.test(question);
+}
 const HIGHLIGHT_SECONDS = 60;
 
 export const TOOLS: ToolSpec[] = [
@@ -607,6 +623,9 @@ export class Agent {
     // A new "how many / where" question is a new search: earlier results may be for another spot (FC-092 follow-up:
     // "how many belts are here?" after "…near me?" reused the character's result instead of searching the view).
     const searchAgain = world && /\b(how many|find|where (are|is)|count|search|look for|any \w+ (here|near))\b/i.test(question);
+    // A follow-up that names nothing of its own means the last thing looked for, and nothing else (FC-187).
+    const bare = !pasted.summaries.length && bareFollowUp(question);
+    const carryOver = bare ? this.lastResult : null;
     // The player's own situation, fetched only when the question is about it (S22).
     const start = !pasted.summaries.length && wantsStartAdvice(intent);
     const [status, around, pointed] = pasted.summaries.length ? [null, null, null] : await Promise.all([
@@ -670,7 +689,7 @@ export class Agent {
     const answeredFromData = Boolean(found?.lines.length || playerLines.length);
     // Register, decided in code (FC-179): flat on anything the player is about to act on, dry everywhere else.
     const plain = plainAnswer(question, {
-      counted: Boolean(found?.lines.length) || (world && SPATIAL.test(question)), measured: Boolean(measuredLine), ready: askedReady,
+      counted: Boolean(found?.lines.length) || Boolean(carryOver) || (world && SPATIAL.test(question)), measured: Boolean(measuredLine), ready: askedReady,
       card: Boolean(sendLine?.startsWith("An approval card")), stopped: Boolean(stopLine), pointed: Boolean(pointed),
       stock: stockLines.length > 0, packing: Boolean(packing),
     });
@@ -682,6 +701,10 @@ export class Agent {
       lootNote(status, around),
       chart ? "" : "no chart block",
       searchAgain ? "call find_entities again for this question, even if an earlier result looks similar" : "",
+      // "A bit further" answered with a search for labs and assembling machines, which nobody had mentioned for two
+      // turns, and reported 0 of each (FC-187).
+      carryOver ? `"${question.trim()}" carries on the last search, which was for ${carryOver.label} ${carryOver.where}: look for ${carryOver.label} again, wider or in the direction they said, and say what you searched for so they can tell you if it's the wrong thing` : "",
+      bare && !carryOver ? `"${question.trim()}" names nothing of its own and there's no earlier search to carry on, so ask what they want looked for — don't pick something` : "",
       start ? "base next steps only on the stage, inventory, hand-craftable, recipe, surroundings and research lines; name no item, building or technology that isn't in them"
         : playerLines.length ? "name no item, building or technology that isn't in the lines above" : "",
       // "That's 50 iron plates from the debris" with 1 in the inventory (FC-140).

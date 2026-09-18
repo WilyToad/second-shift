@@ -417,6 +417,9 @@ function firstHourGame() {
       if (action === "player_status") return { character: true, surface: "nauvis", x: 0, y: 0, items: [{ name: "iron-plate", count: 8 }], total_items: 1, craftable: [{ name: "iron-gear-wheel", count: 4 }], more_craftable: false, crafting_queue: [], recent_builds: [{ name: "stone-furnace", ghost: false, surface: "nauvis", x: 3, y: 0, age_ticks: 120, still_there: true }] };
       if (action === "surroundings") return { surface: "nauvis", x: 0, y: 0, radius: 32, mine: [{ name: "stone-furnace", count: 1, x: 3, y: 0 }], resources: [{ name: "iron-ore", count: 200, amount: 90000, x: 0, y: -15 }], other: [], trees: 40, rocks: 2, enemies: 0, water_tiles: 0, salvage: [], salvage_containers: 0 };
       if (action === "research_options") return { options: [], available: 0, queue: [], triggers: [{ name: "electronics", trigger: "craft 10 copper-cable" }] };
+      // A search that finds nothing is still a search: it records what was looked for, which FC-187 carries forward.
+      if (action === "find_entities") return { surface: "nauvis", count: 0, entities: [], by_name: {}, center: { x: 0, y: 0 } };
+      if (action === "highlight") return { highlighted: 0 };
       throw new Error(`unexpected ${action}`);
     },
   };
@@ -922,4 +925,44 @@ test("FC-171: an answer that names something the save lacks gets a correction, g
   const other = new Agent({ model: good, game: firstHourGame().game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: (m) => { if (m.type === "token") fine.push(m.text); } });
   await other.ask("what's in a green circuit?");
   expect(fine.join("")).not.toContain("Correction:");
+});
+
+test("FC-187: a bare follow-up is recognised, and a question that names its subject isn't", async () => {
+  const { bareFollowUp } = await import("./agent");
+  // The player's own words, and the shapes around them.
+  for (const bare of ["A bit further", "a bit further out", "further", "wider", "again?", "what about over there",
+    "and to the left?", "okay, north", "keep looking", "look again", "try further", "a little more"]) {
+    expect(bareFollowUp(bare)).toBe(true);
+  }
+  // These name what they're about, so they must answer for themselves.
+  for (const named of ["how many rails are near me?", "further north, how many labs?", "what about copper?",
+    "look for biters to the left", "and how many for a red circuit?", "what should I do next?", "a bit further north there's a lake, what is it?"]) {
+    expect(bareFollowUp(named)).toBe(false);
+  }
+});
+
+test("FC-187: 'a bit further' carries the last search, and asks when there was none", async () => {
+  const { game, calls } = firstHourGame();
+  const protos = PrototypesSchema.parse(await Bun.file(new URL("../../data/captures/prototypes.json", import.meta.url)).json());
+  // A search happens, then the bare follow-up: the turn has to name that subject rather than leave it to the model.
+  const model = fakeModel([
+    { tool: "find_entities", args: { what: "enemy", radius: 128, direction: "up" } }, { text: "None up there." },
+    { text: "Still none, 128 tiles out." },
+  ]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {} });
+  await agent.ask("I see a big red dot on the map up there, that must be monsters");
+  await agent.ask("A bit further");
+  const turn = model.seen.at(-1)!.at(-1)!.content as string;
+  expect(turn).toContain("carries on the last search");
+  expect(turn).toContain("enemy");
+  expect(turn).toContain("say what you searched for");
+  expect(calls.filter((c) => c.action === "find_entities")).toHaveLength(1); // the follow-up's own call is the model's choice
+
+  // With nothing to carry — the case the player actually hit, when the first turn was lost — it asks.
+  const fresh = fakeModel([{ text: "What would you like me to look for?" }]);
+  const cold = new Agent({ model: fresh, game: firstHourGame().game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {} });
+  await cold.ask("A bit further");
+  const coldTurn = fresh.seen[0]!.at(-1)!.content as string;
+  expect(coldTurn).toContain("ask what they want looked for");
+  expect(coldTurn).not.toContain("carries on the last search");
 });

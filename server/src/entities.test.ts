@@ -38,3 +38,21 @@ test("S22: ore searches: 'ore' is every resource tile, a named ore is that resou
   expect(resolveEntityFilter("ore patches", null)?.types).toEqual(["resource"]);
   expect(resolveEntityFilter("iron ore", ores)?.names).toEqual(["iron-ore"]);
 });
+
+test("FC-194: the words a player uses for enemies resolve, by engine type", () => {
+  // The dump has no enemy prototypes — only things the player can build — so these can only work by type.
+  for (const said of ["enemy", "enemies", "biters", "monsters", "spitters", "pentapods", "bugs"]) {
+    const filter = resolveEntityFilter(said, null);
+    expect(filter?.types).toEqual(["unit", "unit-spawner", "turret", "segmented-unit"]);
+  }
+  expect(resolveEntityFilter("nests", null)?.types).toEqual(["unit-spawner"]);
+  expect(resolveEntityFilter("worms", null)?.types).toEqual(["turret"]);
+  expect(resolveEntityFilter("demolishers", null)?.types).toEqual(["segmented-unit"]);
+
+  // The player's own words, from the session that started this (2026-09-17).
+  expect(resolveEntityFilterInText("I see a big red dot on the map up there, that must be monsters", null)?.types)
+    .toEqual(["unit", "unit-spawner", "turret", "segmented-unit"]);
+
+  // And the player's own turrets are still their own turrets, not enemies.
+  expect(resolveEntityFilter("turrets", null)?.types).toEqual(["ammo-turret", "electric-turret", "fluid-turret", "artillery-turret"]);
+});

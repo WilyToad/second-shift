@@ -7,6 +7,9 @@ export type EntityFilter = { label: string; types?: string[]; names?: string[] }
 const RAILS = ["straight-rail", "curved-rail-a", "curved-rail-b", "half-diagonal-rail", "legacy-straight-rail", "legacy-curved-rail", "elevated-straight-rail", "elevated-curved-rail-a", "elevated-curved-rail-b", "elevated-half-diagonal-rail", "rail-ramp"];
 
 /** Player words for groups of entity types. Keys are normalized, singular. */
+/** Every hostile thing the engine knows, by type: units (biters, spitters, pentapods), nests, worms and demolishers. */
+const ENEMIES = ["unit", "unit-spawner", "turret", "segmented-unit"];
+
 const GROUPS: Record<string, string[]> = {
   rail: RAILS, track: RAILS, "train track": RAILS, "rail track": RAILS,
   "rail signal": ["rail-signal", "rail-chain-signal"], signal: ["rail-signal", "rail-chain-signal"],
@@ -22,6 +25,13 @@ const GROUPS: Record<string, string[]> = {
   // Resource tiles (S22: "yeah" to "search wider for ore?" got "ore isn't recognized").
   ore: ["resource"], "ore patch": ["resource"], resource: ["resource"],
   "train stop": ["train-stop"], station: ["train-stop"], locomotive: ["locomotive"], wagon: ["cargo-wagon", "fluid-wagon"],
+  // Enemies, by engine type rather than by name: the prototype dump only carries things the player can build, so
+  // there is nothing in it to match "biter" against — and the player asked about "a big red dot on the map … that
+  // must be monsters" and was told the word wasn't recognised (FC-194). Worms are the plain `turret` type, which is
+  // separate from the player's ammo-, electric-, fluid- and artillery-turrets above.
+  enemy: ENEMIES, monster: ENEMIES, biter: ENEMIES, spitter: ENEMIES, pentapod: ENEMIES, bug: ENEMIES,
+  nest: ["unit-spawner"], spawner: ["unit-spawner"], "biter nest": ["unit-spawner"], worm: ["turret"],
+  demolisher: ["segmented-unit"], wriggler: ENEMIES, strafer: ENEMIES, stomper: ENEMIES,
 };
 
 const singular = (w: string) => (w.endsWith("ies") ? w.slice(0, -3) + "y" : /(ch|sh|x|ss)es$/.test(w) ? w.slice(0, -2) : w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
