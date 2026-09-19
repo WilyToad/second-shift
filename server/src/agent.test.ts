@@ -995,3 +995,21 @@ test("FC-215: the one throwback a conversation survives a server restart", async
   await again.ask("and for a red circuit?");
   expect(second.seen[0]!.at(-1)!.content as string).not.toContain("you may let one clause");
 });
+
+test("FC-223: a rate question with a measurement in the lines is answered from the measurement", async () => {
+  const calls: { action: string }[] = [];
+  const game: GameActions = {
+    latest: () => undefined,
+    async call(action: ActionName): Promise<any> {
+      calls.push({ action });
+      if (action === "machine_output") return { tick: 1, window_ticks: 3600, machines: 2, not_visible: 0, recipes: [{ recipe: "landfill", machines: 1, finished: 100, sampled: 1, per_minute: 33 }] };
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  const model = fakeModel([{ text: "Landfill: 33/min from that one machine." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask("what rate is this assembler really hitting?");
+  const turn = model.seen[0]!.at(-1)!.content as string;
+  expect(turn).toContain("landfill 33/min from 1 machine");
+  expect(turn).toContain("the measured line answers a rate question");
+});

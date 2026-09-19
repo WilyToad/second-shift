@@ -549,7 +549,7 @@ export class Agent {
       stock: stockLines.length > 0, packing: Boolean(packing),
     });
     const notes = turnNotes({
-      question, plain, world, answeredFromData, around: Boolean(around), searchAgain, loot: lootNote(status, around), chart,
+      question, plain, measured: Boolean(measuredLine), world, answeredFromData, around: Boolean(around), searchAgain, loot: lootNote(status, around), chart,
       carryOver: carryOver ? { label: carryOver.label, where: carryOver.where } : null, bare, start,
       playerLines: playerLines.length > 0, character: Boolean(status?.character), recipeLines: Boolean(found?.lines.length),
       craftable: craftableRecipes(status).length > 0, describingBuild: wantsPackingList(question) && !packing, spoken, askedBuild,

@@ -9,6 +9,8 @@ export type TurnFacts = {
   question: string;
   /** Flat register: the player is about to act on this (FC-179). */
   plain: boolean;
+  /** A measured line is in the turn: the machines' own craft counts (FC-162). */
+  measured: boolean;
   /** World tools are allowed this turn. */
   world: boolean;
   /** The retrieved data or the player lines already answer the question. */
@@ -83,6 +85,9 @@ export function turnNotes(f: TurnFacts): string[] {
     f.plain || f.throwbackSpent ? "" : "you may let one clause of your own past show in this answer, if it fits the sentence you were already writing; don't add a sentence for it, and don't explain yourself",
     f.askedReady ? "answer with what's still missing and whether the load fits the player's free slots, both from the lines" : "",
     f.packing ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",
+    // Asked for a real rate with the measurement in the lines, it answered about idle labs from the diagnosis hint
+    // instead — "lead with the root cause" outranked the thing they asked (FC-223, the player's session 2026-09-18).
+    f.measured ? "the measured line answers a rate question: quote its per-minute numbers and machine counts first, and any diagnosis hint comes after, in one clause at most" : "",
     f.stock ? "the stock line is a fresh read of what the player carries and what's in the containers they can see: answer from it, don't search, and don't explain how you looked" : "",
     f.cardUp ? "the card asking them to confirm sending the spidertron is already up: tell them to confirm or cancel it in the app, and don't say you can't move it" : "",
     f.stopped ? "say what the stop line says happened, in a few words" : "",
