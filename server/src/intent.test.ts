@@ -100,6 +100,9 @@ const CORPUS: [question: string, expected: string[]][] = [
   ["I'm going to build a smelting outpost 20 stone furnace is a couple hundred belt arms to feed them chest for storage", ["packing"]],
   ["I'm going to build a smelting outpost", ["build"]],
   ["build me a smelting outpost with 20 furnaces and 200 belts", ["packing"]],
+  // The on-device engine dropped a syllable and the measurement was skipped (FC-221, live 2026-09-18).
+  ["What rate are these drills really hitty", ["measured"]],
+  ["What rate are these drills really hitting", ["measured"]],
 ];
 
 test("FC-199: every classifier agrees with the reviewed corpus", () => {

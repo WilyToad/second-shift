@@ -187,7 +187,9 @@ export function wantsPointedAt(text: string): boolean {
 }
 
 // "Is this build hitting 150 a minute?", "what's it really making?" (FC-162).
-const MEASURED = /\b(hitting|really (making|producing|putting out)|actual(ly)? (rate|making|producing|output)|real (rate|output|numbers?)|measure\w*|keeping up|per minute really|how much is (it|this|that) (really )?(making|producing))\b/i;
+// "What rate are these drills really hitty" — the on-device engine dropped a syllable and the whole measurement
+// was skipped (FC-221). "What rate are …" is the question either way, and "hitt…" is close enough.
+const MEASURED = /\b(hitt\w*|what rate (are|is|do|does)|really (making|producing|putting out)|actual(ly)? (rate|making|producing|output)|real (rate|output|numbers?)|measure\w*|keeping up|per minute really|how much is (it|this|that) (really )?(making|producing))\b/i;
 
 export function wantsMeasuredOutput(text: string): boolean {
   return MEASURED.test(text);
