@@ -47,6 +47,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-206 A refused phrase list ended the whole voice session
+  - Notes: the player's first Chrome session with FC-177 live (2026-09-18): "Voice input stopped (phrases-not-supported)". Chrome's online service refuses a phrase list the moment recognition starts with one attached — **biasing is on-device only**, which is the S31 question answered — and the console treated the unknown error like any other and ended listening
+  - Done: the list is dropped for the rest of the page's life and listening carries on; a quiet note says the engine isn't being biased; the FC-185 record shows `phrases: 0` so the session is attributed to rescoring or the engine alone. Test drives the error and checks a fresh recognition starts without a list. **Consequence for S31:** on this engine FC-175's rescoring is the only mechanism in play, so whether it stays now rests on the `Heard` lines from this session, not on biasing
+
 - [x] FC-191 Re-baseline on oMLX 0.7.0.dev4
   - Notes: the runtime changed underneath us (the player upgraded, 2026-09-18) and every figure in PLAN §5 predates it — median visible first token 1.46 s, single-round 1.31 s, with tools 2.36 s, the 4,096-token block behaviour, ~1 ms per uncached tail token, the 107–164 token stage rows costing ~0.16 s. Speculative decoding and the prefix cache are both touched by this release, so the numbers are stale until re-measured, not wrong
   - Acceptance: `scripts/latency-report.ts` and `eval-grounding` re-run on the new build with the aligned prompt size recorded; PLAN §5 updated where a figure moved, with the old value kept beside it so the change is visible; if the block-alignment behaviour changed, `alignToCacheBlock`'s comments and the FC-178/FC-181 conclusions ("personality is free", "the table rides in the tail") get re-checked rather than assumed

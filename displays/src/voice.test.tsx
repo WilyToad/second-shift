@@ -592,3 +592,30 @@ test("FC-190: what counts as working, and what doesn't", async () => {
   expect(working("Nothing is attacking you.")).toBe(false);
   expect(working("- keep the labs fed")).toBe(false);
 });
+
+test("FC-206: an engine that refuses the phrase list drops it and keeps listening", async () => {
+  const voice = await import("./voice");
+  class FakePhrase { constructor(public phrase: string, public boost: number) {} }
+  Object.assign(globalThis, { SpeechRecognitionPhrase: FakePhrase });
+  try {
+    voice.phrasesRejected.value = false;
+    voice.setPhrases(["transport belt"]);
+    const said: string[] = [];
+    const { ctor, made } = fakeRecognition("unavailable");
+    voice.startTalking((t) => said.push(t), ctor);
+    expect(made[0].phrases.length).toBe(1);
+    // Chrome's online service answers this the moment recognition starts with a list attached.
+    made[0].onerror({ error: "phrases-not-supported" });
+    // Still talking, on a fresh recognition, with no list this time.
+    expect(voice.talking.value).toBe(true);
+    expect(made.length).toBe(2);
+    expect(made[1].phrases.length).toBe(0);
+    expect(voice.phrasesRejected.value).toBe(true);
+    expect(voice.voiceError.value).toBeNull();
+    voice.stopTalking({ send: false });
+  } finally {
+    delete (globalThis as { SpeechRecognitionPhrase?: unknown }).SpeechRecognitionPhrase;
+    voice.phrasesRejected.value = false;
+    voice.setPhrases([]);
+  }
+});

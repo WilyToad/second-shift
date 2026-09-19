@@ -74,9 +74,17 @@ let detail: HeardDetail | null = null;
 export const heardDetail = (): HeardDetail | null => detail;
 
 /** Applies the phrases to one recognition, where the browser has the API. Never throws. */
+/**
+ * The engine in use refused a phrase list (FC-206). Chrome's online service answers `phrases-not-supported` the
+ * moment recognition starts with one attached — biasing is on-device only, as the explainer hinted — and before
+ * this that error ended the whole talk session. Now the list is dropped for the rest of the page's life and
+ * listening carries on; the FC-185 record shows `phrases: 0` so the session is attributed correctly.
+ */
+export const phrasesRejected = signal(false);
+
 export function biasRecognition(rec: Recognition, list = phrases.value): number {
   const Phrase = (globalThis as { SpeechRecognitionPhrase?: new (phrase: string, boost: number) => unknown }).SpeechRecognitionPhrase;
-  if (!Phrase || !list.length || !("phrases" in rec)) return 0;
+  if (phrasesRejected.value || !Phrase || !list.length || !("phrases" in rec)) return 0;
   try {
     const name = companionName.value;
     const all = [...(name ? [new Phrase(name, NAME_BOOST)] : []), ...list.map((phrase) => new Phrase(phrase, PHRASE_BOOST))];
@@ -355,6 +363,15 @@ function listen(): void {
     if (!current()) return;
     // Quiet or our own abort just means "keep going"; anything else ends the session with a reason.
     if (e.error === "no-speech" || e.error === "aborted") return;
+    // This engine won't take the phrase list: drop it and listen again, rather than ending the session (FC-206).
+    if (e.error === "phrases-not-supported") {
+      phrasesRejected.value = true;
+      run.aborted = true;
+      active = null;
+      try { rec.abort(); } catch { /* already stopped */ }
+      if (session && !awaitingAnswer) listen();
+      return;
+    }
     const message = s.fromGame && e.error === "not-allowed"
       ? "The browser wouldn't start listening from the game's hotkey. Click Talk once in this tab (and allow the microphone), then the hotkey works."
       : describeError(e.error);

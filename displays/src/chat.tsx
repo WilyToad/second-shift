@@ -6,7 +6,7 @@ import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 import { setSoundsOn, soundsOn } from "./sounds";
 import { capturing, captureError, clipCount, lastClip, sayTruth, setCapturing } from "./capture";
-import { chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
+import { phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
 
 const SILENCE_CHOICES = [1, 1.5, 2, 3, 4, 5];
 
@@ -244,6 +244,8 @@ export function Composer({ onAsk = (text: string, thinking: boolean, spoken = fa
         </div>
       )}
       {captureError.value && <div class="voice-note error" role="status">{captureError.value}</div>}
+      {/* Said once, quietly: the S31 experiment's answer for this engine (FC-206). */}
+      {phrasesRejected.value && <div class="voice-note" id="phrases-rejected" role="status">This speech engine doesn't take a phrase list, so the save's words aren't biasing it — recognizing without them.</div>}
       {/* Said right after hearing it go wrong, while they still remember what they said (FC-188). */}
       {capturing.value && lastClip.value && <TruthRow heard={lastClip.value.heard} />}
       {recognition && !voiceError.value && deviceStatus.value === "downloading" && (
