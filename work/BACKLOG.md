@@ -54,6 +54,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [ ] FC-224 A one-word invented material slips past the name check
+  - Notes: VERIFY row 18, live (2026-09-18): "Metal could be iron plate, copper plate, steel, aluminium, or something else". This save has no aluminium. FC-171 checks hyphenated names only, because that's how the save spells prototypes; a single ordinary-looking word the model borrows from other mods ("aluminium", "titanium", "tungsten" on a save without it) can't be told from English by shape
+  - Acceptance: a short list of material and ore names common across Factorio mods is checked as whole words when they're offered as things the save might have ("could be X", "made of X", "X plate/ore"), and corrected only when the save has no prototype whose name contains the word; the FC-171 false-positive discipline applies — a turn of phrase is never corrected; unit test over this answer
+
 - [x] FC-223 Asked for a measured rate, it answered about idle labs
   - Notes: VERIFY row 12, live (2026-09-18): with "landfill 33/min from 1 machine, stone-brick 0/min from 1 machine" in the lines, the second answer was "no lab counts registered in the last minute… 47 labs idle". The system prompt's "lead with a root cause hint" outranked the question, and no turn note said a rate question is answered from the measured line
   - Done: on a measured turn the tail says to quote the measurement's numbers first and keep any diagnosis hint to one clause after; agent test over a measured turn
