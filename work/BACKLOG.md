@@ -47,6 +47,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-209 Boost 8 on his name made the on-device engine hallucinate it forty times an utterance
+  - Notes: the first on-device turn with biasing live (2026-09-18): 101 phrases accepted, and the transcript was "Ballast Ballast okay I'm running wireBallast Ballast Ballast…" — the real sentence buried in the middle of forty repeats of the name, which was boosted to 8 against 3 for everything else; the next turn was "Ballast Ballast Ballastral Ballastral Ballast", the engine inventing words around it. The on-device engine is far more sensitive to boost than the spike's "~5" assumed, and a single heavily boosted short word fills every silence
+  - Done: the name gets the same nudge as everything else and the whole list drops to 1, to be raised only against measurement; and `collapseRepeats()` splits a glued word and turns three or more of the same word in a row into one before the text becomes a question (two in a row stays — "no no" is speech). Whether boost 1 still helps or merely stops hurting is what the next five sentences measure
+
 - [x] FC-208 The online service's refusal of the phrase list followed the player to the on-device engine
   - Notes: seen in the player's session minutes after FC-206 (2026-09-18): after switching to on-device the console still said "this speech engine doesn't take a phrase list", because FC-206 made the refusal stick for the page's life. The on-device engine — the only one that can bias — was running without the list, and the biasing test would have been silently invalid
   - Done: an engine switch resets the refusal; the on-device engine gets its own chance to accept or refuse. Test covers both directions

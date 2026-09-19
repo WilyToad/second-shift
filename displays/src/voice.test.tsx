@@ -447,7 +447,7 @@ test("FC-177: the recognizer is told which phrases to expect, and a browser with
   Object.assign(globalThis, { SpeechRecognitionPhrase: FakePhrase });
   try {
     expect(voice.biasRecognition(rec)).toBe(2);
-    expect(rec.phrases.map((p: FakePhrase) => [p.phrase, p.boost])).toEqual([["transport belt", 3], ["iron gear wheel", 3]]);
+    expect(rec.phrases.map((p: FakePhrase) => [p.phrase, p.boost])).toEqual([["transport belt", 1], ["iron gear wheel", 1]]);
     // The wiring, not just the function: starting a talk session sets the phrases on the recognition it makes.
     voice.setPhrases(["transport belt", "iron gear wheel"]);
     const { ctor, made } = fakeRecognition("unavailable");
@@ -627,4 +627,15 @@ test("FC-208: switching engines forgets the other engine's refusal of the phrase
   expect(voice.phrasesRejected.value).toBe(false);
   voice.setPreferOnDevice(false);
   expect(voice.phrasesRejected.value).toBe(false);
+});
+
+test("FC-209: a runaway repeat is collapsed, and the real sentence survives", async () => {
+  const voice = await import("./voice");
+  const runaway = "Ballast Ballast okay I'm running wireBallast Ballast Ballast Ballast Ballast Ballast Ballast Ballast";
+  // The leading pair stays (two in a row can be speech); the glued word is split and the run of seven becomes one.
+  expect(voice.collapseRepeats(runaway)).toBe("Ballast Ballast okay I'm running wire Ballast");
+  // Two in a row is speech ("no no"), three is the engine.
+  expect(voice.collapseRepeats("no no that one")).toBe("no no that one");
+  expect(voice.collapseRepeats("send it there there there there")).toBe("send it there");
+  expect(voice.collapseRepeats("okay I'm running wire")).toBe("okay I'm running wire");
 });

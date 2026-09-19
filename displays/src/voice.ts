@@ -53,11 +53,16 @@ export const phrases = signal<string[]>([]);
  * this list is 100, where a strong boost across all of them risks pulling ordinary words ("built") toward item
  * names ("belt"). Middle setting until the player's next session says which way to move it.
  */
-const PHRASE_BOOST = 3;
+const PHRASE_BOOST = 1;
 
 /** The companion's own name, boosted hardest: the player says it to address him, so it must survive being heard. */
 export const companionName = signal<string>("");
-const NAME_BOOST = 8;
+/**
+ * Was 8. On the on-device engine that produced "Ballast Ballast Ballast…" over every silence and noise, forty
+ * times in one utterance, with the real sentence buried in the middle (FC-209, the player's session 2026-09-18).
+ * The engine is sensitive; the name gets the same nudge as everything else, and the whole list starts at 1.
+ */
+const NAME_BOOST = 1;
 
 export function setPhrases(list: string[], name = ""): void {
   phrases.value = list;
@@ -72,6 +77,12 @@ export function setPhrases(list: string[], name = ""): void {
 export type HeardDetail = { first: string; picked: string; alternatives: number; offered: string[]; phrases: number; where: string; carried: boolean };
 let detail: HeardDetail | null = null;
 export const heardDetail = (): HeardDetail | null => detail;
+
+/** "Ballast Ballast Ballast…" forty times is an engine failure, not a sentence: three of the same word in a row become one (FC-209). */
+export function collapseRepeats(text: string): string {
+  // Split a glued word first ("wireBallast"), then collapse a run of three or more; two in a row is speech ("no no").
+  return text.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b(\w+)(?:\s+\1\b){2,}/gi, "$1").replace(/\s+/g, " ").trim();
+}
 
 /** Applies the phrases to one recognition, where the browser has the API. Never throws. */
 /**
@@ -341,7 +352,7 @@ function listen(): void {
   const run: Run = {
     rec, aborted: false,
     // Everything heard and not yet sent: what earlier recognitions left behind, then this one's own words.
-    pending: () => [carried, textFrom(latest)].filter(Boolean).join(" ").replace(/\s+/g, " ").trim(),
+    pending: () => collapseRepeats([carried, textFrom(latest)].filter(Boolean).join(" ")),
     markSent: () => { sentUpTo = latest.length; carried = ""; },
     record: (sent: string) => ({
       first: lastOffered[0] ?? sent, picked: sent, alternatives: lastOffered.length, offered: lastOffered,
