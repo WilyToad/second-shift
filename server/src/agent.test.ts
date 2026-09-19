@@ -1034,3 +1034,10 @@ test("FC-225: 'send the spidertron to the ore patch' looks for ore, not for the 
   expect(cards[0]?.title).toContain("the nearest iron-ore");
   expect(cards[0]?.title).not.toContain("nearest spidertron");
 });
+
+test("FC-227: 'can you point it out to me' asks for a map action, and a highlight isn't a map mark", async () => {
+  const { askedFor } = await import("./agent");
+  expect(askedFor("map_action", "Where is the rocket salad can you point it out to me")).toBe(true);
+  expect(askedFor("map_action", "point me to the silo")).toBe(true);
+  expect(askedFor("map_action", "what's the point of a beacon?")).toBe(false);
+});

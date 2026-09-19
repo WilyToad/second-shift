@@ -54,6 +54,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-227 "Point it out to me" wasn't a map action, and a highlight was called a map mark
+  - Notes: the voice-session replay on the shared harness (2026-09-18): asked "where is the rocket salad, can you point it out to me", the answer found the silo, highlighted it, and said it was "marked on your map for 60 seconds" — no map marker was placed. The approval guard's map-action list had no "point", so a pointing call would have been dropped as unasked anyway
+  - Done: "point it out / point me to / point at the…" count as asking for a map action; the find tool's result now says "Highlighted in-game for 60 s (not marked on the map)" so the model can't confuse the two
+
 - [ ] FC-226 A stray HTML tag reached the page
   - Notes: player's session (2026-09-18): an answer ended with a literal "</br>" line. The stream filter hides chart and tool-call blocks; it doesn't know HTML, and the thread renders text, so the tag showed as text
   - Acceptance: a bare HTML tag on its own line, or trailing an answer, is dropped in the stream filter at every token split; prose that mentions a tag in backticks is untouched; unit test

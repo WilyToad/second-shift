@@ -1066,7 +1066,7 @@ export class Agent {
     // Measured like the surroundings line, so both give the same direction and position (FC-157).
     const nearestNote = nearest ? ` Nearest: ${nearest.name} ${bearing(c, nearest)} at (${Math.floor(nearest.x)}, ${Math.floor(nearest.y)}).` : "";
     const summary = `Found ${r.count} ${what} ${where}${kinds ? ` (${kinds})` : ""}.${nearestNote}`;
-    this.deps.emit({ type: "tool", summary: `${summary}${r.count ? ` Highlighted in-game for ${HIGHLIGHT_SECONDS} s.` : ""}` });
+    this.deps.emit({ type: "tool", summary: `${summary}${r.count ? ` Highlighted in-game for ${HIGHLIGHT_SECONDS} s (not marked on the map).` : ""}` });
     return [
       summary,
       r.truncated ? `Only the first ${r.entities.length} are remembered.` : "",
@@ -1133,7 +1133,7 @@ export class Agent {
       await this.deps.game.call("highlight", { entities: refs.slice(0, 1000), seconds: HIGHLIGHT_SECONDS });
       this.lastResult = { refs, label: `stuck ${what}`, count: refs.length, at: this.now(), where: `on ${here}` };
     }
-    const summary = `${parts.join("; ")}.${refs.length ? ` Highlighted in-game for ${HIGHLIGHT_SECONDS} s.` : ""}`;
+    const summary = `${parts.join("; ")}.${refs.length ? ` Highlighted in-game for ${HIGHLIGHT_SECONDS} s (not marked on the map).` : ""}`;
     this.deps.emit({ type: "tool", summary });
     return summary;
   }
