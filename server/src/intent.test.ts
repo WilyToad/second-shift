@@ -95,6 +95,11 @@ const CORPUS: [question: string, expected: string[]][] = [
   ["research automation", ["research"]],
   ["what am I holding?", ["status","pointed"]],
   ["what's in my inventory?", ["status"]],
+  // From the player's live session (2026-09-18): the spoken form of their own packing example, no "need", no commas,
+  // fell to the build offer instead of a list (FC-211). Two counted things in a build sentence is packing.
+  ["I'm going to build a smelting outpost 20 stone furnace is a couple hundred belt arms to feed them chest for storage", ["packing"]],
+  ["I'm going to build a smelting outpost", ["build"]],
+  ["build me a smelting outpost with 20 furnaces and 200 belts", ["packing"]],
 ];
 
 test("FC-199: every classifier agrees with the reviewed corpus", () => {

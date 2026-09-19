@@ -47,6 +47,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-211 A described build without the word "need" wasn't a packing list
+  - Notes: VERIFY row 14, live (2026-09-18). Spoken, the player's own example came through as "I'm going to build a smelting outpost 20 stone furnace is a couple hundred belt arms to feed them chest for storage" — no "need", no commas — and `wantsPackingList` required one of need/bring/take/pack/list/gather/grab, so the build classifier won and the answer was furnace arithmetic plus the FC-172 paste offer. No list was made
+  - Done: a build sentence with two or more counted things ("20 stone furnace", "a couple hundred belt") is a packing list whether or not it says "need"; the exact transcript is in the corpus, along with a bare "I'm going to build a smelting outpost" (no counts → still the build offer)
+
 - [x] FC-210 Rescoring the recognizer's alternatives comes out
   - Notes: S31's experiment, run on the player's voice (2026-09-18): on Chrome's online service every winning transcript across five sentences was the engine's own first guess, and the only reorder was "testing 1 2 3" → "testing one two three"; the on-device engine returns one alternative, so there is nothing to rescore. Against that, the mechanism had a pinned failure mode ("I built ten of them" → "I belt ten of them"). Inert on one engine, empty on the other, and able to do harm
   - Done: `pickAlternative`, the word list and its 5.5 KB message part are gone; `maxAlternatives` is 1; the FC-185 record still lists what the engine offered. The phrase list (FC-177) stays as the on-device path

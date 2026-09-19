@@ -319,8 +319,19 @@ export function wantsListTalk(text: string): boolean {
 // the player is about to walk out and make (FC-166).
 const BUILD_PLAN = /\b(building|build|set(ting)? up|putting up|outpost|new base|expansion)\b/i;
 
+/** "20 stone furnace", "a couple hundred belt", "some chests": a thing with an amount in front of it. */
+const COUNTED = /\b(\d+|a couple( of)?|a few|a dozen|(a |couple |few |two |three )?hundred|some|plenty of)\s+(of\s+)?[a-z]/gi;
+
+/**
+ * A described build with amounts is a packing list, whether or not the player says "need" (FC-211). Spoken, the
+ * player's own example came through as "I'm going to build a smelting outpost 20 stone furnace is a couple
+ * hundred belt arms to feed them chest for storage" — no "need", no commas — and it fell to the build offer
+ * instead of starting a list. Two counted things in a build sentence is the player packing, not asking for a paste.
+ */
 export function wantsPackingList(text: string): boolean {
-  return BUILD_PLAN.test(text) && /\b(need|bring|take|pack|list|gather|grab)\b/i.test(text);
+  if (!BUILD_PLAN.test(text)) return false;
+  if (/\b(need|bring|take|pack|list|gather|grab)\b/i.test(text)) return true;
+  return (text.match(COUNTED) ?? []).length >= 2;
 }
 
 // "Fill the list", "get the bots to bring it", "ask the bots for the rest" (FC-168).
