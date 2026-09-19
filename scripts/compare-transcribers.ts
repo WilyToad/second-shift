@@ -12,12 +12,14 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-export type Clip = { id: string; wav: string; heard: string; said?: string; seconds: number; where?: string };
+export type Clip = { id: string; wav: string; heard: string; said?: string; saidBy?: string; seconds: number; where?: string };
 export type Score = { exact: boolean; wer: number; errors: number; words: number; classes: string[] };
 
 /** Words as a transcriber would be judged on them: lower case, no punctuation, numerals as written. */
+const NUMBER_WORDS: Record<string, string> = { zero: "0", one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10", eleven: "11", twelve: "12", twenty: "20", thirty: "30", forty: "40", fifty: "50", hundred: "100" };
 export function words(text: string): string[] {
-  return text.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
+  // "ten" and "10" are the same word said aloud; an engine's choice of digits is formatting, not an error.
+  return text.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean).map((w) => NUMBER_WORDS[w] ?? w);
 }
 
 /** Levenshtein over words: substitutions + insertions + deletions, divided by the reference length. */
@@ -82,9 +84,9 @@ export async function loadClips(dir: string): Promise<Clip[]> {
   const names = (await readdir(dir).catch(() => [] as string[])).filter((n) => n.endsWith(".json")).sort();
   const clips: Clip[] = [];
   for (const name of names) {
-    const meta = (await Bun.file(join(dir, name)).json().catch(() => null)) as { heard?: string; said?: string; seconds?: number; detail?: { where?: string } } | null;
+    const meta = (await Bun.file(join(dir, name)).json().catch(() => null)) as { heard?: string; said?: string; saidBy?: string; seconds?: number; detail?: { where?: string } } | null;
     if (!meta?.heard) continue;
-    clips.push({ id: name.replace(/\.json$/, ""), wav: join(dir, name.replace(/\.json$/, ".wav")), heard: meta.heard, said: meta.said, seconds: meta.seconds ?? 0, where: meta.detail?.where });
+    clips.push({ id: name.replace(/\.json$/, ""), wav: join(dir, name.replace(/\.json$/, ".wav")), heard: meta.heard, said: meta.said, saidBy: meta.saidBy, seconds: meta.seconds ?? 0, where: meta.detail?.where });
   }
   return clips;
 }
@@ -94,14 +96,55 @@ export type Backend = { name: string; available: () => Promise<string | null>; t
 
 const which = async (bin: string) => (await Bun.$`which ${bin}`.quiet().nothrow()).exitCode === 0;
 
+const MODEL_DIR = `${process.env.HOME}/.cache/whisper`;
+const WHISPER_MODEL = process.env.WHISPER_MODEL ?? `${MODEL_DIR}/ggml-large-v3-turbo.bin`;
+const PARAKEET_MODEL = process.env.PARAKEET_MODEL ?? `${MODEL_DIR}/ggml-parakeet-tdt-0.6b-v3.bin`;
+const WHISPER_PORT = 8890;
+
+/**
+ * whisper-server, kept resident for the whole run: whisper-cli pays the model load on every clip (~15 s of an
+ * 18 s run on the JFK sample), which is exactly FC-176's argument for a resident service, and would make 35 clips a
+ * ten-minute job per pass. Started here, shut down at the end.
+ */
+let whisperServer: ReturnType<typeof Bun.spawn> | null = null;
+async function ensureWhisperServer(prompt?: string): Promise<void> {
+  if (whisperServer) return;
+  whisperServer = Bun.spawn(["whisper-server", "-m", WHISPER_MODEL, "--host", "127.0.0.1", "--port", String(WHISPER_PORT), ...(prompt ? ["--prompt", prompt] : [])], { stdout: "ignore", stderr: "ignore" });
+  for (let i = 0; i < 120; i++) {
+    try { const r = await fetch(`http://127.0.0.1:${WHISPER_PORT}/`); if (r.status < 500) return; } catch {}
+    await Bun.sleep(500);
+  }
+  throw new Error("whisper-server didn't come up in 60 s");
+}
+export function stopWhisperServer(): void {
+  whisperServer?.kill();
+  whisperServer = null;
+}
+
 export const BACKENDS: Backend[] = [
   {
     name: "whisper.cpp large-v3-turbo",
-    available: async () => (await which("whisper-cli")) ? null : "whisper-cli not installed (brew install whisper.cpp, plus the ggml-large-v3-turbo model)",
+    available: async () => !(await which("whisper-server")) ? "whisper-server not installed (brew install whisper.cpp)" : !(await Bun.file(WHISPER_MODEL).exists()) ? `model not found at ${WHISPER_MODEL} (huggingface.co/ggerganov/whisper.cpp, ggml-large-v3-turbo.bin, 1.6 GB)` : null,
     transcribe: async (wav, prompt) => {
-      const model = process.env.WHISPER_MODEL ?? `${process.env.HOME}/.cache/whisper/ggml-large-v3-turbo.bin`;
+      await ensureWhisperServer(prompt);
+      const form = new FormData();
+      form.append("file", new Blob([await Bun.file(wav).arrayBuffer()], { type: "audio/wav" }), "clip.wav");
+      form.append("response_format", "json");
+      form.append("temperature", "0");
+      if (prompt) form.append("prompt", prompt);
       const started = performance.now();
-      const out = await Bun.$`whisper-cli -m ${model} -f ${wav} -nt -np ${prompt ? ["--prompt", prompt] : []}`.quiet().nothrow();
+      const res = await fetch(`http://127.0.0.1:${WHISPER_PORT}/inference`, { method: "POST", body: form });
+      const json = (await res.json().catch(() => ({}))) as { text?: string };
+      return { text: (json.text ?? "").trim(), ms: performance.now() - started };
+    },
+  },
+  {
+    // whisper.cpp 1.9 ships parakeet-cli, so no pip environment is needed; it wants the ggml conversion of the model.
+    name: "parakeet-tdt-0.6b-v3 (parakeet-cli)",
+    available: async () => !(await which("parakeet-cli")) ? "parakeet-cli not installed (it ships with brew's whisper.cpp)" : !(await Bun.file(PARAKEET_MODEL).exists()) ? `model not found at ${PARAKEET_MODEL} (a ggml conversion of nvidia/parakeet-tdt-0.6b-v3; no hotword biasing)` : null,
+    transcribe: async (wav) => {
+      const started = performance.now();
+      const out = await Bun.$`parakeet-cli -m ${PARAKEET_MODEL} -f ${wav} -np`.quiet().nothrow();
       return { text: out.stdout.toString().trim(), ms: performance.now() - started };
     },
   },
@@ -115,16 +158,6 @@ export const BACKENDS: Backend[] = [
       return { text: out.stdout.toString().trim(), ms: performance.now() - started };
     },
   },
-  {
-    name: "parakeet-tdt-0.6b-v3",
-    available: async () => ((await Bun.$`python3 -c "import parakeet_mlx"`.quiet().nothrow()).exitCode === 0 ? null : "parakeet_mlx not importable (pip install parakeet-mlx); no hotword biasing"),
-    transcribe: async (wav) => {
-      const started = performance.now();
-      const py = `from parakeet_mlx import from_pretrained; import sys; m = from_pretrained("mlx-community/parakeet-tdt-0.6b-v3"); print(m.transcribe(sys.argv[1]).text.strip())`;
-      const out = await Bun.$`python3 -c ${py} ${wav}`.quiet().nothrow();
-      return { text: out.stdout.toString().trim(), ms: performance.now() - started };
-    },
-  },
 ];
 
 if (import.meta.main) {
@@ -132,7 +165,8 @@ if (import.meta.main) {
   const dir = args.includes("--dir") ? args[args.indexOf("--dir") + 1]! : "data/captures/voice";
   const clips = await loadClips(dir);
   const truthful = clips.filter((c) => c.said);
-  console.log(`${clips.length} clips in ${dir}, ${truthful.length} with the player's own wording (the rest presumed right)\n`);
+  const own = truthful.filter((c) => !c.saidBy).length;
+  console.log(`${clips.length} clips in ${dir}; ${truthful.length} with ground truth (${own} from the player, ${truthful.length - own} from the session log), the rest presumed right\n`);
   if (!clips.length) process.exit(0);
 
   // The browser's transcript first: it's what shipped, and it scores without installing anything.
@@ -146,7 +180,11 @@ if (import.meta.main) {
     const ms = rows.filter((r) => r.ms !== undefined).map((r) => r.ms!).sort((a, b) => a - b);
     console.log(`== ${name} ==`);
     for (const r of judged) console.log(`  ${r.s.exact ? "ok  " : "MISS"} ${r.clip.id}  said "${r.clip.said}"  heard "${r.hyp}"${r.s.classes.length ? `  [${r.s.classes.join(", ")}]` : ""}`);
-    console.log(`  ${judged.length} judged: ${exact} exact, WER ${totalWords ? ((totalErr / totalWords) * 100).toFixed(1) : "n/a"}% (${totalErr}/${totalWords} words)${Object.keys(classes).length ? ` · ${Object.entries(classes).map(([c, n]) => `${c} ${n}`).join(", ")}` : ""}${ms.length ? ` · delay p50 ${Math.round(ms[Math.floor(ms.length / 2)]!)} ms, p95 ${Math.round(ms[Math.floor(ms.length * 0.95)]!)} ms` : ""}\n`);
+    // Where this backend and the browser disagree on a clip nobody has corrected, one of them is wrong: those are
+    // the clips worth the player's "Not what I said", so they're listed rather than presumed right.
+    const disagree = scored.filter((r) => !r.clip.said && words(r.hyp).join(" ") !== words(r.clip.heard).join(" "));
+    for (const r of disagree) console.log(`  ?    ${r.clip.id}  browser "${r.clip.heard}"  this "${r.hyp}"`);
+    console.log(`  ${judged.length} judged: ${exact} exact, WER ${totalWords ? ((totalErr / totalWords) * 100).toFixed(1) : "n/a"}% (${totalErr}/${totalWords} words)${Object.keys(classes).length ? ` · ${Object.entries(classes).map(([c, n]) => `${c} ${n}`).join(", ")}` : ""}${ms.length ? ` · delay p50 ${Math.round(ms[Math.floor(ms.length / 2)]!)} ms, p95 ${Math.round(ms[Math.floor(ms.length * 0.95)]!)} ms` : ""}${disagree.length ? ` · disagrees with the browser on ${disagree.length} uncorrected clip${disagree.length === 1 ? "" : "s"}` : ""}\n`);
   };
   report("browser engine (as recorded)", clips.map((c) => ({ clip: c, hyp: c.heard })));
 
@@ -158,4 +196,5 @@ if (import.meta.main) {
     for (const c of clips) { const r = await b.transcribe(c.wav, prompt); rows.push({ clip: c, hyp: r.text, ms: r.ms }); }
     report(`${b.name}${prompt ? " + vocabulary prompt" : ""}`, rows);
   }
+  stopWhisperServer();
 }

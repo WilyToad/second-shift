@@ -519,6 +519,37 @@ recipe lookup gets no direction at all. It also names the stage so the player ca
 the dev save it said "Gleba, I'd say — though your view says otherwise… So I may have the stage wrong; tell me if
 so."
 
+**Local transcription, measured (FC-189, 2026-09-19):** the three-way comparison FC-176 asked for, on the player's own
+35 clips from the 18 Sep session, 24 with ground truth — one corrected by the player, 23 scripted sentences whose
+truth is the session log and marked as such. `scripts/compare-transcribers.ts`, whisper.cpp 1.9 from brew with
+`whisper-server` kept resident, Parakeet via the `parakeet-cli` that ships with it (q8_0 ggml), numerals as words
+and digits counted the same:
+
+| engine | exact | WER | delay p50 / p95 | what it got wrong |
+|---|---|---|---|---|
+| Chrome on-device (as recorded) | 17/24 | 24.1%* | — | one runaway "Ballast ×40" clip is 39 of the 46 errors; without it ~4.6%. "hitty", "stone furnace is a couple", "spider time" |
+| **whisper large-v3-turbo** | **19/24** | **3.7%** | **120 / 161 ms** | "of" for "to" (same slip as the browser), and **"spidertron" three ways: Spider-Tron, SpyderTron, Spider-John** |
+| whisper + vocabulary prompt | 18/24 | 5.8% | 132 / 294 ms | the prompt *hurt*: lowercased everything and split "spider tron", "robo port" |
+| Parakeet tdt-0.6b-v3 (q8) | 16/24 | 7.9% | 305 / 403 ms | "BAUST" for Ballast, "wires", spidertron split or invented |
+
+**What that says.** Whisper fixed every English error the browser made — including recovering *"Okay, I'm running
+wire"* from the clip the browser turned into forty Ballasts — and its remaining misses are one domain word. That
+word is the one thing biasing was for, and the prompt made it worse, so the fix isn't a prompt: it's a
+**normalizer keyed on the save's own names** ("spider tron", "Spider-Tron", "robo port" → `spidertron`,
+`roboport`), which would take whisper to 22/24 on this set. Latency is not a question: FC-176's estimate of 0.3–1.0 s
+was compute-bound reasoning and Metal makes the padded 30 s window cheap; the model load is the cost (15 of the
+18 s a cold `whisper-cli` takes on the JFK sample), so the service stays resident. Hallucination showed once, on
+the "Ballastral" noise clip, as *"Thank you."* — Whisper's documented silence output — so the `/stt` route ships
+with VAD and no-speech gating from day one, as the spike said. Parakeet is faster to load but slower per clip
+here, worse on both the name and the domain word, and has no biasing; mlx-whisper wasn't run (same model family as
+whisper.cpp, and no pip environment was installed).
+
+**Verdict: build the `/stt` route on whisper-server** (FC-230): resident, VAD-gated, with the name normalizer, the
+browser engine kept for the live "heard" text and as the fallback, and the player's clips as the regression set.
+The caveats stand: one voice, one evening, 23 of 24 truths from the log rather than the player, and the FC-191
+lesson that a single run is not a measurement — the next session's clips re-run through the same harness are the
+check.
+
 **S31's experiment, run (2026-09-18, the player's Chrome session, ten test sentences; 35 clips kept by the end of the night):** the two
 mechanisms were tested on both engines and the verdict is clean. **Chrome's online service refuses a phrase list
 outright** (`phrases-not-supported`, the moment recognition starts) — biasing is on-device only, as the explainer
