@@ -47,4 +47,5 @@ try {
 const passed = results.filter(([, ok]) => ok).length;
 console.log(`\n${passed}/${results.length} passed`);
 console.log(`Saved to ${await saveEvalRun("eval-register", asChecks(results), answers)}`);
-if (passed < results.length) process.exit(1);
+// The game connection keeps the process alive, so exit either way (FC-197 follow-up: these two hung on success).
+process.exit(passed < results.length ? 1 : 0);
