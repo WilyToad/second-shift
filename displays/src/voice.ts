@@ -218,6 +218,9 @@ function applyChoice(): void {
 export function setPreferOnDevice(on: boolean): void {
   preferOnDevice.value = on;
   saveSetting("second-shift.onDevice", on);
+  // A refusal belongs to the engine that refused (FC-208): the online service says no to a phrase list, the
+  // on-device model may say yes, and the first version of FC-206 carried the "no" across the switch.
+  phrasesRejected.value = false;
   applyChoice();
 }
 

@@ -619,3 +619,12 @@ test("FC-206: an engine that refuses the phrase list drops it and keeps listenin
     voice.setPhrases([]);
   }
 });
+
+test("FC-208: switching engines forgets the other engine's refusal of the phrase list", async () => {
+  const voice = await import("./voice");
+  voice.phrasesRejected.value = true; // the online service said no
+  voice.setPreferOnDevice(true); // the player switches to the on-device model
+  expect(voice.phrasesRejected.value).toBe(false);
+  voice.setPreferOnDevice(false);
+  expect(voice.phrasesRejected.value).toBe(false);
+});

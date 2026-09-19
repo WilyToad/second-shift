@@ -47,6 +47,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-208 The online service's refusal of the phrase list followed the player to the on-device engine
+  - Notes: seen in the player's session minutes after FC-206 (2026-09-18): after switching to on-device the console still said "this speech engine doesn't take a phrase list", because FC-206 made the refusal stick for the page's life. The on-device engine — the only one that can bias — was running without the list, and the biasing test would have been silently invalid
+  - Done: an engine switch resets the refusal; the on-device engine gets its own chance to accept or refuse. Test covers both directions
+
 - [x] FC-207 "Keep my audio" was on in the console and off in fact after a reload
   - Notes: the player's first session with FC-188 (2026-09-18) said five sentences with the setting ticked and kept zero clips. The setting survives a reload but the tap didn't: it was only opened when the checkbox *changed*, so the console said "your voice is being written to…" while nothing was. Found by the log being silent where `Kept clip` lines should have been
   - Done: `ensureCapture()` opens the tap whenever talking starts with the setting on — a user gesture, so the microphone prompt is allowed — and turns the setting off with a visible reason if it can't. Test drives both states. FC-188 stays `[~]` until a clip actually lands
