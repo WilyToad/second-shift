@@ -3,10 +3,14 @@
 // Test tooling feeds the idle machines next to the player so there's a real rate to find.
 import { openConsole } from "./lib/console";
 import { connectDevGame } from "./lib/devgame";
+import { encodeCommand } from "../interfaces/src/index";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
 
 const dev = await connectDevGame();
 await dev.leaveRemoteView();
+// A sample from an earlier measurement (the player's own, minutes before this ran) makes the first ask answer with
+// rates straight away; the test is about the cold path, so start the count over.
+await dev.rcon.exec(encodeCommand({ id: 7, action: "machine_output" as never, args: { radius: 32, restart: true } as never }));
 const fed = JSON.parse(await dev.sc(`local p = game.connected_players[1] local at = p.physical_position local n = 0
   for _, e in pairs(p.surface.find_entities_filtered({ area = { { at.x - 32, at.y - 32 }, { at.x + 32, at.y + 32 } }, type = "assembling-machine", force = p.force })) do
     local r = e.get_recipe()
