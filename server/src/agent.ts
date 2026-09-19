@@ -10,6 +10,7 @@ import { blueprintsIn, decodeBlueprintString, encodeBlueprintString, type Bluepr
 import { describeRow, productionRow, type RowBuild } from "./blueprint-template";
 import { stageFor, stageLines, tookAThrowback } from "./stages";
 import { nameCorrections } from "./names";
+import { actionClaims } from "./claims";
 import { turnNotes } from "./guidance";
 import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, ASKS_FOR, askedFor, parseTarget, anchorFor, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 export { bareFollowUp, needsWorldTools, PICTURE, ASKS_FOR, askedFor, parseTarget, targetRate, anchorFor, SELECTED_PREFIX, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
@@ -686,7 +687,9 @@ export class Agent {
           // Spend the session's one throwback only if he actually took it (FC-182).
           if (!plain && this.throwbacks === 0 && tookAThrowback(text)) this.throwbacks++;
           // A name this save doesn't have, said with confidence (FC-171), and sums the answer did in its head (FC-153).
-          const corrections = [...(await this.checkClaims(text, status)), ...arithmeticCorrections(text), ...nameCorrections(text, protos)];
+          // "The 6 are highlighted in-game" on a turn with no tool call (FC-229): an action it says it took.
+          const toolsRun = record.rounds.flatMap((r) => r.tools ?? []);
+          const corrections = [...(await this.checkClaims(text, status)), ...arithmeticCorrections(text), ...nameCorrections(text, protos), ...actionClaims(text, toolsRun)];
           if (corrections.length) {
             const add = `\n\n${corrections.join(" ")}`;
             text += add;

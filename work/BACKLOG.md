@@ -54,6 +54,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-229 It said the machines were highlighted on a turn where it ran nothing
+  - Notes: the diagnosis eval on the shared harness (2026-09-18): "Show me the stuck iron gear wheel assemblers" → "The 6 are highlighted in-game for 60 s…" with no tool call at all, and the turn before it wrote "Run `find_stuck_machines`" as prose instead of calling it. The player would go and look for a highlight that isn't there. Counts and names already get correction lines; actions didn't
+  - Done: `actionClaims()` corrects a past-tense claim of a highlight, a map mark, a queued research or a paste on a turn where no tool that does it ran — narrow patterns tied to the tools, and a report ("nothing is queued") is not a claim. The model's reluctance to call the tool on that question is left as model variance for now
+
 - [x] FC-228 A measurement only seconds old read as "0/min, stalled"
   - Notes: the measure e2e after tonight's relaunch: a baseline taken moments before the first ask gave every recipe 0/min, and the answer called the machines stalled. A window of a few seconds can't measure anything
   - Done: under ten seconds the answer says it just started counting and to ask again; unit test. The e2e also now finds "264 firearm-magazine/min" (the item's name between number and unit) and accepts "hitting" as the real-rate verb
