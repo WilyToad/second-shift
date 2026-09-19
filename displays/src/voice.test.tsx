@@ -18,9 +18,12 @@ function fakeRecognition(availability?: "available" | "unavailable" | "downloada
     start() { this.started = true; this.onstart?.(); }
     stop() { this.stopped = true; this.onend?.(); }
     abort() { this.aborted = true; this.onerror?.({ error: "aborted" }); this.onend?.(); }
-    say(parts: { text: string; final: boolean }[]) {
-      const results = parts.map((p) => Object.assign([{ transcript: p.text }], { isFinal: p.final }));
-      this.onresult?.({ resultIndex: 0, results });
+    results: any[] = [];
+    /** Replaces the results (an interim update) unless `append`, which is what a real engine does after a final. */
+    say(parts: { text: string; final: boolean }[], opts: { append?: boolean } = {}) {
+      const fresh = parts.map((p) => Object.assign([{ transcript: p.text }], { isFinal: p.final }));
+      this.results = opts.append ? [...this.results, ...fresh] : fresh;
+      this.onresult?.({ resultIndex: 0, results: this.results });
     }
     static available = availability ? async () => availability : undefined;
   }
@@ -635,4 +638,78 @@ test("FC-209: a runaway repeat is collapsed, and the real sentence survives", as
   expect(voice.collapseRepeats("no no that one")).toBe("no no that one");
   expect(voice.collapseRepeats("send it there there there there")).toBe("send it there");
   expect(voice.collapseRepeats("okay I'm running wire")).toBe("okay I'm running wire");
+});
+
+test("FC-217: the companion's own voice coming back is an echo; the player cutting in isn't", async () => {
+  const { looksLikeEcho } = await import("./voice");
+  const spoken = ["Zero rails within 32 tiles around you on Gleba.", "Nothing to survey yet."];
+  expect(looksLikeEcho("zero rails within 32 tiles around you", spoken)).toBe(true);
+  expect(looksLikeEcho("nothing to survey yet", spoken)).toBe(true);
+  expect(looksLikeEcho("how many chests are near me", spoken)).toBe(false);
+  // One word: noise or echo, unless it's a cut-in word.
+  expect(looksLikeEcho("okay", spoken)).toBe(true);
+  expect(looksLikeEcho("stop", spoken)).toBe(false);
+  expect(looksLikeEcho("Ballast", spoken)).toBe(false);
+  expect(looksLikeEcho("", spoken)).toBe(true);
+});
+
+test("FC-217: with barge-in on, speaking over the answer stops it and starts the next question; off, the mic waits", async () => {
+  const synth = fakeSynthesis();
+  const voice = await import("./voice");
+  const said: string[] = [];
+  const { ctor, made } = fakeRecognition("unavailable");
+  voice.readAloud.value = true;
+  voice.setBargeIn(true);
+  voice.setSilenceSeconds(0.06);
+  try {
+    voice.startTalking((t) => said.push(t), ctor);
+    made[0].say([{ text: "how many rails are near me", final: true }]);
+    await new Promise((r) => setTimeout(r, 120));
+    expect(said).toEqual(["how many rails are near me"]);
+    // The answer is being read; the recognition is still the same one, not aborted.
+    expect(made[0].aborted).toBe(false);
+    voice.answerSpeech.onQuestion(); // the store does this when the question echoes back
+    voice.answerSpeech.onToken("Zero rails within 32 tiles around you. ");
+    expect(synth.spoken).toEqual(["Zero rails within 32 tiles around you."]);
+    // His own voice comes back through the mic: dropped, nothing sent, nothing cancelled.
+    const cancelsBefore = synth.cancels(); // onQuestion cancels any earlier speech; count from here
+    made[0].say([{ text: "zero rails within 32 tiles around you", final: true }], { append: true });
+    await new Promise((r) => setTimeout(r, 120));
+    expect(said).toHaveLength(1);
+    expect(synth.cancels()).toBe(cancelsBefore);
+    // The player cuts in: the reading stops and their words go out after the pause.
+    made[0].say([{ text: "how many chests are near me", final: true }], { append: true });
+    expect(synth.cancels()).toBe(cancelsBefore + 1);
+    await new Promise((r) => setTimeout(r, 120));
+    expect(said).toEqual(["how many rails are near me", "how many chests are near me"]);
+    voice.stopTalking({ send: false });
+
+    // Off: the recognition is aborted when the question goes out, as before (FC-149).
+    voice.setBargeIn(false);
+    const second = fakeRecognition("unavailable");
+    voice.startTalking(() => {}, second.ctor);
+    second.made[0].say([{ text: "what is this", final: true }]);
+    await new Promise((r) => setTimeout(r, 120));
+    expect(second.made[0].aborted).toBe(true);
+    voice.stopTalking({ send: false });
+  } finally {
+    voice.setBargeIn(false);
+    voice.readAloud.value = false;
+    voice.setSilenceSeconds(2);
+  }
+});
+
+test("FC-216: the sentence and word being spoken are found in the answer's text", async () => {
+  const { markSpoken } = await import("./voice");
+  const text = "Zero rails within 32 tiles of you. No track exists yet — **railway** isn't researched.";
+  // The spoken sentence is speakable text; the mark lands on the third word.
+  const spoken = { sentence: "No track exists yet railway isn't researched.", char: 9 };
+  const marked = markSpoken(text, spoken);
+  expect(marked.map((m) => m.mark)).toContain("word");
+  expect(marked.find((m) => m.mark === "word")?.text).toBe("exists");
+  expect(marked.filter((m) => m.mark === null).map((m) => m.text).join("")).toBe("Zero rails within 32 tiles of you. ");
+  // A whole-sentence mark (ElevenLabs), and a sentence that isn't in this text.
+  expect(markSpoken(text, { sentence: "Zero rails within 32 tiles of you.", char: -1 }).find((m) => m.mark === "sentence")?.text).toBe("Zero rails within 32 tiles of you.");
+  expect(markSpoken(text, { sentence: "Something from another answer.", char: 0 })).toEqual([{ text, mark: null }]);
+  expect(markSpoken(text, null)).toEqual([{ text, mark: null }]);
 });

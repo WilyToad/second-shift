@@ -156,3 +156,7 @@ button.link:disabled { color: var(--muted); text-decoration: none; cursor: defau
 .note { margin: 4px 10px; padding: 8px 10px; border-left: 2px solid var(--line, #8886); border-radius: 4px; background: color-mix(in srgb, currentColor 4%, transparent); }
 .note .alert-meta { display: flex; justify-content: space-between; font-size: 11px; opacity: 0.6; letter-spacing: 0.04em; text-transform: uppercase; }
 .note .alert-text { font-size: 13px; margin-top: 2px; }
+
+/* The sentence and word being read aloud (FC-216): a quiet wash for the sentence, the companion's colour for the word. */
+mark.spoken { background: color-mix(in srgb, var(--agent) 18%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+mark.spoken.word { background: var(--agent); color: var(--on-agent); }

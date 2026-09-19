@@ -105,6 +105,36 @@ export const recognizedWhere = signal<Where>("unknown");
 export const deviceStatus = signal<Availability | null>(null);
 export const readAloud = signal(loadSetting("second-shift.readAloud", false));
 /**
+ * Barge-in (FC-217): keep listening while the answer is read aloud, and treat the player's speech as "stop, I'm
+ * talking". Off by default until its false-stop rate has been measured on the player's voice, because a companion
+ * that stops mid-sentence on its own voice is worse than one you can't interrupt.
+ */
+export const bargeIn = signal(loadSetting("second-shift.bargeIn", false));
+export function setBargeIn(on: boolean): void {
+  bargeIn.value = on;
+  saveSetting("second-shift.bargeIn", on);
+}
+/** The word (browser voice) or sentence (ElevenLabs, approximate) being spoken right now (FC-216). */
+export const spokenNow = signal<{ sentence: string; char: number } | null>(null);
+/** What the voice has said in the last minute, so the recognizer hearing it back isn't taken for the player. */
+const recentlySpoken: { text: string; at: number }[] = [];
+const ECHO_WINDOW_MS = 60_000;
+/** A single word that is never an echo: the player cutting in. */
+const BARGE_WORDS = new Set(["stop", "wait", "hold", "no", "hang", "quiet", "shush", "ballast"]);
+
+/**
+ * Is this the companion's own voice coming back through the microphone (FC-217)? Most of its words are in what
+ * was just spoken. A lone word is treated as echo or noise unless it's one of the cut-in words.
+ */
+export function looksLikeEcho(text: string, spoken: string[] = recentlySpoken.filter((s) => Date.now() - s.at < ECHO_WINDOW_MS).map((s) => s.text)): boolean {
+  const said = new Set(spoken.join(" ").toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean));
+  const heardWords = text.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
+  if (!heardWords.length) return true;
+  if (heardWords.length === 1) return !BARGE_WORDS.has(heardWords[0]!);
+  const overlap = heardWords.filter((w) => said.has(w)).length / heardWords.length;
+  return overlap >= 0.6;
+}
+/**
  * Which engine turns the voice into text (FC-174). The browser's own service sends the audio off the machine;
  * on-device keeps it here. The player picks, because it's their tradeoff — before this, installing the on-device
  * model silently made it permanent, and near-homophones ("wire" heard as "wine") had no way back.
@@ -298,7 +328,7 @@ export function startTalking(onUtterance: (text: string) => void, ctor = recogni
 
 function listen(): void {
   const s = session;
-  if (!s || awaitingAnswer) return;
+  if (!s || (awaitingAnswer && !bargeIn.value)) return;
   const rec = new s.ctor();
   rec.lang = s.lang;
   rec.continuous = true;
@@ -337,6 +367,15 @@ function listen(): void {
       const offered: string[] = [];
       for (let i = 0; i < last.length; i++) offered.push(last[i]!.transcript.trim());
       lastOffered = offered;
+    }
+    if (awaitingAnswer) {
+      // The answer is in progress (FC-217). His own voice coming back is dropped; anything else is the player
+      // cutting in: the reading stops and their words start the next question.
+      const text = run.pending();
+      if (isSpeaking() && looksLikeEcho(text)) { run.markSent(); heard.value = ""; return; }
+      awaitingAnswer = false;
+      stopSpeaking();
+      listenState.value = "listening";
     }
     heard.value = run.pending();
     armSend();
@@ -443,7 +482,9 @@ function send(text: string): void {
 function pauseForAnswer(): void {
   awaitingAnswer = true;
   answerDone = false;
-  endRecognition();
+  // With barge-in the recognition keeps running through the answer; its results are judged in onresult (FC-217).
+  if (!bargeIn.value) endRecognition();
+  else { if (silence) { clearTimeout(silence); silence = null; } carried = ""; holds = 0; }
   if (session) listenState.value = "waiting";
 }
 
@@ -460,6 +501,7 @@ function endRecognition(): void {
 function maybeResume(): void {
   if (!session || !awaitingAnswer || !answerDone || isSpeaking()) return;
   awaitingAnswer = false;
+  if (active) { listenState.value = "listening"; return; } // barge-in kept it running (FC-217)
   playSound("listen"); // the mic is open again
   listen();
 }
@@ -592,7 +634,7 @@ export class SentenceQueue {
 }
 
 type Synth = { speak(u: unknown): void; cancel(): void; getVoices(): { name: string; lang: string; localService: boolean; default: boolean }[] };
-type UtteranceCtor = new (text: string) => { voice: unknown; lang: string; rate: number; onend: (() => void) | null; onerror: (() => void) | null };
+type UtteranceCtor = new (text: string) => { voice: unknown; lang: string; rate: number; onend: (() => void) | null; onerror: (() => void) | null; onstart: (() => void) | null; onboundary: ((e: { charIndex: number }) => void) | null };
 
 function synth(): Synth | null {
   return (globalThis as unknown as { speechSynthesis?: Synth }).speechSynthesis ?? null;
@@ -739,8 +781,14 @@ const eleven = new ElevenPlayer({
 });
 
 export function speak(sentence: string): void {
-  if (voiceChoice.value.startsWith("eleven:")) eleven.enqueue(sentence);
-  else speakWithBrowser(sentence);
+  recentlySpoken.push({ text: sentence, at: Date.now() });
+  while (recentlySpoken.length > 12) recentlySpoken.shift();
+  if (voiceChoice.value.startsWith("eleven:")) {
+    // ElevenLabs plays per sentence with no word timing exposed here: the mark is the sentence, from when it's
+    // queued while nothing else is playing (approximate by design, FC-216).
+    if (!eleven.busy()) spokenNow.value = { sentence, char: -1 };
+    eleven.enqueue(sentence);
+  } else speakWithBrowser(sentence);
 }
 
 let browserSpeaking = 0;
@@ -755,9 +803,16 @@ function speakWithBrowser(sentence: string): void {
   if (!s || !Utterance || !sentence) return;
   const u = new Utterance(sentence);
   browserSpeaking++;
-  const finished = () => { browserSpeaking = Math.max(0, browserSpeaking - 1); maybeResume(); };
+  const finished = () => {
+    browserSpeaking = Math.max(0, browserSpeaking - 1);
+    if (spokenNow.value?.sentence === sentence) spokenNow.value = null;
+    maybeResume();
+  };
   u.onend = finished;
   u.onerror = finished;
+  // The browser voice reports each word as it starts (FC-216).
+  u.onstart = () => { spokenNow.value = { sentence, char: 0 }; };
+  u.onboundary = (e) => { spokenNow.value = { sentence, char: e.charIndex }; };
   const lang = globalThis.navigator?.language || "en-US";
   const voice = pickVoice(s.getVoices(), lang);
   if (voice) u.voice = voice;
@@ -769,6 +824,7 @@ function speakWithBrowser(sentence: string): void {
 export function stopSpeaking(): void {
   queue = null;
   browserSpeaking = 0;
+  spokenNow.value = null;
   synth()?.cancel();
   eleven.cancel();
   maybeResume();
@@ -793,3 +849,39 @@ export const answerSpeech = {
     maybeResume();
   },
 };
+
+export type Marked = { text: string; mark: "sentence" | "word" | null };
+
+/**
+ * Splits an answer's text around the sentence being spoken, with the word being said marked inside it (FC-216).
+ * The spoken sentence is `speakable()` text — hyphens and markdown gone — so it's found by its first words with
+ * hyphens and marks allowed between them; a sentence that isn't in this text (another answer's) marks nothing.
+ */
+export function markSpoken(text: string, spoken: { sentence: string; char: number } | null): Marked[] {
+  if (!spoken) return [{ text, mark: null }];
+  const lead = spoken.sentence.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean).slice(0, 3);
+  if (!lead.length) return [{ text, mark: null }];
+  const esc = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const start = new RegExp(lead.map(esc).join("[\\s\\-*_`]+"), "i").exec(text);
+  if (!start) return [{ text, mark: null }];
+  const from = start.index;
+  const endMatch = /[.!?](?=\s|$)/.exec(text.slice(from));
+  const to = endMatch ? from + endMatch.index + 1 : text.length;
+  const sentence = text.slice(from, to);
+  const out: Marked[] = [];
+  if (from) out.push({ text: text.slice(0, from), mark: null });
+  if (spoken.char < 0) out.push({ text: sentence, mark: "sentence" });
+  else {
+    // The word index in the spoken sentence, then the same index in the text's sentence.
+    const index = spoken.sentence.slice(0, spoken.char).split(/\s+/).filter(Boolean).length;
+    const parts = sentence.split(/(\s+)/);
+    let seen = 0;
+    for (const part of parts) {
+      if (!part || /^\s+$/.test(part)) { out.push({ text: part, mark: "sentence" }); continue; }
+      out.push({ text: part, mark: seen === index ? "word" : "sentence" });
+      seen++;
+    }
+  }
+  if (to < text.length) out.push({ text: text.slice(to), mark: null });
+  return out.filter((m) => m.text);
+}

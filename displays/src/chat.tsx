@@ -6,7 +6,7 @@ import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 import { setSoundsOn, soundsOn } from "./sounds";
 import { capturing, captureError, clipCount, lastClip, sayTruth, setCapturing } from "./capture";
-import { phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
+import { bargeIn, markSpoken, setBargeIn, spokenNow, phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
 
 const SILENCE_CHOICES = [1, 1.5, 2, 3, 4, 5];
 
@@ -18,11 +18,18 @@ export function Emphasis({ text }: { text: string }) {
     : p)}</>;
 }
 
+/** The answer's prose with the sentence and word being read aloud marked (FC-216); plain when nothing is. */
+function SpokenText({ text }: { text: string }) {
+  const marked = markSpoken(text, spokenNow.value);
+  if (marked.length === 1 && !marked[0]!.mark) return <Emphasis text={text} />;
+  return <>{marked.map((m, i) => (m.mark ? <mark key={i} class={`spoken ${m.mark}`}>{m.text}</mark> : <Emphasis key={i} text={m.text} />))}</>;
+}
+
 function AgentText({ text }: { text: string }) {
   return (
     <div class="msg agent">
       {segments(text).map((seg, i) =>
-        seg.kind === "text" ? <span key={i}><Emphasis text={seg.text} /></span>
+        seg.kind === "text" ? <span key={i}><SpokenText text={seg.text} /></span>
         : seg.kind === "pending" ? <div key={i} class="vis-empty">Drawing chart…</div>
         : <RateChart key={i} spec={seg} />,
       )}
@@ -187,6 +194,9 @@ export function Composer({ onAsk = (text: string, thinking: boolean, spoken = fa
           <label><input type="checkbox" id="thinking" checked={thinking.value} onChange={(e) => (thinking.value = e.currentTarget.checked)} /> Think it through</label>
           <label title="Short sounds for listening, alerts, research and cards"><input type="checkbox" id="sounds" checked={soundsOn.value} onChange={(e) => setSoundsOn(e.currentTarget.checked)} /> Sounds</label>
           <label title="Writes each spoken question to disk as audio, so a local transcriber can be tested against your own voice. Nothing is sent anywhere."><input type="checkbox" id="keep-audio" checked={capturing.value} onChange={(e) => void setCapturing(e.currentTarget.checked)} /> Keep my audio</label>
+          {recognition && readAloud.value && (
+            <label title="Keep listening while the answer is read; speaking over it stops the reading and starts your next question. Off until its false-stop rate has been measured on your voice."><input type="checkbox" id="barge-in" checked={bargeIn.value} onChange={(e) => setBargeIn(e.currentTarget.checked)} /> Talk over him</label>
+          )}
           <label title="Reads each answer aloud as it arrives"><input type="checkbox" id="read-aloud" checked={readAloud.value} onChange={(e) => { readAloud.value = e.currentTarget.checked; saveSetting("second-shift.readAloud", readAloud.value); if (!readAloud.value) stopSpeaking(); }} /> Read answers aloud</label>
           {readAloud.value && elevenVoices.value.length > 0 && (
             <label title="ElevenLabs voices send the answer text to ElevenLabs">
