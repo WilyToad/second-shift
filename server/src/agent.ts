@@ -9,7 +9,7 @@ import { summarizePasted } from "./blueprint-review";
 import { blueprintsIn, decodeBlueprintString, encodeBlueprintString, type Blueprint } from "./blueprint";
 import { describeRow, productionRow, type RowBuild } from "./blueprint-template";
 import { stageFor, stageLines, tookAThrowback } from "./stages";
-import { nameCorrections } from "./names";
+import { materialCorrections, nameCorrections } from "./names";
 import { actionClaims } from "./claims";
 import { turnNotes } from "./guidance";
 import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, ASKS_FOR, askedFor, parseTarget, anchorFor, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
@@ -689,7 +689,7 @@ export class Agent {
           // A name this save doesn't have, said with confidence (FC-171), and sums the answer did in its head (FC-153).
           // "The 6 are highlighted in-game" on a turn with no tool call (FC-229): an action it says it took.
           const toolsRun = record.rounds.flatMap((r) => r.tools ?? []);
-          const corrections = [...(await this.checkClaims(text, status)), ...arithmeticCorrections(text), ...nameCorrections(text, protos), ...actionClaims(text, toolsRun)];
+          const corrections = [...(await this.checkClaims(text, status)), ...arithmeticCorrections(text), ...nameCorrections(text, protos), ...materialCorrections(text, protos), ...actionClaims(text, toolsRun)];
           if (corrections.length) {
             const add = `\n\n${corrections.join(" ")}`;
             text += add;

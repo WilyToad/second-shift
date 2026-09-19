@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PrototypesSchema } from "@companion/interfaces";
-import { nameCorrections, unknownNames } from "./names";
+import { materialCorrections, nameCorrections, unknownNames } from "./names";
 
 const real = PrototypesSchema.parse(await Bun.file(new URL("../../data/captures/prototypes.json", import.meta.url)).json());
 
@@ -72,4 +72,17 @@ test("FC-171: the names a technology triggers on count as names the save has", (
   for (const triggered of ["big-volcanic-rock", "fulgoran-ruin-vault", "iron-stromatolite", "lithium-iceberg-big"]) {
     expect(known.has(triggered)).toBe(true);
   }
+});
+
+test("FC-224: a one-word material this save doesn't have gets a correction when it's offered as a thing", () => {
+  // Verbatim from VERIFY row 18 (2026-09-18): no aluminium anywhere in this save.
+  const offered = "\"Metal\" could be iron plate, copper plate, steel, aluminium, or something else — the wrong guess wastes a whole line's materials. Which one?";
+  expect(materialCorrections(offered, real)).toEqual(["Correction: this save has no \"aluminium\" — I shouldn't have offered it."]);
+  expect(materialCorrections("You'd need titanium plates for that.", real)).toHaveLength(1);
+  // The save has these in some form (holmium-plate, tungsten-carbide, lithium-plate, carbon), so they're fine.
+  for (const ok of ["Holmium plates come from Fulgora.", "Tungsten ore is on Vulcanus.", "Lithium comes from Aquilo brine."]) expect(materialCorrections(ok, real)).toEqual([]);
+  // A turn of phrase, or a word not offered as a thing, is left alone.
+  expect(materialCorrections("Aluminium foil is a kitchen thing, not a Factorio one.", real)).toEqual([]);
+  expect(materialCorrections("No aluminium here.", real)).toEqual([]);
+  expect(materialCorrections("anything", null)).toEqual([]);
 });

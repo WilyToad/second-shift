@@ -101,3 +101,37 @@ export function nameCorrections(text: string, p: Prototypes | null): string[] {
   const named = unknown.slice(0, 3).map((n) => `"${n}"`).join(", ");
   return [`Correction: this save has no ${named}${unknown.length > 3 ? ` (and ${unknown.length - 3} more)` : ""} — I shouldn't have named ${unknown.length === 1 ? "it" : "them"}.`];
 }
+
+/**
+ * Materials the model borrows from other mods and offers as if this save had them (FC-224): "metal could be iron
+ * plate, copper plate, steel, aluminium" on a save with no aluminium. One-word names can't be told from English by
+ * shape, so this is a short list of the usual suspects, checked as whole words only when they're offered as a
+ * thing — "could be X", "made of X", "X plate/ore/bar" — and only when no prototype name in the save contains the
+ * word. "Holmium" on a save with holmium-plate is fine; "aluminium" in a sentence about kitchen foil is left alone.
+ */
+const MATERIALS = ["aluminium", "aluminum", "titanium", "tungsten", "lead", "tin", "nickel", "zinc", "silver", "gold", "platinum", "cobalt", "chromium", "lithium", "uranium", "thorium", "gallium", "silicon", "quartz", "bauxite", "rutile", "holmium", "tritium", "deuterium", "helium", "nitrogen", "oxygen", "hydrogen", "methane", "ammonia", "graphite", "rubber", "glass", "ceramic", "cement", "bronze", "brass"];
+const OFFERED_BEFORE = /\b(could be|might be|may be|maybe|perhaps|or|such as|like|made (of|from)|out of|from|need|needs|take|takes|require|requires|use|uses|using|smelt|smelting|mine|mining)\s+(?:a |an |the |some |raw )?$/i;
+const OFFERED_LIST = /\b(could be|might be|may be|maybe|perhaps|such as|like|one of|either|options? (are|include))\b/i;
+const OFFERED_AFTER = /^\s+(plates?|ores?|bars?|ingots?|sheets?|rods?|wire|cable|dust|powder|solution|gas)\b/i;
+
+export function materialCorrections(text: string, p: Prototypes | null): string[] {
+  if (!p) return [];
+  const names = Object.keys(p.items).concat(Object.keys(p.fluids), Object.keys(p.recipes), Object.keys(p.entities)).map((n) => n.toLowerCase());
+  const lower = text.toLowerCase();
+  const out: string[] = [];
+  for (const material of MATERIALS) {
+    if (names.some((n) => n.includes(material))) continue; // the save has it in some form
+    const re = new RegExp(`\\b${material}\\b`, "g");
+    for (let m = re.exec(lower); m; m = re.exec(lower)) {
+      const before = lower.slice(Math.max(0, m.index - 24), m.index);
+      const after = lower.slice(m.index + material.length, m.index + material.length + 12);
+      // "could be iron plate, copper plate, steel, aluminium, or…": the cue opens the list, the word sits in it.
+      const sentence = lower.slice(lower.lastIndexOf(".", m.index) + 1, m.index);
+      const listed = OFFERED_LIST.test(sentence) && /^\s*,?\s*(or|and|,)\b|^\s*,/.test(after);
+      if (OFFERED_BEFORE.test(before) || OFFERED_AFTER.test(after) || listed) { out.push(material); break; }
+    }
+  }
+  if (!out.length) return [];
+  const named = out.slice(0, 3).map((n) => `"${n}"`).join(", ");
+  return [`Correction: this save has no ${named}${out.length > 3 ? ` (and ${out.length - 3} more)` : ""} — I shouldn't have offered ${out.length === 1 ? "it" : "them"}.`];
+}
