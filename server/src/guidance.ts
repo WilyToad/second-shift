@@ -45,7 +45,8 @@ export type TurnFacts = {
 
 export function turnNotes(f: TurnFacts): string[] {
   return [
-    f.plain ? "say this one flat: the facts, the numbers, or what to confirm, and nothing about yourself — no aside, no remark, no mention of the ship or the manifest" : "",
+    // Was "say this one flat: …", which the model echoed as a heading ("Numbers, flat:") — the player heard it (FC-212).
+    f.plain ? "keep this answer plain and don't announce that you're doing so: only the facts, the numbers, or what to confirm; no aside, no remark, nothing about yourself, the ship or the manifest" : "",
     f.world || !f.answeredFromData ? "" : "no tool call is needed",
     // With a fresh look already in the lines, the model still searched twice, narrating "let me scan wider" (S22 eval).
     f.around && !f.searchAgain ? "the surroundings lines are a fresh look, so don't search again unless the player asks for a wider search" : "",

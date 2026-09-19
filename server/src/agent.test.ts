@@ -839,13 +839,13 @@ test("FC-179: a turn that counts things tells the model to keep itself out of it
   const model = fakeModel([{ tool: "find_entities", args: { what: "lab", radius: 32 } }, { text: "No labs within 32 tiles." }]);
   const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
   await agent.ask("how many labs are near me?");
-  expect(model.seen[0]!.at(-1)!.content as string).toContain("say this one flat");
+  expect(model.seen[0]!.at(-1)!.content as string).toContain("keep this answer plain");
 
   // A recipe lookup leaves the register alone.
   const other = fakeModel([{ text: "3 copper cable." }]);
   const lookup = new Agent({ model: other, game: firstHourGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
   await lookup.ask("how many copper cables does a green circuit take?");
-  expect(other.seen[0]!.at(-1)!.content as string).not.toContain("say this one flat");
+  expect(other.seen[0]!.at(-1)!.content as string).not.toContain("keep this answer plain");
 });
 
 test("FC-181: 'what should I do' carries the stage and its goals; other turns carry neither", async () => {
@@ -903,7 +903,7 @@ test("FC-182: a turn the player acts on gets no register and no throwback at all
   const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {} });
   await agent.ask("is anything attacking me?");
   const urgent = model.seen[0]!.at(-1)!.content as string;
-  expect(urgent).toContain("say this one flat");
+  expect(urgent).toContain("keep this answer plain");
   expect(urgent).not.toContain("your register here:");
   expect(urgent).not.toContain("you may let one clause");
 

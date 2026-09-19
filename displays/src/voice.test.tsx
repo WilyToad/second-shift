@@ -531,6 +531,8 @@ test("FC-190: the voice says the answer and points at the screen for the working
   const q = new SentenceQueue();
   const spoken = [...answer.split(/(?<=\s)/).flatMap((part) => q.push(part)), ...q.end()];
   expect(spoken[0]).toBe("You'd need 8 biochambers.");
+  // The pointer sits where the working was, and the chart later earns its own (FC-213).
+  expect(spoken).toContain(POINTER.numbers);
   expect(spoken.at(-1)).toBe(POINTER.chart);
   // None of the working is read out.
   expect(spoken.join(" ")).not.toContain("yumako mash");
@@ -549,6 +551,11 @@ test("FC-190: an ordinary answer is read in full, with nothing added", async () 
   const out = [...table.push("Here's the split.\n| item | rate |\n| --- | --- |\n| iron plate | 240/min |\n"), ...table.end()];
   expect(out[0]).toBe("Here's the split.");
   expect(out.at(-1)).toBe(POINTER.numbers);
+
+  // FC-213: numbers in the middle, a question at the end — the pointer is heard in the middle, and the question last.
+  const mid = new SentenceQueue();
+  const heard = [...mid.push("Twenty furnaces. 20 furnaces at 12.5 plates/min each = 250 plates/min, needing ~50 ore/min.\nWant that one-row blueprint, or the outpost added to your packing list? "), ...mid.end()];
+  expect(heard).toEqual(["Twenty furnaces.", POINTER.numbers, "Want that one row blueprint, or the outpost added to your packing list?"]); // speakable() drops hyphens
   expect(out.join(" ")).not.toContain("240");
 });
 

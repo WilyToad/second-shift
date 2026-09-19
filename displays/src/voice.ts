@@ -527,23 +527,33 @@ export class SentenceQueue {
   private skipped = false;
   private sawChart = false;
 
-  /** Drops the working from one chunk, keeping the first thing it says whatever that is. */
-  private worthHearing(raw: string): string {
+  /**
+   * Drops the working from one chunk, keeping the first thing it says whatever that is. The pointer is said *where*
+   * the working was skipped — after the last sentence it sounded like something was missing off the end, when the
+   * numbers had been in the middle (FC-213, the player's session 2026-09-18).
+   */
+  private worthHearing(raw: string): { text: string; pointer?: string } {
+    let chartHere = false;
     const prose = raw.replace(/```[\s\S]*?```/g, () => {
-      this.sawChart = true;
-      this.skipped = true;
+      chartHere = true;
       return "\n";
     });
     const kept: string[] = [];
+    let skippedHere = chartHere;
     for (const line of prose.split("\n")) {
       const text = line.trim();
       if (!text) continue;
       // The answer itself is never dropped, however many numbers it carries.
       if ((!this.said && !kept.length) || !working(text)) kept.push(text);
-      else this.skipped = true;
+      else skippedHere = true;
     }
     if (kept.length) this.said = true;
-    return kept.join(" ");
+    // One pointer, in place, the first time something is skipped; a chart skipped later earns its own. Spoken as its
+    // own sentence, after whatever this chunk kept.
+    const pointer = skippedHere && (!this.skipped || (chartHere && !this.sawChart)) ? (chartHere ? POINTER.chart : POINTER.numbers) : undefined;
+    if (skippedHere) this.skipped = true;
+    if (chartHere) this.sawChart = true;
+    return { text: kept.join(" "), pointer };
   }
 
   push(delta: string): string[] {
@@ -554,18 +564,21 @@ export class SentenceQueue {
       const safe = fences % 2 === 1 ? this.buffer.slice(0, this.buffer.lastIndexOf("```")) : this.buffer;
       const m = /[\s\S]*?(?:[.!?](?=\s)|\n\n)/.exec(safe);
       if (!m) break;
-      const sentence = speakable(this.worthHearing(m[0]));
+      const heard = this.worthHearing(m[0]);
+      const sentence = speakable(heard.text);
       this.buffer = this.buffer.slice(m[0].length);
       if (sentence) out.push(sentence);
+      if (heard.pointer) out.push(heard.pointer);
     }
     return out;
   }
 
   end(): string[] {
-    const rest = speakable(this.worthHearing(this.buffer));
+    const heard = this.worthHearing(this.buffer);
+    const rest = speakable(heard.text);
     this.buffer = "";
     const out = rest ? [rest] : [];
-    if (this.skipped) out.push(this.sawChart ? POINTER.chart : POINTER.numbers);
+    if (heard.pointer) out.push(heard.pointer);
     this.said = false;
     this.skipped = false;
     this.sawChart = false;

@@ -47,6 +47,13 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-212 Every recipe-grounded answer was flat, and the model announced it
+  - Notes: heard by the player (2026-09-18): a build description answered as "Numbers, flat: 20 furnaces at 12.5 plates/min each…". FC-179's tier decision counted retrieved *recipe lines* as a "count", so any answer with recipe grounding got the flat register — which is most answers — and the instruction "say this one flat" was being echoed as a heading
+  - Done: retrieved recipe lines are no longer a count (a carried-over search or a spatial question is); the flat note is phrased so it can't be read as a heading and says not to announce it. `eval-register`'s cases were unaffected because none of them retrieved recipes on a dry turn — the corpus should grow a recipe question with an expected dry register, which needs the game
+- [x] FC-213 The read-aloud pointer came after the last sentence, not where the working was
+  - Notes: the player heard "…or the outpost added to your packing list?" and then "The numbers are in your app", and looked for numbers after the question. They'd been in the middle
+  - Done: the pointer is spoken as its own sentence in place, the first time something is skipped, and a chart skipped later earns its own line; the two existing FC-190 tests are updated and a third pins numbers-in-the-middle, question-last
+
 - [x] FC-211 A described build without the word "need" wasn't a packing list
   - Notes: VERIFY row 14, live (2026-09-18). Spoken, the player's own example came through as "I'm going to build a smelting outpost 20 stone furnace is a couple hundred belt arms to feed them chest for storage" — no "need", no commas — and `wantsPackingList` required one of need/bring/take/pack/list/gather/grab, so the build classifier won and the answer was furnace arithmetic plus the FC-172 paste offer. No list was made
   - Done: a build sentence with two or more counted things ("20 stone furnace", "a couple hundred belt") is a packing list whether or not it says "need"; the exact transcript is in the corpus, along with a bare "I'm going to build a smelting outpost" (no counts → still the build offer)

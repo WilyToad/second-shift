@@ -541,7 +541,9 @@ export class Agent {
     const answeredFromData = Boolean(found?.lines.length || playerLines.length);
     // Register, decided in code (FC-179): flat on anything the player is about to act on, dry everywhere else.
     const plain = plainAnswer(question, {
-      counted: Boolean(found?.lines.length) || Boolean(carryOver) || (world && SPATIAL.test(question)), measured: Boolean(measuredLine), ready: askedReady,
+      // Retrieved recipe lines are not a count: treating them as one made every recipe-grounded answer flat, and the
+      // player's build description came back as "Numbers, flat: 20 furnaces at 12.5 plates/min…" (FC-212).
+      counted: Boolean(carryOver) || (world && SPATIAL.test(question)), measured: Boolean(measuredLine), ready: askedReady,
       card: Boolean(sendLine?.startsWith("An approval card")), stopped: Boolean(stopLine), pointed: Boolean(pointed),
       stock: stockLines.length > 0, packing: Boolean(packing),
     });
