@@ -32,7 +32,13 @@ Alt+V to start listening.
 
 **Scripts to run once with the game hosted** (they were migrated to the shared harness without being run): every
 `scripts/e2e-*.ts` and `scripts/eval-*.ts` that doesn't say otherwise in its header. A first clean run of each
-retires FC-197's caveat. Not yet run as of 18 Sep.
+retires FC-197's caveat. **Run 18 Sep, all 24:** 21 clean; three script fixes on the way (measure's cold start,
+blueprint-request's spelled-out count, register/stages exiting on success); one runner misuse (session's two
+phases); and the runs found two product bugs — FC-227 (a highlight called a map mark) and FC-229 (an action
+claimed on a turn that ran nothing) — plus FC-228 (a seconds-old measurement read as stalled). Left as is:
+`e2e-long` wants a history compaction within 16 turns and gets none (an S16-era assumption), and `e2e-measure`'s
+last check compares the mod's 35 s window (115/min) with the script's own 30 s window (88/min) on a bursty feed
+at 25% tolerance — noise, not a defect, and not loosened blindly.
 
 **Session log, 18 Sep:** ten rows closed, fourteen bugs found and fixed while the player talked (FC-206–FC-215,
 FC-218), S31 settled on both engines, and two requests filed (FC-216, FC-217).
