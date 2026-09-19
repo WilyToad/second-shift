@@ -961,6 +961,18 @@ never reaches the page; the picker labels them online.
    pass (FC-193) asking "which of these forty alerts is worth mentioning", where no code rule expresses
    the judgement and the latency is nobody's wait. Revisit Jev itself only if TypeSafe ships local
    weights; that single change is what would reopen this.
+
+   **Second look, 2026-09-19 — open MLX implementations of the technique.** Verified real: `bnsd55/jevmlx`
+   (library + server, one prefill broadcast across a batch row per field, scalar-temperature calibration),
+   `daseinlabs/open-jev` (Gemma 3 4B, 0.17 s median for 8 options), `rorshopping/jev-on-a-laptop` (the study
+   jevmlx grew from), `hr98w/jev-visual` and `NullPo-jp/PocketJev` (vision, Qwen3.5-0.8B / Qwen3-VL-2B). All
+   score option tokens from logits after a shared prefill; none has Jev's training, so their probabilities are
+   softmax over logits, not calibrated. Measured here through oMLX with a 67-token question and `max_tokens: 1`:
+   **oMLX drops `logprobs`/`top_logprobs` silently** (200, no `logprobs` field), so through our server the shape
+   is argmax only; Flash-Next answers a one-token choice in 327 ms warm (1.66 s cold); `Qwen3.5-0.8B-MLX-4bit`,
+   already in `~/.omlx/models`, loads on demand beside Flash-Next (0.6 GB, Flash-Next stayed resident at 73.3 GB
+   total) and answers in 101–109 ms warm (5.1 s first load). Real probabilities would need mlx-lm direct, a
+   second process beside oMLX, the way whisper-server sits beside it (FC-230).
 5. ~~**Transport: RCON or UDP?**~~ **Decided 2026-09-13: RCON**, after testing and prior-art
    research. The player accepted the multiplayer-hosting trade-offs below. The RCON keys go in
    the player's real `config.ini` (set by `scripts/setup-rcon.ts` with the game closed).
