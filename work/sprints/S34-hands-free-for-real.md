@@ -1,15 +1,17 @@
 # S34 — Hands free, for real
 
-- **Status:** planned
+- **Status:** active
+- **Started:** 2026-09-18
 - **Goal:** Hands-free that behaves like a coworker: you can talk over him, he stops, and what he says is honest to the last word — no restating the list, no borrowed material names, no stray markup — and the local-transcriber question gets its answer from your own recordings.
 - **Acceptance:** With read-aloud on, speaking over an answer stops it within a second and becomes the next question, and Ballast's own voice never triggers it; a list is only restated when asked about; a one-word material this save doesn't have gets a correction and a turn of phrase never does; no HTML tag reaches the page; the words being spoken are marked in the thread as the voice reads them; FC-189's three-way comparison is written into PLAN with a verdict — including "keep the browser engine" if the numbers say so — measured on the player's own clips; every eval and the corpus test still green.
 
 ## Items
 
-- [ ] FC-226 A stray HTML tag reached the page
+- [x] FC-226 A stray HTML tag reached the page
   - Notes: player's session (2026-09-18): an answer ended with a literal "</br>" line. The stream filter hides chart and tool-call blocks; it doesn't know HTML, and the thread renders text, so the tag showed as text
   - Acceptance: a bare HTML tag on its own line, or trailing an answer, is dropped in the stream filter at every token split; prose that mentions a tag in backticks is untouched; unit test
-- [ ] FC-224 A one-word invented material slips past the name check
+  - Done: the stream filter holds a line while it could still be nothing but a tag and drops it whole once it is, at every split; "x < y", "<->" and a tag in backticks pass through. Test uses the session's answer shape
+- [~] FC-224 A one-word invented material slips past the name check
   - Notes: VERIFY row 18, live (2026-09-18): "Metal could be iron plate, copper plate, steel, aluminium, or something else". This save has no aluminium. FC-171 checks hyphenated names only, because that's how the save spells prototypes; a single ordinary-looking word the model borrows from other mods ("aluminium", "titanium", "tungsten" on a save without it) can't be told from English by shape
   - Acceptance: a short list of material and ore names common across Factorio mods is checked as whole words when they're offered as things the save might have ("could be X", "made of X", "X plate/ore"), and corrected only when the save has no prototype whose name contains the word; the FC-171 false-positive discipline applies — a turn of phrase is never corrected; unit test over this answer
 - [ ] FC-219 It restates the packing list on questions that aren't about it

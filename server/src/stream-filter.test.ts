@@ -68,3 +68,15 @@ test("FC-202: a chart-allowed turn still hides a tool call written as text, and 
   expect(out).not.toContain("<tool_call>");
   expect(out).toContain("Done.");
 });
+
+test("FC-226: a bare HTML tag on its own line, or trailing the answer, never reaches the page", () => {
+  // Verbatim shape from the player's session: an answer that ended with a line holding only "</br>".
+  const answer = "Nearest accumulator is 29 tiles west at (-16, 86).\n</br>";
+  for (let i = 1; i < answer.length; i++) expect(streamed([answer.slice(0, i), answer.slice(i)])).toBe("Nearest accumulator is 29 tiles west at (-16, 86).\n");
+  expect(streamed([...answer])).toBe("Nearest accumulator is 29 tiles west at (-16, 86).\n");
+  expect(streamed(["Done.\n<br/>\nNext."])).toBe("Done.\nNext.");
+  // Text that merely contains angle brackets, or a tag in code, is untouched.
+  expect(streamed(["x < y and y > z"])).toBe("x < y and y > z");
+  expect(streamed(["Use `<br>` for a line break."])).toBe("Use `<br>` for a line break.");
+  expect(streamed(["The pipe <-> the tank"])).toBe("The pipe <-> the tank");
+});

@@ -2,6 +2,9 @@
 // allow charts (FC-111, the model is told "no chart block" but sometimes writes one anyway and the page would draw
 // it), and a tool call the model wrote as text (FC-184, which reached one player as their entire answer).
 const FENCE = "```";
+/** A line holding nothing but HTML tags, complete ("</br>", "<br/>") or still arriving ("</b"). */
+const BARE_TAG_LINE = /^[ \t]*(?:<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^<>\n]*)?\/?>[ \t]*)+\n/gm;
+const BARE_TAG_SO_FAR = /^[ \t]*(?:<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^<>\n]*)?\/?>[ \t]*)*<\/?[a-zA-Z0-9]*(?:\s[^<>\n]*)?\/?>?[ \t]*$/;
 type Block = { open: string; close: string };
 const CHART: Block = { open: "```rate_chart", close: FENCE };
 const TOOL_CALL: Block = { open: "<tool_call>", close: "</tool_call>" };
@@ -28,7 +31,16 @@ export class HiddenBlockFilter {
         if (this.pending.slice(-k) === block.open.slice(0, k)) { keep = k; break; }
       }
     }
+    // A line that so far is only a bare HTML tag (or the start of one) waits, so "</br>" can be dropped whole
+    // rather than shown (FC-226). Anything else on the line frees it: "x < y" is text, and so is `<br>` in code.
+    const line = this.pending.slice(this.pending.lastIndexOf("\n") + 1);
+    if (BARE_TAG_SO_FAR.test(line) && line.length > keep) keep = line.length;
     return keep;
+  }
+
+  /** Drops bare-tag lines from text that is about to be shown. */
+  private static clean(text: string): string {
+    return text.replace(BARE_TAG_LINE, "");
   }
 
   /** Text that is safe to show now. Anything that might still turn into a chart block is held back. */
@@ -54,13 +66,13 @@ export class HiddenBlockFilter {
         if (i >= 0 && (at < 0 || i < at)) { at = i; hit = block; }
       }
       if (hit) {
-        out += this.pending.slice(0, at);
+        out += HiddenBlockFilter.clean(this.pending.slice(0, at));
         this.pending = this.pending.slice(at + hit.open.length);
         this.inBlock = hit;
         continue;
       }
       const keep = this.held();
-      out += this.pending.slice(0, this.pending.length - keep);
+      out += HiddenBlockFilter.clean(this.pending.slice(0, this.pending.length - keep));
       this.pending = this.pending.slice(this.pending.length - keep);
       return out;
     }
@@ -69,7 +81,8 @@ export class HiddenBlockFilter {
   /** What's left when the answer ends; an unfinished block is dropped. A bare marker prefix can no longer grow
    * into one, so it's ordinary text and passes through (an answer really can end on a backtick). */
   end(): string {
-    const rest = this.inBlock ? "" : this.pending;
+    // A bare tag with no newline after it — "</br>" trailing the answer — goes too.
+    const rest = this.inBlock ? "" : HiddenBlockFilter.clean(this.pending + "\n").replace(/\n$/, "");
     this.pending = "";
     this.inBlock = null;
     return rest;
