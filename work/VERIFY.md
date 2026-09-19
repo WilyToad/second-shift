@@ -30,6 +30,14 @@ Alt+V to start listening.
 | 18 | ✅ 18 Sep — asked which metal, offered a one-row paste as ghosts, no card until asked. (It listed "aluminium" as a possible metal — a single-word name FC-171 can't check; noted, not filed) | Ask "build a line up to my metal" | It says what it can paste and what it can't | No flat refusal | FC-172 |
 | 19 | ✅ 18 Sep — two enemy searches ran, flat answer, no invented name | Ask "I see a big red dot on the map up there, that must be monsters" | A search for enemies runs | Not "I don't know what enemy refers to" | FC-194, FC-204 |
 
+**Added overnight 18–19 Sep (S34):**
+
+| # | Status | Do | Say / expect | Pass looks like | Closes |
+|---|---|---|---|---|---|
+| 20 | ⬜ | Read answers aloud on, tick **Talk over him**, ask something long, then talk over it | Your words | The reading stops within a second and your words go up as the next question; his own voice through your speakers never stops him. Count false stops over ten answers — that number decides whether the switch can default on | FC-217 |
+| 21 | ⬜ | Read answers aloud on, ask anything | — | The word being spoken is marked in the answer as the voice reads (browser voice); the sentence, with ElevenLabs | FC-216 |
+| 22 | ⬜ | With a packing list up, ask "do you ever miss flying?" | — | No list report in the answer | FC-219 (and `e2e-packing` on the dev save) |
+
 **Scripts to run once with the game hosted** (they were migrated to the shared harness without being run): every
 `scripts/e2e-*.ts` and `scripts/eval-*.ts` that doesn't say otherwise in its header. A first clean run of each
 retires FC-197's caveat. **Run 18 Sep, all 24:** 21 clean; three script fixes on the way (measure's cold start,

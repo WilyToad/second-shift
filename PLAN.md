@@ -519,7 +519,7 @@ recipe lookup gets no direction at all. It also names the stage so the player ca
 the dev save it said "Gleba, I'd say — though your view says otherwise… So I may have the stage wrong; tell me if
 so."
 
-**S31's experiment, run (2026-09-18, the player's Chrome session, ten sentences, nine clips kept):** the two
+**S31's experiment, run (2026-09-18, the player's Chrome session, ten test sentences; 35 clips kept by the end of the night):** the two
 mechanisms were tested on both engines and the verdict is clean. **Chrome's online service refuses a phrase list
 outright** (`phrases-not-supported`, the moment recognition starts) — biasing is on-device only, as the explainer
 hinted. On that service the five test sentences came through 5/5 and **every winner was the engine's own first
