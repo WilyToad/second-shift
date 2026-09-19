@@ -17,6 +17,24 @@ const RING_S = 60;
 const ONSET_S = 1.5;
 
 export const capturing = signal(load());
+/**
+ * Local transcription (FC-230): the same tap feeds the server's whisper, which answered 19 of 24 of the player's
+ * clips exactly in 120 ms (FC-189). On when the server has it; the switch is remembered per browser.
+ */
+export const localStt = signal(loadFlag("second-shift.localStt", true));
+export const sttStatus = signal<{ available: boolean; ready: boolean; reason?: string; model?: string } | null>(null);
+export const lastLocal = signal<{ text: string; ms: number; engine: string } | null>(null);
+function loadFlag(key: string, fallback: boolean): boolean {
+  try { const v = globalThis.localStorage?.getItem(key); return v === null || v === undefined ? fallback : v === "true"; } catch { return fallback; }
+}
+export function setLocalStt(on: boolean): void {
+  localStt.value = on;
+  try { globalThis.localStorage?.setItem("second-shift.localStt", String(on)); } catch { /* per-browser */ }
+}
+/** Asks the server once whether whisper is there; the composer says so either way. */
+export async function probeStt(): Promise<void> {
+  try { sttStatus.value = await (await fetch("/stt/status")).json(); } catch { sttStatus.value = null; }
+}
 export const captureError = signal<string | null>(null);
 /** The last clip written, so the player can say what they actually said while they still remember. */
 export const lastClip = signal<{ id: string; heard: string } | null>(null);
@@ -166,7 +184,8 @@ export async function setCapturing(on: boolean): Promise<void> {
  * user gesture, so the browser's microphone prompt is allowed.
  */
 export async function ensureCapture(): Promise<void> {
-  if (!capturing.value || mic) return;
+  // The tap serves two things: keeping clips (opt-in) and local transcription (on when the server has it).
+  if ((!capturing.value && !(localStt.value && sttStatus.value?.available)) || mic) return;
   const error = await startCapture();
   if (error) { captureError.value = error; capturing.value = false; }
 }
@@ -175,6 +194,40 @@ export async function ensureCapture(): Promise<void> {
 export function markUtterance(): void {
   if (!mic || startedAt !== null) return;
   startedAt = Math.max(0, written - Math.floor(rate * ONSET_S));
+}
+
+/** The current utterance as a WAV, without closing it out — for local transcription before the question goes (FC-230). */
+export function currentClip(): Uint8Array | null {
+  const mark = startedAt;
+  if (!mic || mark === null) return null;
+  const samples = resample(since(mark), rate);
+  return samples.length < TARGET_RATE / 4 ? null : wav(samples);
+}
+
+/** How long the question may wait for the local transcript before the browser's is used instead. */
+export const STT_WAIT_MS = 700;
+
+/**
+ * The local transcript for the current utterance, or null — in time, or not at all. Never throws, never blocks the
+ * question longer than STT_WAIT_MS: the browser's text is always there as the fallback.
+ */
+export async function transcribeLocally(): Promise<{ text: string; ms: number; engine: string } | null> {
+  if (!localStt.value || !sttStatus.value?.available) return null;
+  const clip = currentClip();
+  if (!clip) return null;
+  const control = new AbortController();
+  const timer = setTimeout(() => control.abort(), STT_WAIT_MS);
+  try {
+    const res = await fetch("/stt", { method: "POST", headers: { "content-type": "audio/wav" }, body: clip as unknown as BodyInit, signal: control.signal });
+    if (!res.ok) return null;
+    const out = (await res.json()) as { text: string; ms: number; engine: string; gated?: string };
+    lastLocal.value = out;
+    return out.text ? out : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

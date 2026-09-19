@@ -4,7 +4,7 @@
 // audio goes to the browser's speech service, and the console says which.
 import { signal } from "@preact/signals";
 import { playSound } from "./sounds";
-import { ensureCapture, keepClip, markUtterance } from "./capture";
+import { ensureCapture, keepClip, markUtterance, transcribeLocally } from "./capture";
 
 type Alternative = { transcript: string };
 type Result = { isFinal: boolean; 0: Alternative; length: number; [index: number]: Alternative };
@@ -62,7 +62,7 @@ export function setPhrases(list: string[], name = ""): void {
  * good transcript can't be attributed: biasing preventing the error, rescoring correcting it, and the engine simply
  * getting it right all look identical afterwards. Sent with the question for the log, never into the prompt.
  */
-export type HeardDetail = { first: string; picked: string; alternatives: number; offered: string[]; phrases: number; where: string; carried: boolean };
+export type HeardDetail = { first: string; picked: string; alternatives: number; offered: string[]; phrases: number; where: string; carried: boolean; browser?: string; localMs?: number };
 let detail: HeardDetail | null = null;
 export const heardDetail = (): HeardDetail | null => detail;
 
@@ -461,9 +461,15 @@ function armSend(): void {
       return;
     }
     holds = 0;
-    detail = run.record(text);
-    run.markSent();
-    send(text);
+    // Local transcription first, within its cap (FC-230); the browser's text is the fallback either way.
+    void (async () => {
+      const local = await transcribeLocally();
+      if (!session || active !== run) return; // the session ended or the engine restarted while we waited
+      const chosen = local?.text ?? text;
+      detail = { ...run.record(chosen), ...(local ? { where: `local ${local.engine}`, browser: text, localMs: Math.round(local.ms) } : {}) };
+      run.markSent();
+      send(chosen);
+    })();
   }, silenceSeconds.value * 1000);
 }
 

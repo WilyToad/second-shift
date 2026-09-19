@@ -11,6 +11,9 @@ const HeardSchema = z.object({
   phrases: z.number().int().nonnegative(),
   where: z.string(),
   carried: z.boolean(),
+  /** With local transcription (FC-230): what the browser heard, and how long whisper took. */
+  browser: z.string().optional(),
+  localMs: z.number().optional(),
 });
 
 export const ClientMessageSchema = z.discriminatedUnion("type", [

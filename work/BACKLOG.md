@@ -10,9 +10,6 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 4 — Voice and extras
 
-- [ ] FC-230 Local transcription: the `/stt` route on whisper-server
-  - Notes: FC-189's verdict (PLAN §5, 2026-09-19): whisper large-v3-turbo at 19/24 exact and 120 ms p50 fixed every English error the browser made, and its only misses were "spidertron" spelled three ways — which a prompt made worse and a normalizer keyed on the save's names would fix. So: a resident `whisper-server` supervised by the Bun server, a `/stt` route mirroring `/tts` that takes the FC-188 clip and returns the text, the browser engine kept for the live "heard" display and as the fallback when the server is down
-  - Acceptance: `whisper-server` started and watched by the server (restarted if it dies, absent without complaint if whisper.cpp isn't installed); `/stt` takes a 16 kHz WAV, gates on VAD and no-speech so silence never becomes "Thank you.", and returns text within the FC-189 latency (p95 under 300 ms on this machine); a normalizer that joins or respells split and hyphenated save names ("spider tron", "Spider-Tron", "robo port") from the same list FC-177 sends, tested on the FC-189 misses; the console sends the clip and uses the returned text as the question when it arrives, the browser's transcript otherwise, and the FC-185 record says which; `compare-transcribers.ts` re-run on the next session's clips as the regression check; oMLX first-token unchanged with the service resident (memory measured); the README's "nothing leaves your Mac" becomes true for voice on this path
 
 
 - [x] FC-188 Keep the audio, so accuracy can be argued from the player's own voice

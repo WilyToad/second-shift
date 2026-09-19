@@ -519,6 +519,19 @@ recipe lookup gets no direction at all. It also names the stage so the player ca
 the dev save it said "Gleba, I'd say — though your view says otherwise… So I may have the stage wrong; tell me if
 so."
 
+**Local transcription, shipped (FC-230, 2026-09-19):** `server/src/stt.ts` starts `whisper-server` beside the Bun server
+and restarts it with backoff if it dies; absent without complaint when whisper.cpp or the model isn't there. The
+console sends each utterance's clip to `/stt` before the question goes and uses the text if it comes back within
+700 ms, the browser's transcript otherwise; the FC-185 line says which and how long. Silence is refused three ways
+— a loudness gate before whisper, the silero VAD inside it, and a short list of Whisper's known inventions
+("Thank you.") after — and the save's own spellings go back in afterwards (`normalize-names.ts`: "Spider-Tron",
+"spider tron", "robo port" → `spidertron`, `roboport`). **Measured:** `scripts/test-stt.ts` 7/7 on the player's
+clips — the three FC-189 misses fixed, the forty-Ballasts clip recovered, the noise clip refused — at **p50 127 ms,
+max 146 ms** through the server; whisper-server resident at **1.94 GB** footprint; oMLX first token **1.03 s
+median** with it beside it, inside FC-191's 1.13–1.79 s spread. Not fixed and not pretended: "SpyderTron" and
+"Spider-John" stay wrong, because the normalizer is spelling, not phonetics. **Not yet heard by the player** —
+VERIFY row 23.
+
 **Local transcription, measured (FC-189, 2026-09-19):** the three-way comparison FC-176 asked for, on the player's own
 35 clips from the 18 Sep session, 24 with ground truth — one corrected by the player, 23 scripted sentences whose
 truth is the session log and marked as such. `scripts/compare-transcribers.ts`, whisper.cpp 1.9 from brew with

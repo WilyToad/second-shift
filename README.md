@@ -29,8 +29,9 @@ Second Shift is the job. **Ballast** is who works it: the pilot AI off the ship 
 your helmet with no body and no ship, and rather good at manifests. You can call him by name — the speech recognizer
 is told to expect it.
 
-Everything runs on your machine: the game, a small mod, a local server and a local language model. Nothing is sent to
-the cloud unless you use voice features that rely on an online service (see [Talk to it](#talk-to-it)).
+Everything runs on your machine: the game, a small mod, a local server and a local language model. With whisper.cpp
+installed (`brew install whisper.cpp` and one model file), your voice is transcribed on your Mac too, and nothing
+leaves it; without it, the browser's own speech service does the transcribing (see [Talk to it](#talk-to-it)).
 
 > **Status: early.** It works end to end on the author's macOS machine with a heavily modded Space Age save. It
 > hasn't been tried on Windows or Linux yet, and it only talks to a local oMLX model for now. See [Requirements](#requirements) before you start.

@@ -5,7 +5,7 @@ import { BlueprintView, RateChart, RecipeGraph, segments } from "./components";
 import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 import { setSoundsOn, soundsOn } from "./sounds";
-import { capturing, captureError, clipCount, lastClip, sayTruth, setCapturing } from "./capture";
+import { capturing, captureError, clipCount, lastClip, lastLocal, localStt, probeStt, sayTruth, setCapturing, setLocalStt, sttStatus } from "./capture";
 import { bargeIn, markSpoken, setBargeIn, spokenNow, phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
 
 const SILENCE_CHOICES = [1, 1.5, 2, 3, 4, 5];
@@ -165,6 +165,7 @@ export function Composer({ onAsk = (text: string, thinking: boolean, spoken = fa
     // The third argument marks it as speech, so the turn reads an odd word as a mis-hear (FC-175).
     else startTalking((said: string) => onAsk(said, thinking.value, true), recognition, undefined, { fromGame });
   };
+  useEffect(() => { void probeStt(); }, []);
   // Push to talk from the game (FC-147): each press toggles, like clicking Talk.
   const seenTalk = useRef(talkRequests.peek());
   useEffect(() => {
@@ -194,6 +195,9 @@ export function Composer({ onAsk = (text: string, thinking: boolean, spoken = fa
           <label><input type="checkbox" id="thinking" checked={thinking.value} onChange={(e) => (thinking.value = e.currentTarget.checked)} /> Think it through</label>
           <label title="Short sounds for listening, alerts, research and cards"><input type="checkbox" id="sounds" checked={soundsOn.value} onChange={(e) => setSoundsOn(e.currentTarget.checked)} /> Sounds</label>
           <label title="Writes each spoken question to disk as audio, so a local transcriber can be tested against your own voice. Nothing is sent anywhere."><input type="checkbox" id="keep-audio" checked={capturing.value} onChange={(e) => void setCapturing(e.currentTarget.checked)} /> Keep my audio</label>
+          {recognition && sttStatus.value?.available && (
+            <label title="Your voice is transcribed on this Mac by whisper (FC-230). Off, the browser's speech engine does it as before."><input type="checkbox" id="local-stt" checked={localStt.value} onChange={(e) => setLocalStt(e.currentTarget.checked)} /> Transcribe on this Mac</label>
+          )}
           {recognition && readAloud.value && (
             <label title="Keep listening while the answer is read; speaking over it stops the reading and starts your next question. Off until its false-stop rate has been measured on your voice."><input type="checkbox" id="barge-in" checked={bargeIn.value} onChange={(e) => setBargeIn(e.currentTarget.checked)} /> Talk over him</label>
           )}
@@ -245,6 +249,11 @@ export function Composer({ onAsk = (text: string, thinking: boolean, spoken = fa
             <option value="service">Your browser's speech service — the audio leaves your Mac</option>
             <option value="device">This device — nothing leaves your Mac</option>
           </select>
+        </div>
+      )}
+      {recognition && sttStatus.value?.available && localStt.value && (
+        <div class="voice-note" id="local-stt-note" role="status">
+          Transcribed on this Mac{sttStatus.value.ready ? "" : " once whisper has loaded"}{lastLocal.value ? ` — last one in ${Math.round(lastLocal.value.ms)} ms` : ""}; the browser's transcript is the fallback.
         </div>
       )}
       {capturing.value && (

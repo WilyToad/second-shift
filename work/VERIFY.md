@@ -37,6 +37,7 @@ Alt+V to start listening.
 | 20 | ⬜ | Read answers aloud on, tick **Talk over him**, ask something long, then talk over it | Your words | The reading stops within a second and your words go up as the next question; his own voice through your speakers never stops him. Count false stops over ten answers — that number decides whether the switch can default on | FC-217 |
 | 21 | ⬜ | Read answers aloud on, ask anything | — | The word being spoken is marked in the answer as the voice reads (browser voice); the sentence, with ElevenLabs | FC-216 |
 | 22 | ⬜ | With a packing list up, ask "do you ever miss flying?" | — | No list report in the answer | FC-219 (and `e2e-packing` on the dev save) |
+| 23 | ⬜ | **Transcribe on this Mac** ticked (it appears when whisper is installed), say the five sentences and "send the spidertron to the nearest roboport" | — | The server log's `Heard (local whisper.cpp, … ms)` lines; "spidertron" and "roboport" spelled the save's way; nothing over ~300 ms; if whisper is slow or down, the browser's text goes instead and the line says so | FC-230 |
 
 **Scripts to run once with the game hosted** (they were migrated to the shared harness without being run): every
 `scripts/e2e-*.ts` and `scripts/eval-*.ts` that doesn't say otherwise in its header. A first clean run of each

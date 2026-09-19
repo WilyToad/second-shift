@@ -7,6 +7,8 @@ import type { ServerMessage } from "./messages";
 import { OmlxClient, readOmlxApiKey } from "./model";
 import { craftersByCategory, recognitionPhrases } from "./grounding";
 import { VoiceClips } from "./voice-clips";
+import { WhisperService } from "./stt";
+import { normalizeNames } from "./normalize-names";
 import { COMPANION_NAME } from "./prompt";
 import { alignToCacheBlock, buildMessages, systemPrompt, userTurn } from "./prompt";
 import { RecipeRetriever } from "./retrieval";
@@ -99,6 +101,14 @@ const watcher = new Watcher({
   },
 });
 
+/**
+ * Local transcription (FC-230): whisper.cpp's server kept resident beside oMLX, started here and restarted if it
+ * dies; absent without complaint when it isn't installed. The console posts each spoken clip and uses the text if
+ * it comes back in time, the browser's transcript otherwise.
+ */
+const stt = new WhisperService(console.log);
+void stt.start();
+
 const clips = new VoiceClips(join(import.meta.dir, "..", "..", "data", "captures", "voice"));
 
 const server = Bun.serve({
@@ -121,6 +131,23 @@ const server = Bun.serve({
       return new Response(file, { headers: { "content-type": "audio/mpeg", "cache-control": "no-cache" } });
     },
     // The player's own voice, kept for FC-189's comparison. Local only, gitignored, and off unless they turn it on.
+    "/stt/status": () => Response.json(stt.status()),
+    "/stt": {
+      POST: async (req) => {
+        const wav = new Uint8Array(await req.arrayBuffer());
+        if (wav.byteLength < 44) return new Response("no audio", { status: 400 });
+        const started = performance.now();
+        const result = await stt.transcribe(wav);
+        if (!result) return Response.json({ available: stt.status().ready, text: "" }, { status: 503 });
+        // The save's own spellings go back in afterwards (FC-189: a prompt made "spider tron" worse, not better).
+        const protos = game.prototypes()?.data;
+        const text = result.text && protos ? normalizeNames(result.text, [...recognitionPhrases(protos, 400), "Ballast"]) : result.text;
+        const ms = Math.round(performance.now() - started);
+        if ("gated" in result) console.log(`Local transcription refused a clip (${result.gated}) in ${ms} ms`);
+        else console.log(`Local transcription (${ms} ms): "${text}"${text !== result.text ? ` — was "${result.text}"` : ""}`);
+        return Response.json({ text, ms, engine: result.engine, ...("gated" in result ? { gated: result.gated } : {}) });
+      },
+    },
     "/capture/voice": {
       POST: async (req) => {
         try {
@@ -206,7 +233,7 @@ const server = Bun.serve({
         if (msg.heard) {
           const h = msg.heard;
           const others = h.offered.slice(1).filter((t) => t !== h.picked);
-          console.log(`Heard (${h.where}, ${h.alternatives} alternative${h.alternatives === 1 ? "" : "s"}, ${h.phrases} phrase${h.phrases === 1 ? "" : "s"}${h.carried ? ", carried across a restart" : ""}): "${h.picked}"${h.first !== h.picked ? ` — engine's first guess was "${h.first}"` : ""}${others.length ? ` · also offered: ${others.map((t) => `"${t}"`).join(", ")}` : ""}`);
+          console.log(`Heard (${h.where}, ${h.alternatives} alternative${h.alternatives === 1 ? "" : "s"}, ${h.phrases} phrase${h.phrases === 1 ? "" : "s"}${h.carried ? ", carried across a restart" : ""}${h.localMs !== undefined ? `, ${h.localMs} ms` : ""}): "${h.picked}"${h.browser !== undefined && h.browser !== h.picked ? ` — browser heard "${h.browser}"` : h.first !== h.picked ? ` — engine's first guess was "${h.first}"` : ""}${others.length ? ` · also offered: ${others.map((t) => `"${t}"`).join(", ")}` : ""}`);
         }
         try {
           await agent.ask(msg.text.trim(), msg.thinking ?? false, msg.spoken === true);
