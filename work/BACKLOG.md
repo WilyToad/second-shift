@@ -54,6 +54,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [ ] FC-219 It restates the packing list on questions that aren't about it
+  - Notes: player's session (2026-09-18): asked "Do you ever miss flying?" it answered in character, then added "The list is 0 of 4 done: 1 of 20 furnace, 0 of 250 belt…" unprompted. The active list rides in every turn's tail so the model can answer list questions, and it took that as an invitation to report on it
+  - Acceptance: the list lines are answered from only when the question is about the list, readiness, stock or a build; a turn guidance line says so; unit test over this question; `e2e-packing` still passes
+
 - [x] FC-218 Read-aloud silenced a whole paragraph for one sentence of arithmetic
   - Notes: player, 2026-09-18: "It did say 'The numbers are in the app' again and I don't really see much to explain why." The answer's first paragraph was one line — "…rounded to 200. Twenty furnaces smelt 250 plates/min, so coal lands near 25–30/min… I trimmed a ship on arithmetic that tidy." — and FC-190 judged per line, so three numbers in the middle sentence silenced the two prose sentences around it, and all they heard was the pointer and the closing question
   - Done: a paragraph is judged sentence by sentence (a table row or bullet still whole), so only the arithmetic sentence is skipped; test uses the player's own answer
