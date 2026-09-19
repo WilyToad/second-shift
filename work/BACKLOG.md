@@ -10,7 +10,8 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 4 — Voice and extras
 
-- [ ] FC-234 The echo rule eats the player quoting him back
+- [x] FC-234 The echo rule eats the player quoting him back
+  - Done (2026-09-19): `looksLikeEcho()` calls it the player when the heard text opens with a cut-in lead (the barge words plus what/which/why/how/when/where/who/say/sorry/hey/okay/actually/hmm) or ends on an interrogative, "again" or "right" — only when that word isn't in what was just spoken, so an echo of "What do you want first?" still falls through to the overlap. `bun scripts/eval-barge-scorer.ts --rule-only` (no model) 687/687, from 652; the cut-in cases are the script's own templates, so a live session's false-stop count (VERIFY row 20) is still the number that decides the default.
   - Notes: found by FC-233's case set (2026-09-19): `looksLikeEcho()` judges by word overlap with what was just spoken, so the player cutting in with the companion's own words — "wait, me to queue that research?", "no, not from yumako processing", "what do you mean 14 tiles away?" — is called echo 34 times in 60, and one real question ("What is this") was eaten the same way. An echo repeats the sentence in order from its start or a piece of it; a cut-in leads with the player's own word.
   - Acceptance: a heard text that opens with a cut-in lead ("wait", "no", "what", "which", "say that again", "hold on", …) is the player whatever the overlap; a plain repeat of the spoken words in order stays echo; `bun scripts/eval-barge-scorer.ts` reports the rule at or above 680/687 with the echo classes still 480/480; the FC-217 tests keep passing.
 - [x] FC-233 Spike: Jev-style option scoring on a small local model, tried on barge-in first

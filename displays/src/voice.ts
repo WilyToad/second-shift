@@ -121,16 +121,26 @@ const recentlySpoken: { text: string; at: number }[] = [];
 const ECHO_WINDOW_MS = 60_000;
 /** A single word that is never an echo: the player cutting in. */
 const BARGE_WORDS = new Set(["stop", "wait", "hold", "no", "hang", "quiet", "shush", "ballast"]);
+/** Words the player opens or closes a cut-in with; an echo repeats the sentence, it doesn't lead with one of these. */
+const CUT_IN_LEADS = new Set([...BARGE_WORDS, "what", "which", "why", "how", "when", "where", "who", "say", "sorry", "hey", "okay", "actually", "hmm"]);
+const CUT_IN_TAILS = new Set(["what", "which", "why", "how", "when", "where", "who", "again", "right"]);
 
 /**
  * Is this the companion's own voice coming back through the microphone (FC-217)? Most of its words are in what
- * was just spoken. A lone word is treated as echo or noise unless it's one of the cut-in words.
+ * was just spoken. A lone word is treated as echo or noise unless it's one of the cut-in words. The player quoting
+ * him back — "no, not from yumako processing", "wait, me to queue that research?" — shares most of its words with
+ * the echo but opens or closes with a word he didn't say (FC-234); an echo of a sentence that itself starts with
+ * "what" still falls through to the overlap.
  */
 export function looksLikeEcho(text: string, spoken: string[] = recentlySpoken.filter((s) => Date.now() - s.at < ECHO_WINDOW_MS).map((s) => s.text)): boolean {
   const said = new Set(spoken.join(" ").toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean));
   const heardWords = text.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
   if (!heardWords.length) return true;
   if (heardWords.length === 1) return !BARGE_WORDS.has(heardWords[0]!);
+  const first = heardWords[0]!;
+  if (CUT_IN_LEADS.has(first) && !said.has(first)) return false;
+  const tail = heardWords.slice(-2);
+  if (tail.some((w) => CUT_IN_TAILS.has(w) && !said.has(w))) return false;
   const overlap = heardWords.filter((w) => said.has(w)).length / heardWords.length;
   return overlap >= 0.6;
 }

@@ -2,7 +2,7 @@
 // from the companion's own echo better than `looksLikeEcho()` (FC-217)? Builds the cases from real answer sentences
 // in data/eval and the player's kept clips, runs the code rule and jevmlx over the same cases, and reports accuracy,
 // latency and memory. Usage: bun scripts/eval-barge-scorer.ts [--model test|fast|quality|<hub id>] [--batch N]
-// [--scoring slots|labels] [--prior] (jevmlx's neutral-context prior correction)
+// [--scoring slots|labels] [--prior] (jevmlx's neutral-context prior correction) [--rule-only] (no model; FC-234)
 import { readdirSync } from "node:fs";
 import { Window } from "../displays/node_modules/happy-dom";
 
@@ -12,6 +12,7 @@ const opt = (name: string, fallback: string) => { const i = args.indexOf(name); 
 const model = opt("--model", "test");
 const batch = Number(opt("--batch", "1"));
 const extra = [...(args.includes("--prior") ? ["--prior"] : []), "--scoring", opt("--scoring", "slots")];
+const ruleOnly = args.includes("--rule-only");
 
 // The same rule the console runs, imported from the console's own module (browser globals first).
 const window = new Window({ url: "http://127.0.0.1:5170/" });
@@ -64,6 +65,15 @@ for (const w of ["stop", "wait", "hold on", "no", "quiet", "Ballast", "hang on",
 // heard text against the spoken one, not the word list.
 
 const rule = new Map(cases.map((c) => [c.id, looksLikeEcho(c.heard, [c.spoken]) ? "echo" : "player"] as const));
+
+if (ruleOnly) {
+  const kinds = [...new Set(cases.map((c) => c.kind))];
+  console.log(`FC-234 echo rule — ${cases.length} cases\n`);
+  for (const k of kinds) { const sel = cases.filter((c) => c.kind === k); console.log(`${k.padEnd(28)} ${`${sel.filter((c) => rule.get(c.id) === c.truth).length}/${sel.length}`.padStart(9)}`); }
+  console.log(`${"overall".padEnd(28)} ${`${cases.filter((c) => rule.get(c.id) === c.truth).length}/${cases.length}`.padStart(9)}`);
+  for (const c of cases.filter((c) => rule.get(c.id) !== c.truth).slice(0, 8)) console.log(`  [${c.kind}] said "${c.spoken.slice(0, 60)}…" heard "${c.heard}" → rule ${rule.get(c.id)}`);
+  process.exit(0);
+}
 
 // jevmlx, in the venv, over the same cases.
 const t0 = performance.now();

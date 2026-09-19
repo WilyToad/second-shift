@@ -665,6 +665,27 @@ test("FC-217: the companion's own voice coming back is an echo; the player cutti
   expect(looksLikeEcho("", spoken)).toBe(true);
 });
 
+test("FC-234: the player quoting him back is the player, not an echo", async () => {
+  const { looksLikeEcho } = await import("./voice");
+  const spoken = ["Carbon comes from coal + sulfuric acid in a chemical plant; yumako-mash from yumako processing.", "Want me to queue that research?"];
+  // Opens with a word he didn't say.
+  expect(looksLikeEcho("no, not from yumako processing", spoken)).toBe(false);
+  expect(looksLikeEcho("wait, me to queue that research", spoken)).toBe(false);
+  expect(looksLikeEcho("what do you mean yumako processing", spoken)).toBe(false);
+  expect(looksLikeEcho("say that again, from yumako processing", spoken)).toBe(false);
+  // Closes with one.
+  expect(looksLikeEcho("from yumako processing, which one", spoken)).toBe(false);
+  // A real question that happens to share words with the answer.
+  expect(looksLikeEcho("what is this", ["Note: the carbon-fiber technology isn't researched yet, so this is locked."])).toBe(false);
+  // Echoes stay echoes: whole, leading piece, trailing piece, garbled.
+  expect(looksLikeEcho("carbon comes from coal sulfuric acid in a chemical plant yumako mash from yumako processing", spoken)).toBe(true);
+  expect(looksLikeEcho("want me to queue", spoken)).toBe(true);
+  expect(looksLikeEcho("from yumako processing", spoken)).toBe(true);
+  expect(looksLikeEcho("carbon comes from sulfuric acid in chemical plant yumako from yumako processing", spoken)).toBe(true);
+  // An echo of a sentence that itself opens with a cut-in word is still an echo.
+  expect(looksLikeEcho("what do you want first", ["What do you want first, the outpost or the belt?"])).toBe(true);
+});
+
 test("FC-217: with barge-in on, speaking over the answer stops it and starts the next question; off, the mic waits", async () => {
   const synth = fakeSynthesis();
   const voice = await import("./voice");
