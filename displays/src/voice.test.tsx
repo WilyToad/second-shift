@@ -387,33 +387,7 @@ test("FC-149: the pause length is a setting, remembered per browser", async () =
   render(null, root);
 });
 
-test("FC-175: the transcript that matches the save wins, and the engine's order breaks ties", async () => {
-  const voice = await import("./voice");
-  voice.setVocabulary(["wire", "copper", "cable", "belt", "inserter", "automation", "bottle"]);
-  // The player's own examples: Chrome's first guess was the wrong one of a near-homophone pair.
-  const result = (...transcripts: string[]) => Object.assign(transcripts.map((transcript) => ({ transcript })), { length: transcripts.length });
-  expect(voice.pickAlternative(result("okay I'm running wine", "okay I'm running wire") as any)).toBe("okay I'm running wire");
-  expect(voice.pickAlternative(result("got 10 red darts", "got 10 red bottles") as any)).toBe("got 10 red bottles");
-  // Nothing from the save in any of them: the engine's first guess stands.
-  expect(voice.pickAlternative(result("that must be monsters", "that must be munsters") as any)).toBe("that must be monsters");
-  // One transcript only, or no vocabulary yet: unchanged.
-  expect(voice.pickAlternative(result("just the one") as any)).toBe("just the one");
-  voice.setVocabulary([]);
-  expect(voice.pickAlternative(result("running wine", "running wire") as any)).toBe("running wine");
-});
 
-test("FC-175 has a cost: this save's words are ordinary English words too", async () => {
-  const voice = await import("./voice");
-  // Pinned, not endorsed. The vocabulary holds "belt", "rail", "tank", "lab" and "wall", so a wrong alternative can
-  // carry a save word that the *correct* first guess doesn't, and rescoring then picks the wrong one. Biasing the
-  // engine (FC-177) makes such alternatives more likely, which is why the spike says rescoring comes out if biasing
-  // works. The decision waits on the player's next session; this test is the evidence for it.
-  voice.setVocabulary(["belt", "inserter", "wire", "furnace"]);
-  const result = (...transcripts: string[]) => Object.assign(transcripts.map((transcript) => ({ transcript })), { length: transcripts.length });
-  expect(voice.pickAlternative(result("I built ten of them", "I belt ten of them") as any)).toBe("I belt ten of them");
-  expect(voice.pickAlternative(result("a bit further", "a belt further") as any)).toBe("a belt further");
-  voice.setVocabulary([]);
-});
 
 test("FC-174: the player picks the engine, and installing the on-device model counts as picking it", async () => {
   const voice = await import("./voice");
@@ -485,22 +459,20 @@ test("FC-185: a spoken question carries what the engine offered and what was pic
   const voice = await import("./voice");
   const said: string[] = [];
   const { ctor, made } = fakeRecognition("unavailable");
-  voice.setVocabulary(["wire", "belt"]);
   voice.setSilenceSeconds(0.08);
   voice.startTalking((text) => said.push(text), ctor);
-  // Two transcripts, the save's word in the second: the record has to show that's why it won.
-  made[0].onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: "okay I'm running wine" }, { transcript: "okay I'm running wire" }], { isFinal: true, length: 2 })] } as any);
+  // The engine's first guess is what's sent (FC-210); the record still lists what else it offered.
+  made[0].onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: "okay I'm running wire" }, { transcript: "okay I'm running wine" }], { isFinal: true, length: 2 })] } as any);
   await new Promise((r) => setTimeout(r, 200));
   const record = voice.heardDetail()!;
   expect(said).toEqual(["okay I'm running wire"]);
   expect(record.picked).toBe("okay I'm running wire");
-  expect(record.first).toBe("okay I'm running wine");
+  expect(record.first).toBe("okay I'm running wire");
   expect(record.alternatives).toBe(2);
   expect(record.phrases).toBe(0); // no biasing API on this browser
   expect(record.where).toBe(voice.recognizedWhere.value);
   voice.stopTalking({ send: false });
   voice.setSilenceSeconds(2);
-  voice.setVocabulary([]);
 });
 
 test("FC-186: the console says where the voice goes, and never which browser hears best", async () => {

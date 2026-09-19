@@ -31,18 +31,6 @@ export type RecognitionCtor = {
 };
 
 /**
- * Words from the player's own save, sent by the server once a page connects (FC-175). The recognizer offers
- * several transcripts of what it heard; the one carrying this save's words is nearly always the right one
- * ("running wire" over "running wine"), and the engine's own first guess breaks ties.
- */
-export const vocabulary = signal<Set<string>>(new Set());
-/** How many transcripts to ask the recognizer for. More than a handful costs accuracy nothing and time nothing. */
-export const ALTERNATIVES = 4;
-
-/** Singular and plural count as the same word: the player says "belts", the save calls it "belt". */
-const stem = (word: string) => (word.length > 3 && word.endsWith("s") ? word.slice(0, -1) : word);
-
-/**
  * Phrases the recognizer is told to expect (FC-177). Chromium 153 takes an array of `SpeechRecognitionPhrase`
  * with a boost of 0–10; biasing the engine beats re-ranking its guesses afterwards, and the two work together.
  * Checked in Chromium 153: assignment takes a plain array, and a boost outside the range throws.
@@ -84,7 +72,6 @@ export function collapseRepeats(text: string): string {
   return text.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b(\w+)(?:\s+\1\b){2,}/gi, "$1").replace(/\s+/g, " ").trim();
 }
 
-/** Applies the phrases to one recognition, where the browser has the API. Never throws. */
 /**
  * The engine in use refused a phrase list (FC-206). Chrome's online service answers `phrases-not-supported` the
  * moment recognition starts with one attached — biasing is on-device only, as the explainer hinted — and before
@@ -104,26 +91,6 @@ export function biasRecognition(rec: Recognition, list = phrases.value): number 
   } catch {
     return 0; // an older browser, or a list it won't take: the alternatives scoring still helps
   }
-}
-
-export function setVocabulary(words: string[]): void {
-  vocabulary.value = new Set(words.map((w) => stem(w.toLowerCase())).filter((w) => w.length > 2));
-}
-
-const spoken = (text: string) => (text.toLowerCase().match(/[a-z']+/g) ?? []).map(stem);
-
-/** The transcript that matches the save best: most words it knows, the engine's order deciding a tie. */
-export function pickAlternative(result: { length: number; [index: number]: { transcript: string } }, words = vocabulary.value): string {
-  const first = result[0]?.transcript ?? "";
-  if (!words.size || result.length < 2) return first;
-  let best = first, bestScore = -1;
-  for (let i = 0; i < Math.min(result.length, ALTERNATIVES); i++) {
-    const transcript = result[i]?.transcript;
-    if (transcript === undefined) continue;
-    const score = spoken(transcript).filter((w) => words.has(w)).length;
-    if (score > bestScore) { best = transcript; bestScore = score; }
-  }
-  return best;
 }
 
 export type ListenState = "idle" | "listening" | "waiting" | "error";
@@ -336,7 +303,7 @@ function listen(): void {
   rec.lang = s.lang;
   rec.continuous = true;
   rec.interimResults = true;
-  rec.maxAlternatives = ALTERNATIVES;
+  rec.maxAlternatives = 1; // FC-210: the alternatives were never worth having (PLAN §5)
   if (onDevice) rec.processLocally = true;
   const applied = biasRecognition(rec);
   if (onDevice === null) recognizedWhere.value = s.ctor.available ? "unknown" : "speech-service";
@@ -345,7 +312,7 @@ function listen(): void {
   let latest: ArrayLike<Result> = [];
   const textFrom = (results: ArrayLike<Result>) => {
     let text = "";
-    for (let i = sentUpTo; i < results.length; i++) text += pickAlternative(results[i]!);
+    for (let i = sentUpTo; i < results.length; i++) text += results[i]![0].transcript;
     return text.trim();
   };
   let lastOffered: string[] = [];
@@ -368,7 +335,7 @@ function listen(): void {
     const last = e.results[e.results.length - 1];
     if (last) {
       const offered: string[] = [];
-      for (let i = 0; i < last.length && i < ALTERNATIVES; i++) offered.push(last[i]!.transcript.trim());
+      for (let i = 0; i < last.length; i++) offered.push(last[i]!.transcript.trim());
       lastOffered = offered;
     }
     heard.value = run.pending();

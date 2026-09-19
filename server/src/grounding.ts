@@ -104,26 +104,6 @@ export function entityFacts(name: string, p: Prototypes): string | null {
 }
 
 /**
- * Every word this save's own names are made of (FC-175): the console scores the recognizer's transcripts against
- * these, so "belt" beats "bolt" and item names survive. Words only — the recognizer never hears the hyphens.
- */
-export function vocabulary(p: Prototypes, max = 4000): string[] {
-  const words = new Set<string>();
-  const add = (name: string) => {
-    for (const word of name.toLowerCase().split(/[^a-z]+/)) if (word.length > 2) words.add(word);
-  };
-  for (const name of Object.keys(p.items)) add(name);
-  for (const name of Object.keys(p.fluids)) add(name);
-  for (const name of Object.keys(p.machines)) add(name);
-  for (const name of Object.keys(p.entities)) add(name);
-  for (const name of Object.keys(p.recipes)) add(name);
-  for (const name of Object.keys(p.technologies)) add(name);
-  // Words the player says about the game that aren't in any prototype name.
-  for (const word of ["wire", "wires", "ore", "patch", "biter", "biters", "nest", "nests", "ghost", "ghosts", "smelter", "smelters", "outpost", "belt", "belts", "bots", "spidertron"]) words.add(word);
-  return [...words].slice(0, max);
-}
-
-/**
  * Phrases to bias the recognizer toward (FC-177): the names of things in this save, as a person says them, most
  * talked-about first. Chrome takes a modest list, so the order matters more than the length.
  *

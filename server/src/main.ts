@@ -5,7 +5,7 @@ import { Agent, fileSession, mapSession, SELECTED_PREFIX, TOOLS } from "./agent"
 import { GameLink, type Snapshot } from "./game";
 import type { ServerMessage } from "./messages";
 import { OmlxClient, readOmlxApiKey } from "./model";
-import { craftersByCategory, recognitionPhrases, vocabulary } from "./grounding";
+import { craftersByCategory, recognitionPhrases } from "./grounding";
 import { VoiceClips } from "./voice-clips";
 import { COMPANION_NAME } from "./prompt";
 import { alignToCacheBlock, buildMessages, systemPrompt, userTurn } from "./prompt";
@@ -181,7 +181,7 @@ const server = Bun.serve({
       if (transcript.length) ws.send(JSON.stringify({ type: "transcript", items: transcript } satisfies ServerMessage));
       // The save's own words, so the console can pick the transcript that matches them (FC-175).
       const protos = game.prototypes()?.data;
-      if (protos) ws.send(JSON.stringify({ type: "vocabulary", words: vocabulary(protos), phrases: recognitionPhrases(protos), name: COMPANION_NAME } satisfies ServerMessage));
+      if (protos) ws.send(JSON.stringify({ type: "vocabulary", phrases: recognitionPhrases(protos), name: COMPANION_NAME } satisfies ServerMessage));
       // The lists the companion keeps, so a reloaded page shows the panel straight away (FC-163).
       const lists = agent.lists.all();
       if (lists.length) ws.send(JSON.stringify({ type: "lists", lists, ...(agent.lists.active()?.name ? { active: agent.lists.active()!.name } : {}) } satisfies ServerMessage));
@@ -298,7 +298,7 @@ game.onPrototypes((p) => {
   console.log(`Grounding on ${Object.keys(p.data.recipes).length} recipes (${p.source}).`);
   // The console usually opens before the game does, so the words and phrases also go out when the save arrives
   // rather than only to a page that connects after it (FC-175, FC-177).
-  broadcast({ type: "vocabulary", words: vocabulary(p.data), phrases: recognitionPhrases(p.data), name: COMPANION_NAME });
+  broadcast({ type: "vocabulary", phrases: recognitionPhrases(p.data), name: COMPANION_NAME });
   busy = busy.then(async () => {
     const base = systemPrompt(p.data, p.mods);
     // Research only flips enabled and researched flags, which the system prompt doesn't show: the

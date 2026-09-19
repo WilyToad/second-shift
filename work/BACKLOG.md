@@ -47,6 +47,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-210 Rescoring the recognizer's alternatives comes out
+  - Notes: S31's experiment, run on the player's voice (2026-09-18): on Chrome's online service every winning transcript across five sentences was the engine's own first guess, and the only reorder was "testing 1 2 3" → "testing one two three"; the on-device engine returns one alternative, so there is nothing to rescore. Against that, the mechanism had a pinned failure mode ("I built ten of them" → "I belt ten of them"). Inert on one engine, empty on the other, and able to do harm
+  - Done: `pickAlternative`, the word list and its 5.5 KB message part are gone; `maxAlternatives` is 1; the FC-185 record still lists what the engine offered. The phrase list (FC-177) stays as the on-device path
+
 - [x] FC-209 Boost 8 on his name made the on-device engine hallucinate it forty times an utterance
   - Notes: the first on-device turn with biasing live (2026-09-18): 101 phrases accepted, and the transcript was "Ballast Ballast okay I'm running wireBallast Ballast Ballast…" — the real sentence buried in the middle of forty repeats of the name, which was boosted to 8 against 3 for everything else; the next turn was "Ballast Ballast Ballastral Ballastral Ballast", the engine inventing words around it. The on-device engine is far more sensitive to boost than the spike's "~5" assumed, and a single heavily boosted short word fills every silence
   - Done: the name gets the same nudge as everything else and the whole list drops to 1, to be raised only against measurement; and `collapseRepeats()` splits a glued word and turns three or more of the same word in a row into one before the text becomes a question (two in a row stays — "no no" is speech). Whether boost 1 still helps or merely stops hurting is what the next five sentences measure

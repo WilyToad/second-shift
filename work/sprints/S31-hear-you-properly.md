@@ -127,7 +127,11 @@ accuracy claim in FC-174's picker was wrong and is gone (FC-186), and the premis
 service is the better engine — doesn't survive contact either. The one remaining miss is the near-homophone class
 ("wire" heard as "where"), which is exactly what biasing targets.
 
-**Acceptance is partly pending, and deliberately not claimed.** Three things need the player's voice in Chrome:
+**Resolved 2026-09-18** — see PLAN §5 "S31's experiment, run": biasing is on-device only (the service refuses the
+list), rescoring never changed an answer for the better on either engine and is removed (FC-210), and boost 8 on the
+name made the on-device engine hallucinate it; the whole list runs at 1 now (FC-209).
+
+**Acceptance was partly pending, and deliberately not claimed at the time.** Three things need the player's voice in Chrome:
 whether the engine applies `SpeechRecognition.phrases` at all, whether it does so outside `processLocally` (SODA is
 still stuck "downloading" here), and whether FC-175's rescoring helps or hurts. That last one has evidence *against*
 it now, pinned in a test: this save's words are ordinary English words, so "I built ten of them" is rescored to "I

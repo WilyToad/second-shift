@@ -35,9 +35,9 @@ export type ServerMessage =
   | { type: "talk" }
   // The lists the companion keeps for the player (FC-163); the player can't edit them, so this is display only.
   | { type: "lists"; lists: Checklist[]; active?: string }
-  // Words from this save, so the console can pick the transcript that matches them (FC-175), and phrases to bias
-  // the recognizer toward where the browser supports that (FC-177).
-  | { type: "vocabulary"; words: string[]; phrases?: string[]; name?: string }
+  // Phrases to bias the recognizer toward where the browser supports that (FC-177), and the companion's name.
+  // (The word list for rescoring alternatives went with FC-210: it never changed an answer for the better.)
+  | { type: "vocabulary"; phrases: string[]; name?: string }
   // One quiet line from the background pass (FC-193): never spoken, never acted on, at most one per look.
   | { type: "note"; text: string; at: number; sinceMs: number }
   | { type: "watching"; on: boolean };
