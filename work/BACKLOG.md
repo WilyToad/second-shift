@@ -54,6 +54,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [ ] FC-226 A stray HTML tag reached the page
+  - Notes: player's session (2026-09-18): an answer ended with a literal "</br>" line. The stream filter hides chart and tool-call blocks; it doesn't know HTML, and the thread renders text, so the tag showed as text
+  - Acceptance: a bare HTML tag on its own line, or trailing an answer, is dropped in the stream filter at every token split; prose that mentions a tag in backticks is untouched; unit test
+
 - [x] FC-225 "Send the spidertron to the ore patch" sent it to itself
   - Notes: VERIFY row 13, live (2026-09-18): the card read "Send the spidertron to the nearest spidertron at (22, 86)? … 0 tiles away". The destination resolver ran over the whole sentence, matched "spidertron" as an entity name before it reached "ore patch", and picked the nearest spidertron — the one being sent. It confirmed, walked nowhere, and reported arrival
   - Done: only the words after "to"/"towards"/"at", with the spider words stripped, name the destination; test checks the search is for ore and the card names the ore, not the spidertron
