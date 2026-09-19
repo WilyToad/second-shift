@@ -519,7 +519,7 @@ recipe lookup gets no direction at all. It also names the stage so the player ca
 the dev save it said "Gleba, I'd say — though your view says otherwise… So I may have the stage wrong; tell me if
 so."
 
-**S31's experiment, run (2026-09-18, the player's Chrome session, ten sentences, eleven clips kept):** the two
+**S31's experiment, run (2026-09-18, the player's Chrome session, ten sentences, nine clips kept):** the two
 mechanisms were tested on both engines and the verdict is clean. **Chrome's online service refuses a phrase list
 outright** (`phrases-not-supported`, the moment recognition starts) — biasing is on-device only, as the explainer
 hinted. On that service the five test sentences came through 5/5 and **every winner was the engine's own first
@@ -535,7 +535,7 @@ on-device engine ends recognition mid-sentence like Safari, and FC-183's carry-o
 make a right answer wrong. FC-177 stays as the on-device path at boost 1, to be raised only against measurement.
 Yesterday's note that on-device was "stuck downloading" is superseded: it installed in under a minute today.
 Ten sentences on a quiet evening is a measurement of what our code does with the engine's output, not of the
-engine's accuracy; the eleven clips in `data/captures/voice/` (one with the player's own correction) are FC-189's.
+engine's accuracy; the nine clips in `data/captures/voice/` (one with the player's own correction) are FC-189's.
 
 **Hearing the player properly (S31, 2026-09-17):** their early-game session had three of 24 spoken turns come
 through wrong ("I'm running wire" → "running wine", "I've got 10 red bottles" → "Got10 red bottles", "a big red
