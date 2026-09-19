@@ -298,12 +298,15 @@ test("FC-148: ElevenLabs sentences are fetched as they arrive and played in orde
   }) as typeof fetch;
   const played: string[] = [];
   const audios: any[] = [];
+  const marks: (string | null)[] = [];
   const player = new ElevenPlayer({
     post,
     makeAudio: (src) => { const a = { src, onended: null as any, onerror: null as any, paused: false, play: async () => { played.push(src); }, pause() { this.paused = true; } }; audios.push(a); return a; },
     fallback: () => {},
     voice: () => "v1",
     onError: () => {},
+    onPlay: (text) => marks.push(text),
+    onIdle: () => marks.push(null),
   });
   player.enqueue("First.");
   player.enqueue("Second.");
@@ -317,6 +320,8 @@ test("FC-148: ElevenLabs sentences are fetched as they arrive and played in orde
   audios[0].onended();
   await new Promise((r) => setTimeout(r, 5));
   expect(played).toEqual(["blob:First.", "blob:Second."]);
+  // FC-231: the mark follows each sentence as it starts (it used to stay on the first for the whole answer).
+  expect(marks).toEqual(["First.", "Second."]);
 
   player.enqueue("Third.");
   player.cancel();
@@ -324,6 +329,13 @@ test("FC-148: ElevenLabs sentences are fetched as they arrive and played in orde
   await new Promise((r) => setTimeout(r, 5));
   expect(played.length).toBe(2);
   expect(audios[1].paused).toBe(true);
+  // FC-231: and clears when the queue runs dry.
+  player.enqueue("Fourth.");
+  release["Fourth."]!();
+  await new Promise((r) => setTimeout(r, 5));
+  audios[2].onended();
+  await new Promise((r) => setTimeout(r, 5));
+  expect(marks.slice(2)).toEqual(["Fourth.", null]);
 });
 
 test("FC-148: a failed ElevenLabs sentence is read with the Mac voice and the console says why", async () => {

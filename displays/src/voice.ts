@@ -713,6 +713,7 @@ export class ElevenPlayer {
       fallback: (text: string) => void;
       voice: () => string;
       onError: (message: string) => void;
+      onPlay?: (text: string) => void;
       onIdle?: () => void;
     },
   ) {}
@@ -765,6 +766,7 @@ export class ElevenPlayer {
     };
     audio.onended = done;
     audio.onerror = done;
+    this.deps.onPlay?.(item.text);
     audio.play().catch(() => { this.deps.fallback(item.text); done(); });
   }
 
@@ -783,18 +785,17 @@ const eleven = new ElevenPlayer({
   fallback: (text) => speakWithBrowser(text),
   voice: () => voiceChoice.value.replace(/^eleven:/, ""),
   onError: (message) => { voiceError.value = `ElevenLabs couldn't speak (${message}); using this Mac's voice instead.`; },
-  onIdle: () => maybeResume(),
+  // ElevenLabs plays per sentence with no word timing exposed here: the mark is the sentence, moved as each one
+  // starts and cleared when the queue runs dry (FC-216, FC-231).
+  onPlay: (sentence) => { spokenNow.value = { sentence, char: -1 }; },
+  onIdle: () => { spokenNow.value = null; maybeResume(); },
 });
 
 export function speak(sentence: string): void {
   recentlySpoken.push({ text: sentence, at: Date.now() });
   while (recentlySpoken.length > 12) recentlySpoken.shift();
-  if (voiceChoice.value.startsWith("eleven:")) {
-    // ElevenLabs plays per sentence with no word timing exposed here: the mark is the sentence, from when it's
-    // queued while nothing else is playing (approximate by design, FC-216).
-    if (!eleven.busy()) spokenNow.value = { sentence, char: -1 };
-    eleven.enqueue(sentence);
-  } else speakWithBrowser(sentence);
+  if (voiceChoice.value.startsWith("eleven:")) eleven.enqueue(sentence);
+  else speakWithBrowser(sentence);
 }
 
 let browserSpeaking = 0;
