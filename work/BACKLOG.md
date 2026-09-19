@@ -54,6 +54,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-220 "The numbers are in the app" was too eager
+  - Notes: player, 2026-09-18: after "Every day, and it's not a thing I talk about on shift" the voice said "The numbers are in the app" to cover "The list is 0 of 4 done: 1 of 20 furnace, 0 of 250 belt, 0 of 20 chest, 27 of 200 wood" — which "would have been fine to say". Their rule: the pointer is for heavy charts, tables and things that would be gibberish spoken. FC-190 had been skipping any sentence with more than one number
+  - Done: a sentence with numbers in it is prose and is heard; only a table row, a bullet that leads with a figure, arithmetic ("8 × 7.5 = 60", "each = 250") and a chart block are working. Tests over the player's sentence and the three earlier cases
+
 - [ ] FC-219 It restates the packing list on questions that aren't about it
   - Notes: player's session (2026-09-18): asked "Do you ever miss flying?" it answered in character, then added "The list is 0 of 4 done: 1 of 20 furnace, 0 of 250 belt…" unprompted. The active list rides in every turn's tail so the model can answer list questions, and it took that as an invitation to report on it
   - Acceptance: the list lines are answered from only when the question is about the list, readiness, stock or a build; a turn guidance line says so; unit test over this question; `e2e-packing` still passes

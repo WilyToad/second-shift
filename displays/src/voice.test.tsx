@@ -565,16 +565,21 @@ test("FC-218: a paragraph is judged sentence by sentence, so prose around the ar
   const paragraph = "\"Stone surfaces\" I take as stone furnaces; \"belt arms\" as transport belts, rounded to 200. Twenty furnaces smelt 250 plates/min, so coal lands near 25–30/min — plan for a coal field, not a chest. I trimmed a ship on arithmetic that tidy.\n\nSay the word and I'll start the packing list. ";
   const q = new SentenceQueue();
   const heard = [...paragraph.split(/(?<=\s)/).flatMap((part) => q.push(part)), ...q.end()];
+  // With FC-220 the whole paragraph is prose and is heard in full: no pointer at all.
   expect(heard.join(" ")).toContain("I take as stone furnaces");
+  expect(heard.join(" ")).toContain("250 plates");
   expect(heard.join(" ")).toContain("I trimmed a ship on arithmetic that tidy.");
-  expect(heard.join(" ")).not.toContain("250 plates");
-  expect(heard).toContain(POINTER.numbers);
+  expect(heard).not.toContain(POINTER.numbers);
   expect(heard.at(-1)).toBe("Say the word and I'll start the packing list.");
 });
 
 test("FC-190: what counts as working, and what doesn't", async () => {
   const { working } = await import("./voice");
-  expect(working("Each makes 7.5 bioflux/min from 15 jelly + 15 mash.")).toBe(true);
+  // Prose with numbers in it is heard (FC-220): only arithmetic, tables, bullets of figures and charts are working.
+  expect(working("Each makes 7.5 bioflux/min from 15 jelly + 15 mash.")).toBe(false);
+  expect(working("The list is 0 of 4 done: 1 of 20 furnace, 0 of 250 belt, 0 of 20 chest, 27 of 200 wood.")).toBe(false);
+  expect(working("Twenty furnaces smelt 250 plates/min, so coal lands near 25–30/min.")).toBe(false);
+  expect(working("- keep the labs fed, 3 of them")).toBe(false);
   expect(working("| iron plate | 240/min |")).toBe(true);
   expect(working("- 120 jelly/min")).toBe(true);
   expect(working("8 × 7.5 = 60")).toBe(true);

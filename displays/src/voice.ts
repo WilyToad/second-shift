@@ -493,21 +493,21 @@ export function speakable(text: string): string {
     .trim();
 }
 
-const FIGURE = /\d[\d,.]*/g;
-const figures = (text: string) => (text.match(FIGURE) ?? []).length;
-
 /**
- * Is this line the *working* rather than the answer (FC-190)? Read aloud, "each makes 7.5 bioflux/min from 15 jelly
- * + 15 yumako mash, so 8 × 7.5 = 60/min" is exhausting to listen to, and it's already on screen. A table row, a
- * bullet carrying a figure, a chain of arithmetic, or any sentence with more than one number counts.
+ * Is this line the *working* rather than the answer (FC-190)? Only what is gibberish spoken: a table row, a bullet
+ * that is mostly figures, arithmetic ("8 × 7.5 = 60"), a chart. A sentence with numbers in it is prose and is
+ * heard — "the list is 0 of 4 done: 1 of 20 furnace, 0 of 250 belt…" reads fine aloud, and the first version of
+ * this rule silenced it for having more than one number (FC-220, the player's call on 2026-09-18).
  */
 export function working(line: string): boolean {
   const text = line.trim();
   if (!text) return false;
   if (/^\|/.test(text) || /^[-|:\s]+$/.test(text)) return true; // a table row or its divider
-  if (/^([-*•]|\d+[.)])\s/.test(text) && figures(text) >= 1) return true; // a bullet of figures
-  if (/\d\s*[×x*+/=→-]\s*\d/.test(text)) return true; // arithmetic
-  return figures(text) > 1;
+  // A bullet that leads with a figure ("- 120 jelly/min") is a line of a table in disguise; "- keep the labs fed,
+  // 3 of them" is a sentence.
+  const bullet = /^([-*•]|\d+[.)])\s+(.*)$/.exec(text);
+  if (bullet && /^[~≈]?\d/.test(bullet[2]!)) return true;
+  return /=\s*[~≈]?\d/.test(text) || /\d\s*[×x*÷]\s*\d/.test(text) || /→\s*\d/.test(text); // arithmetic
 }
 
 /** What to say instead of reading the detail out. Short on purpose: it's a pointer, not a summary. */
