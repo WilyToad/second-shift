@@ -18,6 +18,8 @@ export const ENGLISH = new Set([
   "north-west", "south-east", "south-west", "per-minute", "end-to-end", "side-by-side", "full-heavy-oil-tank",
   "e-g", "i-e", "co-located", "re-run", "set-up", "follow-up", "trade-off", "work-in-progress",
   "hand-mine", "hand-mined", "hand-mining", "hand-place", "hand-placed", "hand-built", "well-run", "off-world",
+  // Coinages and nicknames the model uses for things the save spells differently.
+  "lab-less", "two-thirds", "one-third", "three-quarters", "green-chip", "green-chips", "red-chip", "red-chips", "blue-chip", "blue-chips",
 ]);
 
 const NAME = /\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g;

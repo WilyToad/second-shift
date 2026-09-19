@@ -47,6 +47,7 @@ test("FC-171: a turn of phrase is never corrected, and framing is what makes the
     "Spoilage as a fuel is an insult to a well-run hold. What's short on gleba?",
     "Off-world means a rocket-silo, a cargo-landing-pad, and cargo that survives the trip.",
     "Hand-mine an iron-stromatolite to start agriculture.",
+    "You're lab-less for now; two-thirds of the green-chip line is idle.",
   ]) {
     expect(unknownNames(text, real)).toEqual([]);
     expect(nameCorrections(text, real)).toEqual([]);

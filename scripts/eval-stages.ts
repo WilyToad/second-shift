@@ -4,7 +4,7 @@
 import { openConsole } from "./lib/console";
 import { encodeCommand, parseReply, PrototypesSchema } from "../interfaces/src/index";
 import { connectDevGame } from "./lib/devgame";
-import { unknownNames } from "../server/src/names";
+import { nameCorrections } from "../server/src/names";
 import { asChecks, saveEvalRun } from "./lib/eval-log";
 
 const dev = await connectDevGame();
@@ -29,9 +29,10 @@ try {
     console.log(`\n"${c.ask}"\n  → ${answer.replace(/\n+/g, " ")}\n`);
     // The check that matters, run through the product's own checker (FC-171) so the eval measures what the player
     // would actually be told, not a cruder scan of its own.
-    const unknown = unknownNames(answer, p);
-    check(`${c.name}: names only what the save has`, unknown.length === 0, unknown.join(", "));
-    check(`${c.name}: no correction line was needed`, !answer.includes("Correction:"), answer.slice(-120));
+    // What the player would actually be told (FC-171's checker, cue and all) — the bare scan also flags English
+    // coinages like "lab-less" and "two-thirds", which the product rightly lets through.
+    const corrections = nameCorrections(answer, p);
+    check(`${c.name}: names only what the save has`, corrections.length === 0, corrections.join(" "));
     if (c.stage) check(`${c.name}: answers for the stage it's in`, c.stage.test(answer), answer.slice(0, 200));
     // "the whole row won't fit" — the answer must still be an answer, not a recital of the table.
     if (c.stage) check(`${c.name}: doesn't recite the table`, !answer.includes("classic miss") && !answer.includes("[stage:"), "");
