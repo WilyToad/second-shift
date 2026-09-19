@@ -29,4 +29,8 @@ test("FC-230: the save's names are put back the way the save spells them", () =>
   expect(normalizeNames("Two hundred belt, arms to feed them.", phrases)).toBe("Two hundred belt, arms to feed them.");
   expect(normalizeNames("An Iron-Gear-Wheel costs two plates.", phrases)).toBe("An iron gear wheel costs two plates.");
   expect(normalizeNames("nothing to do here", [])).toBe("nothing to do here");
+  // A near miss of a long name, from the first live clip: "spider train". Short names never get this treatment.
+  expect(normalizeNames("Where is this spider train?", phrases)).toBe("Where is this spidertron?");
+  expect(normalizeNames("Whereas the spider charm", phrases)).toBe("Whereas the spider charm");
+  expect(normalizeNames("the iron plant is busy", [...phrases, "iron plate"])).toBe("the iron plant is busy");
 });
