@@ -132,6 +132,8 @@ export async function startCapture(): Promise<string | null> {
   try {
     const stream = await media.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     const ctx = new Ctx();
+    // A context made outside a user gesture starts suspended and delivers zeros; resume is cheap and idempotent.
+    await ctx.resume().catch(() => {});
     rate = ctx.sampleRate;
     ring = new Float32Array(Math.ceil(rate * RING_S));
     written = 0;
