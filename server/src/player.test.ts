@@ -277,3 +277,11 @@ test("FC-222: standing among drills, the answer says they can't be counted rathe
   // Nothing at all nearby reads as before.
   expect(formatMachineOutput({ ...none, unmeasurable: {} }, "32 tiles around the player")).not.toContain("are there");
 });
+
+test("FC-228: a sample only seconds old says it just started, not 0/min", async () => {
+  const { formatMachineOutput } = await import("./player");
+  const young = { tick: 1, window_ticks: 120, machines: 4, not_visible: 0, recipes: [{ recipe: "firearm-magazine", machines: 4, finished: 10, sampled: 4, per_minute: 0 }] };
+  expect(formatMachineOutput(young, "32 tiles around the player")).toContain("ask again in about a minute");
+  const grown = { ...young, window_ticks: 1800, recipes: [{ ...young.recipes[0]!, per_minute: 256 }] };
+  expect(formatMachineOutput(grown, "32 tiles around the player")).toContain("firearm-magazine 256/min");
+});

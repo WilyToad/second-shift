@@ -54,6 +54,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-228 A measurement only seconds old read as "0/min, stalled"
+  - Notes: the measure e2e after tonight's relaunch: a baseline taken moments before the first ask gave every recipe 0/min, and the answer called the machines stalled. A window of a few seconds can't measure anything
+  - Done: under ten seconds the answer says it just started counting and to ask again; unit test. The e2e also now finds "264 firearm-magazine/min" (the item's name between number and unit) and accepts "hitting" as the real-rate verb
+
 - [x] FC-227 "Point it out to me" wasn't a map action, and a highlight was called a map mark
   - Notes: the voice-session replay on the shared harness (2026-09-18): asked "where is the rocket salad, can you point it out to me", the answer found the silo, highlighted it, and said it was "marked on your map for 60 seconds" — no map marker was placed. The approval guard's map-action list had no "point", so a pointing call would have been dropped as unasked anyway
   - Done: "point it out / point me to / point at the…" count as asking for a map action; the find tool's result now says "Highlighted in-game for 60 s (not marked on the map)" so the model can't confuse the two

@@ -245,6 +245,8 @@ export function formatContents(c: ContainerContents): string {
 }
 
 /** Measured output of the machines the player asked about (FC-162), or what to say when the clock just started. */
+/** Ten seconds: under that, craft counts haven't moved enough to mean anything. */
+const MIN_WINDOW_TICKS = 600;
 const PLURAL: Record<string, string> = { "mining-drill": "mining drills", lab: "labs", "agricultural-tower": "agricultural towers", "offshore-pump": "offshore pumps" };
 
 export function formatMachineOutput(m: MachineOutput, where: string): string {
@@ -254,7 +256,8 @@ export function formatMachineOutput(m: MachineOutput, where: string): string {
   const cantRead = uncounted.length ? ` — but ${uncounted.join(" and ")} are there: the game keeps no per-machine craft count for those, so their real rate is the surface's production line in the game state, not a measurement` : "";
   if (!m.machines) return `no assemblers, furnaces or silos of the player's own are in ${where}${m.not_visible ? `, and ${m.not_visible} are somewhere they can't see` : ""}, so nothing was measured${cantRead}`;
   const seconds = Math.round(m.window_ticks / 60);
-  const measured = m.recipes.filter((r) => r.per_minute !== undefined);
+  // A window of a few seconds can't measure anything: a sample taken moments ago read as "0/min, stalled" (FC-228).
+  const measured = m.window_ticks >= MIN_WINDOW_TICKS ? m.recipes.filter((r) => r.per_minute !== undefined) : [];
   if (!measured.length) {
     return `started measuring ${m.machines} machines in ${where} just now (their own craft counts): ask again in about a minute and the answer will be the real rate`;
   }
