@@ -74,10 +74,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
   - Notes: VERIFY row 12, live (2026-09-18): with "landfill 33/min from 1 machine, stone-brick 0/min from 1 machine" in the lines, the second answer was "no lab counts registered in the last minute… 47 labs idle". The system prompt's "lead with a root cause hint" outranked the question, and no turn note said a rate question is answered from the measured line
   - Done: on a measured turn the tail says to quote the measurement's numbers first and keep any diagnosis hint to one clause after; agent test over a measured turn
 
-- [~] FC-222 Standing among 33 drills, it said "no drills around you"
+- [x] FC-222 Standing among 33 drills, it said "no drills around you"
   - Notes: VERIFY row 12, live (2026-09-18). `machine_output` reads `products_finished`, which the game keeps only for assemblers, furnaces and silos; mining drills have no per-machine craft counter, so the measurement found nothing and the answer denied the drills existed. A design limit stated wrongly
   - Acceptance: the handler counts the nearby machines it can't read, by type, and the answer says they're there and why their rate comes from the production statistics instead; unit test on the formatter; `test-machines.ts` green on the dev save after the game restarts (the mod reloads only then); per-tick cost unchanged, since the count is on demand
-  - Built, not yet loaded: the mod counts mining drills, labs, agricultural towers and offshore pumps in the search area with `count_entities_filtered` (on demand, one call per type); the formatter says "33 mining drills are there: the game keeps no per-machine craft count for those…". Stays `[~]` until the game has restarted with it and `test-machines.ts` has run
+  - Done: the mod counts mining drills, labs, agricultural towers and offshore pumps in the search area with `count_entities_filtered` (on demand, one call per type); the formatter says "33 mining drills are there: the game keeps no per-machine craft count for those…". Loaded on the relaunch: `test-machines.ts` 11/11 and a live call from the base returns the drill count
 
 - [x] FC-221 One dropped syllable skipped the whole measurement
   - Notes: VERIFY row 12, live (2026-09-18): the on-device engine heard "What rate are these drills really hitty", `wantsMeasuredOutput` wanted the whole word "hitting", and the turn answered from production statistics instead of measuring the drills three tiles away
