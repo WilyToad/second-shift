@@ -32,7 +32,10 @@ for (const [n, req] of REQUESTS.entries()) {
   } catch {}
   check(`${req.item}: the page gets a blueprint card with a valid string`, bp !== null && entities > 0 && label.startsWith(req.item), `${label}, ${entities} entities; ${bp?.summary}`);
   const machines = /(\d+) (assembling-machine|electromagnetic-plant|foundry)/.exec(bp?.summary ?? "")?.[1];
-  check(`${req.item}: the answer explains it without writing a string`, !!machines && r.answer.includes(machines) && !/0eN[A-Za-z0-9+/]{20,}/.test(r.answer), `${r.answer.slice(0, 400)} [${r.seconds} s]`);
+  // "Two assembling-machine-3s" is the same count as "2": the answer may spell it out.
+  const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+  const saysCount = !!machines && new RegExp(`\\b(${machines}|${WORDS[Number(machines)] ?? machines})\\b`, "i").test(r.answer);
+  check(`${req.item}: the answer explains it without writing a string`, saysCount && !/0eN[A-Za-z0-9+/]{20,}/.test(r.answer), `${r.answer.slice(0, 400)} [${r.seconds} s]`);
 
   if (n === 0) {
     // Test tooling: stand the player on open ground (the dev save's spot is built up), restored afterwards.
