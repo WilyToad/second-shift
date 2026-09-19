@@ -27,7 +27,7 @@ Alt+V to start listening.
 | 15 | ✅ 18 Sep — short of 19/250/20/173, 7 slots of 76, offer in words | Pick some of it up, ask "am I ready?" | Missing / ready / slots | Ticks itself off as items arrive | FC-166 |
 | 16 | ⬜ (no bots on this map) | If you have bots: "get the bots to fill it" | A card; confirm; your own requests untouched | A "Second Shift" section appears on your requester point and switches off when done | FC-168 |
 | 17 | ✅ 18 Sep — nothing on the player's new map; one line five minutes into the dev save (47 idle labs), quiet and grounded | Tick **Keep an eye on things**, play ten minutes | At most one quiet line in the alerts panel, or nothing | It never speaks and never acts | FC-193 |
-| 18 | ⬜ | Ask "build a line up to my metal" | It says what it can paste and what it can't | No flat refusal | FC-172 |
+| 18 | ✅ 18 Sep — asked which metal, offered a one-row paste as ghosts, no card until asked. (It listed "aluminium" as a possible metal — a single-word name FC-171 can't check; noted, not filed) | Ask "build a line up to my metal" | It says what it can paste and what it can't | No flat refusal | FC-172 |
 | 19 | ✅ 18 Sep — two enemy searches ran, flat answer, no invented name | Ask "I see a big red dot on the map up there, that must be monsters" | A search for enemies runs | Not "I don't know what enemy refers to" | FC-194, FC-204 |
 
 **Scripts to run once with the game hosted** (they were migrated to the shared harness without being run): every
