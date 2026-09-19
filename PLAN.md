@@ -563,6 +563,43 @@ The caveats stand: one voice, one evening, 23 of 24 truths from the log rather t
 lesson that a single run is not a measurement — the next session's clips re-run through the same harness are the
 check.
 
+**Jev-style option scoring, measured (FC-233, 2026-09-19):** the player's second research pass found open MLX
+implementations of the technique behind Jev (one prefill, every option scored from its logits; §8 item 5 "Second
+look"), so the spike PLAN asked for ran on the one judgement in the app that is a real two-way choice with a hard
+budget and no good code rule: barge-in, "is the microphone hearing the player, or the companion's own voice coming
+back?" (FC-217). `scripts/eval-barge-scorer.ts` builds 687 cases from 2,077 real companion sentences in
+`data/eval` and the player's 37 kept clips — echoes as the whole sentence, a leading or trailing piece, and a
+garbled version (480); the player as their real questions, one-word cut-ins, and the hard set, quoting him back
+("wait, me to queue that research?", 207) — and runs the console's own `looksLikeEcho()` and jevmlx over the same
+cases. jevmlx in a project venv (`.venv-jev/`, gitignored), its Qwen2.5-Instruct 4-bit models; the
+`Qwen3.5-0.8B` already on disk isn't a model family jevmlx loads.
+
+| | code rule | 1.5B | 1.5B labels+prior | 3B | 3B prior | 7B | 7B prior |
+|---|---|---|---|---|---|---|---|
+| echo (480) | **480** | 0 | 77 | 397 | 0 | 320 | 480 |
+| player (207) | 172 | 206 | 207 | 51 | 207 | 120 | 12 |
+| overall (687) | **652** | 206 | 284 | 448 | 207 | 440 | 492 |
+| p50 per decision | µs | 35 ms | 26 ms | 57 ms | 55 ms | 105 ms | 100 ms |
+
+Footprint after one decision: 1.97 GB (1.5B), 4.1 GB (3B); after the 687-case run the process sat at 18 GB
+(1.5B), 25 GB (3B) and 30 GB (7B) — jevmlx keeps what it broadcasts. Load 0.5–0.8 s warm from disk, 25–100 s
+on first download.
+
+**What that says.** Every configuration collapses to one side: the 1.5B says "player" to everything, prior
+correction and label scoring move it to "echo" for everything on the 3B and 7B, and the best of the seven
+(7B, prior-corrected, 492/687) is 160 cases behind a six-line rule, at 100 ms and 8+ GB. The "probabilities"
+confirm §8's warning: in 480 of the 1.5B's 481 errors its own confidence was ≥0.95. That is a token prior, not
+a judgement, and it is what an untrained model gives this technique; Jev's contribution was the training, and
+no open project has it (jevmlx's `calibrate` fits one temperature, which cannot un-collapse a class). The latency
+and the shape are as good as advertised — 26–105 ms, always a valid choice — so the technique would earn its
+keep only with a head trained on our own cases, and 687 synthetic cases is not that.
+
+**Verdict: not adopted — for barge-in or anywhere else — until a model trained for it exists locally.** The
+rule stays. What the spike did buy: the case set caught the rule's real weakness — the player quoting the
+companion back is called echo 34 times in 60 ("no, not from yumako processing"), and one real question ("What
+is this") was eaten by word overlap — filed as FC-234, a code fix. The script stays as the yardstick for any
+later scorer: it must beat 652/687 on the same cases before it touches the console.
+
 **S31's experiment, run (2026-09-18, the player's Chrome session, ten test sentences; 35 clips kept by the end of the night):** the two
 mechanisms were tested on both engines and the verdict is clean. **Chrome's online service refuses a phrase list
 outright** (`phrases-not-supported`, the moment recognition starts) — biasing is on-device only, as the explainer
@@ -972,7 +1009,10 @@ never reaches the page; the picker labels them online.
    is argmax only; Flash-Next answers a one-token choice in 327 ms warm (1.66 s cold); `Qwen3.5-0.8B-MLX-4bit`,
    already in `~/.omlx/models`, loads on demand beside Flash-Next (0.6 GB, Flash-Next stayed resident at 73.3 GB
    total) and answers in 101–109 ms warm (5.1 s first load). Real probabilities would need mlx-lm direct, a
-   second process beside oMLX, the way whisper-server sits beside it (FC-230).
+   second process beside oMLX, the way whisper-server sits beside it (FC-230). **Spike run the same day
+   (FC-233, §5 "Jev-style option scoring, measured"): jevmlx on 1.5B/3B/7B against the barge-in question, seven
+   configurations, best 492/687 against the code rule's 652/687 — every model collapses to one answer. Not
+   adopted; the case set and script remain the bar any later scorer must clear.**
 5. ~~**Transport: RCON or UDP?**~~ **Decided 2026-09-13: RCON**, after testing and prior-art
    research. The player accepted the multiplayer-hosting trade-offs below. The RCON keys go in
    the player's real `config.ini` (set by `scripts/setup-rcon.ts` with the game closed).
