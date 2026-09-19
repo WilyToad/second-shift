@@ -47,6 +47,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-207 "Keep my audio" was on in the console and off in fact after a reload
+  - Notes: the player's first session with FC-188 (2026-09-18) said five sentences with the setting ticked and kept zero clips. The setting survives a reload but the tap didn't: it was only opened when the checkbox *changed*, so the console said "your voice is being written to…" while nothing was. Found by the log being silent where `Kept clip` lines should have been
+  - Done: `ensureCapture()` opens the tap whenever talking starts with the setting on — a user gesture, so the microphone prompt is allowed — and turns the setting off with a visible reason if it can't. Test drives both states. FC-188 stays `[~]` until a clip actually lands
+
 - [x] FC-206 A refused phrase list ended the whole voice session
   - Notes: the player's first Chrome session with FC-177 live (2026-09-18): "Voice input stopped (phrases-not-supported)". Chrome's online service refuses a phrase list the moment recognition starts with one attached — **biasing is on-device only**, which is the S31 question answered — and the console treated the unknown error like any other and ended listening
   - Done: the list is dropped for the rest of the page's life and listening carries on; a quiet note says the engine isn't being biased; the FC-185 record shows `phrases: 0` so the session is attributed to rescoring or the engine alone. Test drives the error and checks a fresh recognition starts without a list. **Consequence for S31:** on this engine FC-175's rescoring is the only mechanism in play, so whether it stays now rests on the `Heard` lines from this session, not on biasing

@@ -159,6 +159,18 @@ export async function setCapturing(on: boolean): Promise<void> {
   }
 }
 
+/**
+ * Opens the tap if the setting is on and it isn't open yet (FC-207). The setting survives a reload but the tap
+ * didn't: it was only opened when the checkbox *changed*, so after a reload the console said "your voice is being
+ * written" while nothing was — the player's first session kept zero clips. Called when talking starts, which is a
+ * user gesture, so the browser's microphone prompt is allowed.
+ */
+export async function ensureCapture(): Promise<void> {
+  if (!capturing.value || mic) return;
+  const error = await startCapture();
+  if (error) { captureError.value = error; capturing.value = false; }
+}
+
 /** The player has started saying something: the clip begins a little before this, to catch the first word. */
 export function markUtterance(): void {
   if (!mic || startedAt !== null) return;

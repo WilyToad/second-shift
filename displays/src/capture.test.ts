@@ -23,3 +23,16 @@ test("FC-188: audio is written as the 16 kHz mono PCM every candidate transcribe
   expect(view.getInt16(44 + 4, true)).toBe(-32767);
   expect(bytes.length).toBe(44 + 8);
 });
+
+test("FC-207: the tap follows the remembered setting, not the checkbox", async () => {
+  const cap = await import("./capture");
+  // No microphone in this environment: opening the tap reports why, turns the setting off, and never throws.
+  cap.capturing.value = true;
+  await cap.ensureCapture();
+  expect(cap.capturing.value).toBe(false);
+  expect(cap.captureError.value).toMatch(/can't record audio/);
+  // Off: nothing is attempted, and no error is shown.
+  cap.captureError.value = null;
+  await cap.ensureCapture();
+  expect(cap.captureError.value).toBeNull();
+});

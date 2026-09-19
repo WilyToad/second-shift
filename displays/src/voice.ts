@@ -4,7 +4,7 @@
 // audio goes to the browser's speech service, and the console says which.
 import { signal } from "@preact/signals";
 import { playSound } from "./sounds";
-import { keepClip, markUtterance } from "./capture";
+import { ensureCapture, keepClip, markUtterance } from "./capture";
 
 type Alternative = { transcript: string };
 type Result = { isFinal: boolean; 0: Alternative; length: number; [index: number]: Alternative };
@@ -305,6 +305,7 @@ export function startTalking(onUtterance: (text: string) => void, ctor = recogni
   stopSpeaking(); // talking over an answer stops it
   endRecognition();
   fromGame = Boolean(opts.fromGame);
+  void ensureCapture(); // the tap follows the setting, not the checkbox (FC-207)
   session = { ctor, lang, onUtterance, fromGame };
   talking.value = true;
   awaitingAnswer = false;
