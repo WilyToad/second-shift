@@ -316,7 +316,10 @@ function M.register(handlers)
   -- Capped: reading a machine costs ~5 µs (a position lookup), so 200 keeps one read near a millisecond.
   local MAX_SAMPLE = 200
   local CRAFTING_TYPES = { "assembling-machine", "furnace", "rocket-silo" }
+  -- `products_finished` exists only on crafting machines; these run, but the game doesn't count what they make.
+  local UNMEASURABLE_TYPES = { "mining-drill", "lab", "agricultural-tower", "offshore-pump" }
   handlers.machine_output = function(args)
+    local unmeasurable = nil
     local player = util.companion_player()
     if not player then util.reject("no_player", "No player is connected.") end
     local surface = player.surface
@@ -330,10 +333,15 @@ function M.register(handlers)
     else
       local radius = math.min(tonumber(args.radius) or 32, 64)
       local at = player.physical_position
-      found = surface.find_entities_filtered({
-        area = { { at.x - radius, at.y - radius }, { at.x + radius, at.y + radius } },
-        type = CRAFTING_TYPES, force = player.force, limit = MAX_SAMPLE,
-      })
+      local area = { { at.x - radius, at.y - radius }, { at.x + radius, at.y + radius } }
+      found = surface.find_entities_filtered({ area = area, type = CRAFTING_TYPES, force = player.force, limit = MAX_SAMPLE })
+      -- Machines the game keeps no craft counter for (FC-222): the player stood among 33 drills and was told "no
+      -- drills around you". Counted, not read, so the answer can say what it can't measure and why. On demand only.
+      unmeasurable = {}
+      for _, t in ipairs(UNMEASURABLE_TYPES) do
+        local n = surface.count_entities_filtered({ area = area, type = t, force = player.force })
+        if n > 0 then unmeasurable[t] = n end
+      end
     end
     local now = game.tick
     local sample, groups, machines, not_visible = {}, {}, 0, 0
@@ -383,7 +391,7 @@ function M.register(handlers)
       if g.sampled > 0 and window > 0 then entry.per_minute = (g.finished - g.before) * 3600 / window end
       out[#out + 1] = entry
     end
-    return { tick = now, window_ticks = window, machines = machines, not_visible = not_visible, recipes = out }
+    return { tick = now, window_ticks = window, machines = machines, not_visible = not_visible, unmeasurable = unmeasurable, recipes = out }
   end
 
   -- Test tooling: forget the registry so the initial scan runs again (its cost can then be profiled).

@@ -54,6 +54,11 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [~] FC-222 Standing among 33 drills, it said "no drills around you"
+  - Notes: VERIFY row 12, live (2026-09-18). `machine_output` reads `products_finished`, which the game keeps only for assemblers, furnaces and silos; mining drills have no per-machine craft counter, so the measurement found nothing and the answer denied the drills existed. A design limit stated wrongly
+  - Acceptance: the handler counts the nearby machines it can't read, by type, and the answer says they're there and why their rate comes from the production statistics instead; unit test on the formatter; `test-machines.ts` green on the dev save after the game restarts (the mod reloads only then); per-tick cost unchanged, since the count is on demand
+  - Built, not yet loaded: the mod counts mining drills, labs, agricultural towers and offshore pumps in the search area with `count_entities_filtered` (on demand, one call per type); the formatter says "33 mining drills are there: the game keeps no per-machine craft count for those…". Stays `[~]` until the game has restarted with it and `test-machines.ts` has run
+
 - [x] FC-221 One dropped syllable skipped the whole measurement
   - Notes: VERIFY row 12, live (2026-09-18): the on-device engine heard "What rate are these drills really hitty", `wantsMeasuredOutput` wanted the whole word "hitting", and the turn answered from production statistics instead of measuring the drills three tiles away
   - Done: "hitt…" and "what rate are/is…" both count; both transcripts are in the corpus

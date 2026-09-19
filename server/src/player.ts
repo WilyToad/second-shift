@@ -245,8 +245,14 @@ export function formatContents(c: ContainerContents): string {
 }
 
 /** Measured output of the machines the player asked about (FC-162), or what to say when the clock just started. */
+const PLURAL: Record<string, string> = { "mining-drill": "mining drills", lab: "labs", "agricultural-tower": "agricultural towers", "offshore-pump": "offshore pumps" };
+
 export function formatMachineOutput(m: MachineOutput, where: string): string {
-  if (!m.machines) return `no machines of the player's own are in ${where}${m.not_visible ? `, and ${m.not_visible} are somewhere they can't see` : ""}, so nothing was measured`;
+  // Drills, labs and pumps run but the game keeps no craft counter for them, so a player standing among 33 drills
+  // used to be told "no drills around you" (FC-222). Say what's there and why it can't be read this way.
+  const uncounted = Object.entries(m.unmeasurable ?? {}).filter(([, n]) => n > 0).map(([t, n]) => `${n} ${PLURAL[t] ?? t.replace(/-/g, " ")}`);
+  const cantRead = uncounted.length ? ` — but ${uncounted.join(" and ")} are there: the game keeps no per-machine craft count for those, so their real rate is the surface's production line in the game state, not a measurement` : "";
+  if (!m.machines) return `no assemblers, furnaces or silos of the player's own are in ${where}${m.not_visible ? `, and ${m.not_visible} are somewhere they can't see` : ""}, so nothing was measured${cantRead}`;
   const seconds = Math.round(m.window_ticks / 60);
   const measured = m.recipes.filter((r) => r.per_minute !== undefined);
   if (!measured.length) {

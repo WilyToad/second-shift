@@ -133,6 +133,8 @@ export const MachineOutputSchema = z.object({
   window_ticks: z.number(),
   machines: z.number(),
   not_visible: z.number(),
+  /** Machines nearby the game keeps no craft counter for, by type (FC-222): counted so the answer can say why. */
+  unmeasurable: z.record(z.string(), z.number()).optional(),
   recipes: luaArray(z.object({ recipe: z.string(), machines: z.number(), finished: z.number(), sampled: z.number(), per_minute: z.number().optional() })),
 });
 export type MachineOutput = z.infer<typeof MachineOutputSchema>;

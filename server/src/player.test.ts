@@ -266,3 +266,14 @@ test("FC-168: the words that hand the list to the bots, and the network lines", 
   expect(lines[0]).toBe("the player's logistic network is in range: 12 of 42 logistic robots free, 88 item kinds in it");
   expect(lines[1]).toContain('"trash unrequested" on');
 });
+
+test("FC-222: standing among drills, the answer says they can't be counted rather than that they aren't there", async () => {
+  const { formatMachineOutput } = await import("./player");
+  const none = { tick: 1, window_ticks: 0, machines: 0, not_visible: 0, recipes: [], unmeasurable: { "mining-drill": 33 } };
+  const line = formatMachineOutput(none, "32 tiles around the player");
+  expect(line).toContain("no assemblers, furnaces or silos");
+  expect(line).toContain("33 mining drills are there");
+  expect(line).toContain("no per-machine craft count");
+  // Nothing at all nearby reads as before.
+  expect(formatMachineOutput({ ...none, unmeasurable: {} }, "32 tiles around the player")).not.toContain("are there");
+});
