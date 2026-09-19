@@ -541,11 +541,16 @@ export class SentenceQueue {
     const kept: string[] = [];
     let skippedHere = chartHere;
     for (const line of prose.split("\n")) {
-      const text = line.trim();
-      if (!text) continue;
-      // The answer itself is never dropped, however many numbers it carries.
-      if ((!this.said && !kept.length) || !working(text)) kept.push(text);
-      else skippedHere = true;
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      // A table row or a bullet is judged whole; a paragraph is judged sentence by sentence, or one line holding
+      // "rounded to 200… 250 plates/min… 25–30/min" silences the prose around the arithmetic too (FC-218).
+      const parts = /^([-*•|]|\d+[.)])\s/.test(trimmed) || /^\|/.test(trimmed) ? [trimmed] : trimmed.split(/(?<=[.!?]["')]?)\s+/).map((t) => t.trim()).filter(Boolean); // after a terminator and a space, so "3.5" stays whole
+      for (const text of parts) {
+        // The answer itself is never dropped, however many numbers it carries.
+        if ((!this.said && !kept.length) || !working(text)) kept.push(text);
+        else skippedHere = true;
+      }
     }
     if (kept.length) this.said = true;
     // One pointer, in place, the first time something is skipped; a chart skipped later earns its own. Spoken as its

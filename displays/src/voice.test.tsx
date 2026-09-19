@@ -559,6 +559,19 @@ test("FC-190: an ordinary answer is read in full, with nothing added", async () 
   expect(out.join(" ")).not.toContain("240");
 });
 
+test("FC-218: a paragraph is judged sentence by sentence, so prose around the arithmetic is still heard", async () => {
+  const { SentenceQueue, POINTER } = await import("./voice");
+  // The player's own answer (2026-09-18): one line, three sentences, and only the middle one is working.
+  const paragraph = "\"Stone surfaces\" I take as stone furnaces; \"belt arms\" as transport belts, rounded to 200. Twenty furnaces smelt 250 plates/min, so coal lands near 25–30/min — plan for a coal field, not a chest. I trimmed a ship on arithmetic that tidy.\n\nSay the word and I'll start the packing list. ";
+  const q = new SentenceQueue();
+  const heard = [...paragraph.split(/(?<=\s)/).flatMap((part) => q.push(part)), ...q.end()];
+  expect(heard.join(" ")).toContain("I take as stone furnaces");
+  expect(heard.join(" ")).toContain("I trimmed a ship on arithmetic that tidy.");
+  expect(heard.join(" ")).not.toContain("250 plates");
+  expect(heard).toContain(POINTER.numbers);
+  expect(heard.at(-1)).toBe("Say the word and I'll start the packing list.");
+});
+
 test("FC-190: what counts as working, and what doesn't", async () => {
   const { working } = await import("./voice");
   expect(working("Each makes 7.5 bioflux/min from 15 jelly + 15 mash.")).toBe(true);
