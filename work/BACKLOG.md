@@ -47,6 +47,13 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-214 The approval guard dropped the packing list the model rightly started
+  - Notes: VERIFY row 14, second try (2026-09-18). After FC-211 the turn was classified as packing and the model called `update_list` with a good list — 20 stone furnace, 200 transport belt, 20 chest, drills, coal, ore — and `askedFor("update_list")` dropped it as unasked, twice, because the guard's build-description clause had the same "need/bring/take" gap the classifier had. The answer offered to start the list instead
+  - Done: a described build with amounts is asking for a list, in the guard as well as the classifier — one rule, `wantsPackingList`, decides both. Agent-level test runs the tool on the session's exact spoken transcript and checks the list exists; a bare build sentence still isn't asking
+- [x] FC-215 A server restart handed Ballast a second throwback
+  - Notes: the allowance lived in memory, so each of tonight's restarts reset it — the player heard "I trimmed a ship for less" and then "I trimmed a ship on arithmetic that tidy" in the same conversation
+  - Done: kept with the session, so a restart resumes the conversation with the allowance already spent; test starts a second agent on the same session file
+
 - [x] FC-212 Every recipe-grounded answer was flat, and the model announced it
   - Notes: heard by the player (2026-09-18): a build description answered as "Numbers, flat: 20 furnaces at 12.5 plates/min each…". FC-179's tier decision counted retrieved *recipe lines* as a "count", so any answer with recipe grounding got the flat register — which is most answers — and the instruction "say this one flat" was being echoed as a heading
   - Done: retrieved recipe lines are no longer a count (a carried-over search or a spatial question is); the flat note is phrased so it can't be read as a heading and says not to announce it. `eval-register`'s cases were unaffected because none of them retrieved recipes on a dry turn — the corpus should grow a recipe question with an expected dry register, which needs the game

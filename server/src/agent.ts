@@ -58,7 +58,7 @@ export type TurnRecord = {
 
 const MAX_TOOL_ROUNDS = 3;
 export type TranscriptItem = { kind: "user" | "agent"; text: string };
-export type SessionData = { savedAt: string; history: ChatMessage[]; transcript: TranscriptItem[]; lists?: ListsData };
+export type SessionData = { savedAt: string; history: ChatMessage[]; transcript: TranscriptItem[]; lists?: ListsData; throwbacks?: number };
 export type SessionStore = { load(): SessionData | null; save(data: SessionData): void; clear(): void };
 const MAX_TRANSCRIPT = 60;
 
@@ -380,6 +380,7 @@ export class Agent {
       this.history.push(...saved.history);
       this.shown.push(...saved.transcript);
       this.lists.load(saved.lists);
+      this.throwbacks = saved.throwbacks ?? 0;
       this.showLists();
     }
   }
@@ -422,7 +423,7 @@ export class Agent {
   }
 
   private saveSession(): void {
-    this.session?.save({ savedAt: new Date(this.now()).toISOString(), history: this.history, transcript: this.shown.slice(-MAX_TRANSCRIPT), lists: this.lists.save() });
+    this.session?.save({ savedAt: new Date(this.now()).toISOString(), history: this.history, transcript: this.shown.slice(-MAX_TRANSCRIPT), lists: this.lists.save(), throwbacks: this.throwbacks });
   }
 
   private now(): number {

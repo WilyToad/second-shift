@@ -69,6 +69,9 @@ export const ASKS_FOR: Record<string, RegExp> = {
 };
 /** Is this tool call something the player asked for? Tools not listed in ASKS_FOR always are. */
 export function askedFor(tool: string, intent: string): boolean {
+  // A described build with amounts is the player asking for a packing list, whether or not they said "need" —
+  // the model made the right call and the guard dropped it as unasked, twice, in the player's session (FC-214).
+  if (tool === "update_list" && wantsPackingList(intent)) return true;
   return ASKS_FOR[tool]?.test(intent) ?? true;
 }
 /** A production target in the question ("60 bioflux per minute", "2/s") as items per minute, plus the words naming what. */

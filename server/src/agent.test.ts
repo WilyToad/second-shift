@@ -968,3 +968,30 @@ test("FC-187: 'a bit further' carries the last search, and asks when there was n
   expect(coldTurn).toContain("ask what they want looked for");
   expect(coldTurn).not.toContain("carries on the last search");
 });
+
+test("FC-214: a described build with amounts runs the list tool instead of being dropped as unasked", async () => {
+  const { askedFor } = await import("./agent");
+  // Verbatim from the player's session (2026-09-18), as the on-device engine heard it.
+  const spoken = "I'm going to build a smelting outpost 20 stone surfaces a couple hundred belt arms to feed them and chests for storage";
+  expect(askedFor("update_list", spoken)).toBe(true);
+  // And the tool call actually lands: the list exists afterwards.
+  const model = fakeModel([{ tool: "update_list", args: { kind: "packing", list: "smelting outpost", add: ["20 stone furnace", "200 transport belt", "20 iron chest"] } }, { text: "Started the list." }]);
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask(spoken);
+  expect(agent.lists.active()?.items.map((i) => i.text)).toEqual(["20 stone furnace", "200 transport belt", "20 iron chest"]);
+  // A plain build sentence with no amounts still isn't asking for a list.
+  expect(askedFor("update_list", "I'm going to build a smelting outpost")).toBe(false);
+});
+
+test("FC-215: the one throwback a conversation survives a server restart", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "fc-session-"));
+  const session = fileSession(join(dir, "s.json"));
+  const protos = PrototypesSchema.parse(await Bun.file(new URL("../../data/captures/prototypes.json", import.meta.url)).json());
+  const first = new Agent({ model: fakeModel([{ text: "Three. I trimmed mass on the ship for less." }]), game: firstHourGame().game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {}, session });
+  await first.ask("how many copper cables does a green circuit take?");
+  // A new agent on the same session — a restart — must not hand him a second one.
+  const second = fakeModel([{ text: "Two." }]);
+  const again = new Agent({ model: second, game: firstHourGame().game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {}, session });
+  await again.ask("and for a red circuit?");
+  expect(second.seen[0]!.at(-1)!.content as string).not.toContain("you may let one clause");
+});
