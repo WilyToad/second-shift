@@ -821,7 +821,11 @@ export class Agent {
     }
     const coordinates = /\(?\s*(-?\d+)\s*,\s*(-?\d+)\s*\)?/.exec(question.replace(/\b(spidertron|spider)\b/gi, ""));
     if (coordinates) return { x: Number(coordinates[1]), y: Number(coordinates[2]), label: "that spot" };
-    const filter = resolveEntityFilterInText(question, this.deps.prototypes());
+    // Only the destination names the target: "send the spidertron to the ore patch" resolved "spidertron" as the
+    // entity and sent it to itself, zero tiles, card and all (FC-225, the player's session 2026-09-18).
+    const stripped = question.replace(/\b(spidertron|spider)\b/gi, " ");
+    const destination = /\b(?:to|towards?|toward|over to|up to|down to|at)\s+(.+)$/i.exec(stripped)?.[1] ?? stripped;
+    const filter = resolveEntityFilterInText(destination, this.deps.prototypes());
     if (!filter) return null;
     try {
       const r = await this.deps.game.call("find_entities", { types: filter.types, names: filter.names, direction: "around", radius: 128, from: "character" });

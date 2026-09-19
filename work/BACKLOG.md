@@ -54,6 +54,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-225 "Send the spidertron to the ore patch" sent it to itself
+  - Notes: VERIFY row 13, live (2026-09-18): the card read "Send the spidertron to the nearest spidertron at (22, 86)? … 0 tiles away". The destination resolver ran over the whole sentence, matched "spidertron" as an entity name before it reached "ore patch", and picked the nearest spidertron — the one being sent. It confirmed, walked nowhere, and reported arrival
+  - Done: only the words after "to"/"towards"/"at", with the spider words stripped, name the destination; test checks the search is for ore and the card names the ore, not the spidertron
+
 - [ ] FC-224 A one-word invented material slips past the name check
   - Notes: VERIFY row 18, live (2026-09-18): "Metal could be iron plate, copper plate, steel, aluminium, or something else". This save has no aluminium. FC-171 checks hyphenated names only, because that's how the save spells prototypes; a single ordinary-looking word the model borrows from other mods ("aluminium", "titanium", "tungsten" on a save without it) can't be told from English by shape
   - Acceptance: a short list of material and ore names common across Factorio mods is checked as whole words when they're offered as things the save might have ("could be X", "made of X", "X plate/ore"), and corrected only when the save has no prototype whose name contains the word; the FC-171 false-positive discipline applies — a turn of phrase is never corrected; unit test over this answer

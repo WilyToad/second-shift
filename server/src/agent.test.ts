@@ -1013,3 +1013,24 @@ test("FC-223: a rate question with a measurement in the lines is answered from t
   expect(turn).toContain("landfill 33/min from 1 machine");
   expect(turn).toContain("the measured line answers a rate question");
 });
+
+test("FC-225: 'send the spidertron to the ore patch' looks for ore, not for the spidertron", async () => {
+  const searches: any[] = [];
+  const game: GameActions = {
+    latest: () => undefined,
+    async call(action: ActionName, args?: any): Promise<any> {
+      if (action === "spidertrons") return { spidertrons: [{ name: "spidertron", unit_number: 7, x: 22, y: 86, distance: 6, driver: false }], total: 1, has_remote: true, surface: "gleba" };
+      if (action === "find_entities") { searches.push(args); return { surface: "gleba", count: 1, entities: [{ name: "iron-ore", x: 60, y: 90, surface: "gleba" }], by_name: { "iron-ore": 1 }, center: { x: 16, y: 86 } }; }
+      if (action === "highlight") return { highlighted: 1 };
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  const cards: any[] = [];
+  const model = fakeModel([{ text: "Card's up." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: (m) => { if (m.type === "approval") cards.push(m); } });
+  await agent.ask("send the spidertron to the ore patch");
+  expect(searches).toHaveLength(1);
+  expect(searches[0].types).toEqual(["resource"]);
+  expect(cards[0]?.title).toContain("the nearest iron-ore");
+  expect(cards[0]?.title).not.toContain("nearest spidertron");
+});
