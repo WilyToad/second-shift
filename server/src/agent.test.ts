@@ -1041,3 +1041,13 @@ test("FC-227: 'can you point it out to me' asks for a map action, and a highligh
   expect(askedFor("map_action", "point me to the silo")).toBe(true);
   expect(askedFor("map_action", "what's the point of a beacon?")).toBe(false);
 });
+
+test("FC-219: with a list up, an unrelated question is told not to report on it; a list question isn't", async () => {
+  const model = fakeModel([{ tool: "update_list", args: { list: "outpost", kind: "packing", add: ["20 stone furnace"] } }, { text: "Listed." }, { text: "Every day." }, { text: "Not yet." }]);
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask("I'm building a smelting outpost, I need 20 ovens");
+  await agent.ask("Do you ever miss flying?");
+  expect(model.seen.at(-1)!.at(-1)!.content as string).toContain("the list lines are context only");
+  await agent.ask("am I ready?");
+  expect(model.seen.at(-1)!.at(-1)!.content as string).not.toContain("the list lines are context only");
+});

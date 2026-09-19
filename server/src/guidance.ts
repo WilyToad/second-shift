@@ -36,6 +36,10 @@ export type TurnFacts = {
   throwbackSpent: boolean;
   askedReady: boolean;
   packing: boolean;
+  /** A list exists in the turn's tail (FC-219). */
+  listActive: boolean;
+  /** The question is about the list — its items, readiness, stock, or a build (FC-219). */
+  aboutList: boolean;
   stock: boolean;
   /** The spidertron card is already up (FC-144). */
   cardUp: boolean;
@@ -85,6 +89,9 @@ export function turnNotes(f: TurnFacts): string[] {
     f.plain || f.throwbackSpent ? "" : "you may let one clause of your own past show in this answer, if it fits the sentence you were already writing; don't add a sentence for it, and don't explain yourself",
     f.askedReady ? "answer with what's still missing and whether the load fits the player's free slots, both from the lines" : "",
     f.packing ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",
+    // Asked "do you ever miss flying?", it answered and then added "The list is 0 of 4 done: 1 of 20 furnace…" — the
+    // list rides in every turn so it can answer list questions, not so it can report on it unasked (FC-219).
+    f.listActive && !f.aboutList ? "the list lines are context only: don't mention the list or its progress unless the question is about it" : "",
     // Asked for a real rate with the measurement in the lines, it answered about idle labs from the diagnosis hint
     // instead — "lead with the root cause" outranked the thing they asked (FC-223, the player's session 2026-09-18).
     f.measured ? "the measured line answers a rate question: quote its per-minute numbers and machine counts first and say they were measured from the machines' own craft counts, not estimated; any diagnosis hint comes after, in one clause at most" : "",

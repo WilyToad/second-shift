@@ -555,7 +555,9 @@ export class Agent {
       playerLines: playerLines.length > 0, character: Boolean(status?.character), recipeLines: Boolean(found?.lines.length),
       craftable: craftableRecipes(status).length > 0, describingBuild: wantsPackingList(question) && !packing, spoken, askedBuild,
       stage: { id: stage.row.id, register: stage.row.register }, throwbackSpent: this.throwbacks > 0, askedReady,
-      packing: Boolean(packing), stock: stockLines.length > 0, cardUp: Boolean(sendLine?.startsWith("An approval card")),
+      packing: Boolean(packing), listActive: this.lists.all().length > 0,
+      aboutList: askedReady || askedStock || askedFill || Boolean(clearLine) || wantsListTalk(question) || wantsPackingList(question) || askedBuild,
+      stock: stockLines.length > 0, cardUp: Boolean(sendLine?.startsWith("An approval card")),
       stopped: Boolean(stopLine), pointed: Boolean(pointed), referred, referenceWord: referred.length ? REFERENCE.exec(question)![0] : "",
     });
     // Blueprint requests are built in code; the model only explains the result (S14).
