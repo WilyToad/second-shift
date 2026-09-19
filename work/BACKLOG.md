@@ -10,6 +10,10 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 4 — Voice and extras
 
+- [ ] FC-233 Spike: Jev-style option scoring on a small local model, tried on barge-in first
+  - Notes: player's second research pass (2026-09-19) — open MLX implementations of the technique now exist (`bnsd55/jevmlx`, `daseinlabs/open-jev`, `rorshopping/jev-on-a-laptop`; verified, PLAN §8 item 5 "Second look"). Measured here: a one-token choice is 327 ms warm on Flash-Next and 101–109 ms on `Qwen3.5-0.8B-MLX-4bit` (already in `~/.omlx/models`, loads beside Flash-Next), but oMLX drops `logprobs` silently, so real per-option scores need a process of its own beside oMLX, the way whisper-server does (FC-230). The 18 Sep reasoning still holds for routing (code rules cost microseconds); the candidates are judgements no code rule expresses and whose answer is a choice: barge-in "is that the player or his own voice?" (FC-217), watcher triage (FC-193), correction arbitration (FC-171/224/229), read-aloud speakability (FC-220). Barge-in first: it has a hard one-second budget and the false-stop count from VERIFY row 20 to score against.
+  - Acceptance: `jevmlx serve` (or equivalent) on the 0.8B or a 1.5B in a venv, no oMLX change, started and watched by the server like whisper-server, absent without complaint; a script scores it on the barge-in question over the kept clips plus the answer's own sentences (echo vs player), reporting accuracy, latency p50/p95 and resident memory; verdict written in PLAN §5 with the numbers — adopt for barge-in, adopt elsewhere, or drop — before any code path depends on it. Probabilities are a hint, never a threshold (PLAN §8).
+
 
 
 - [x] FC-188 Keep the audio, so accuracy can be argued from the player's own voice
