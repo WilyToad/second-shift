@@ -664,6 +664,30 @@ requirement — "if the user starts speaking, he's interrupting." The echo rule,
 are gone; any voice over him is the player. The numbers above stand as the record of why a text model was never the
 answer to a question that turned out not to need asking.*
 
+**Laya, the trained one (2026-09-20).** The player found `mizorewww/laya-mlx`, an MLX port of Convai's Laya: a 421M
+ModernBERT-large encoder with a decision head trained by RLCD against a proper scoring rule — the training the
+Jev-style projects lacked — Apache-2.0, calibration published (ECE 0.466 → 0.081 after one temperature per question
+type). The retired case set (now 717 cases, the clips having grown to 47) ran through it as a benchmark from the
+scratchpad, the rule as the bar:
+
+| | rule | untrained 7B, best (Fri) | Laya base | Laya typed-decisions |
+|---|---|---|---|---|
+| overall | 717/717 | 492/687 (72%) | **512/717 (71%)** | 426/717 (59%) |
+| echo / player | 480 / 237 | — | 397 / 115 | 243 / 183 |
+| p50 per decision | µs | 100 ms | **6 ms** | 6 ms |
+| footprint | — | 8+ GB | 4.3 GB | 4.3 GB |
+| wrong at ≥0.8 confidence | — | 480 of 481 | **1 of 205** | 0 of 291 |
+
+Zero-shot it's the majority class plus a little (67% of the cases are echo), no better than the untrained 7B — and
+upstream says so of itself: the base checkpoints "score near chance zero-shot (0.36 and 0.35)" on their own
+typed-decisions benchmark, 0.766 after fine-tuning. The difference from Friday is the last row: when Laya is wrong it
+*knows* — 0.63-ish either way, one confident error in 205 — which is what calibration training buys and what makes a
+model usable behind a threshold, or trainable. Its value is entirely in fine-tuning on one's own labeled decisions:
+upstream's notebook runs RLCD plus temperature fitting over ~30k questions in 4–5 h on two T4s. That is the endpoint
+FC-236 (labels from play) points at, with the honest correction that the labels needed are in the thousands, and
+that the training path is CUDA notebooks, not this Mac, today. Verdict unchanged: nothing adopted; the shape and the
+model to train are now known.
+
 **S31's experiment, run (2026-09-18, the player's Chrome session, ten test sentences; 35 clips kept by the end of the night):** the two
 mechanisms were tested on both engines and the verdict is clean. **Chrome's online service refuses a phrase list
 outright** (`phrases-not-supported`, the moment recognition starts) — biasing is on-device only, as the explainer
