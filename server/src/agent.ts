@@ -363,6 +363,8 @@ export class Agent {
       prototypes: () => Prototypes | null;
       fallbackSnapshot?: () => Snapshot | undefined;
       emit: (m: ServerMessage) => void;
+      /** One line per finished answer, so the server log shows what he said (FC-243). */
+      log?: (line: string) => void;
       now?: () => number;
       /** Appends a JSON line per answered question (FC-080). */
       turnLog?: string;
@@ -545,6 +547,9 @@ export class Agent {
     // should I do" turn, and only the matched row: the whole table is ~2,650 tokens and the cached prefix has no
     // room for it. Costs nothing on every other turn.
     const stage = stageFor(protos, snap?.digest ?? null);
+    // The list is in front of the model only on turns about it: with it in view every turn, "do you ever miss
+    // flying?" got a "3 of 11 ticked" report on the end, live, with the note asking it not to (FC-219).
+    const aboutList = askedReady || askedStock || askedFill || Boolean(clearLine) || wantsListTalk(question) || wantsPackingList(question) || askedBuild;
     const playerLines = [
       ...(status ? formatPlayerStatus(status, { builds: start || /\b(buil\w*|plac\w*|made)\b/i.test(intent) }) : []),
       ...(around ? formatSurroundings(around) : []),
@@ -553,7 +558,7 @@ export class Agent {
       ...(measuredLine ? [measuredLine] : []),
       ...(start ? stageLines(stage) : []),
       ...stockLines,
-      ...this.lists.format(),
+      ...(aboutList ? this.lists.format() : []),
       ...packingLines,
       ...networkLines,
       ...(fillLine ? [fillLine] : []),
@@ -581,7 +586,7 @@ export class Agent {
       craftable: craftableRecipes(status).length > 0, describingBuild: wantsPackingList(question) && !packing, spoken, askedBuild,
       stage: { id: stage.row.id, register: stage.row.register }, throwbackSpent: this.throwbacks > 0, askedReady,
       packing: Boolean(packing), listActive: this.lists.all().length > 0,
-      aboutList: askedReady || askedStock || askedFill || Boolean(clearLine) || wantsListTalk(question) || wantsPackingList(question) || askedBuild,
+      aboutList,
       stock: stockLines.length > 0, cardUp: Boolean(sendLine?.startsWith("An approval card")),
       stopped: Boolean(stopLine), pointed: Boolean(pointed), referred, referenceWord: referred.length ? REFERENCE.exec(question)![0] : "",
     });
@@ -727,7 +732,9 @@ export class Agent {
           // Store the question without its bulky retrieved lines and snapshot: the next turn re-reads the
           // previous turn anyway (it sits past the last cache block), so a short version is much cheaper (S08).
           this.history.push(...working.map((m, i) => (i === 0 && m.role === "user" ? { ...m, content: compactUserContent(m.content) } : m)));
-          this.shown.push({ kind: "agent", text: [...earlier, text].filter((t) => t.trim()).join("\n\n") });
+          const full = [...earlier, text].filter((t) => t.trim()).join("\n\n");
+          this.shown.push({ kind: "agent", text: full });
+          this.deps.log?.(`Answer (${result.usage?.completion_tokens ?? "?"} tok, ${Math.round(performance.now() - started)} ms): ${full.replace(/\s*\n+\s*/g, " | ")}`);
           record.visibleTtftMs = ttftMs;
           record.totalMs = performance.now() - started;
           this.logTurn(record);

@@ -743,11 +743,14 @@ test("FC-163: the list tool edits the player's list, shows it, and is dropped wh
   expect(shown.active).toBe("packing");
   expect(shown.lists[0].kind).toBe("packing");
 
-  // The next turn sees the list in its tail, so it can answer about it without asking the game.
-  await agent.ask("how many radars are near me?");
+  // A turn about the list sees it in its tail, so it can answer without asking the game; a turn that isn't about
+  // it doesn't see the list at all (FC-219: with it in view every turn, unrelated answers ended with its progress).
+  await agent.ask("what's on my list?");
   const tail = model.seen[2]!.at(-1)!.content; // the first ask used two rounds (tool, then answer)
   expect(tail).toContain('the player\'s list "packing" (0 of 2 done');
   expect(tail).toContain("- [ ] 200 transport belt");
+  await agent.ask("how many radars are near me?");
+  expect(model.seen[3]!.at(-1)!.content).not.toContain('the player\'s list "packing"');
 
   // A question that isn't about lists: an edit the player didn't ask for is dropped (FC-126).
   await agent.ask("what's my iron plate production?");
@@ -1047,7 +1050,7 @@ test("FC-219: with a list up, an unrelated question is told not to report on it;
   const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
   await agent.ask("I'm building a smelting outpost, I need 20 ovens");
   await agent.ask("Do you ever miss flying?");
-  expect(model.seen.at(-1)!.at(-1)!.content as string).toContain("the list lines are context only");
+  expect(model.seen.at(-1)!.at(-1)!.content as string).toContain("the player's list isn't in this turn");
   await agent.ask("am I ready?");
-  expect(model.seen.at(-1)!.at(-1)!.content as string).not.toContain("the list lines are context only");
+  expect(model.seen.at(-1)!.at(-1)!.content as string).not.toContain("the player's list isn't in this turn");
 });

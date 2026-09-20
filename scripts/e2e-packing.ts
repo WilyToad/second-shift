@@ -44,6 +44,9 @@ try {
   const ready = await ask("Am I ready to head out?");
   answers["ready"] = ready.answer;
   check("the readiness answer names what's missing and the slots", /missing|short|still need|left|outstanding|not yet/i.test(ready.answer) && /slot/i.test(ready.answer), ready.answer.slice(0, 200));
+  // An unrelated question gets no list report on the end (FC-219; live 2026-09-19 it got "3 of 11 ticked").
+  const flying = await ask("Do you ever miss flying?");
+  check("an unrelated question gets no list report", !/\b\d+ of \d+\b|ticked|unaccounted|packing list|\bthe list\b|still (need|missing)/i.test(flying.answer), flying.answer.slice(0, 200));
   const changed = await ask("Make it 30 ovens and drop the chests.");
   answers["change"] = changed.answer;
   const after = (changed.list?.items ?? []).map((i: any) => i.text.toLowerCase());

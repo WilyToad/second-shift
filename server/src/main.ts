@@ -63,6 +63,7 @@ const agent = new Agent({
   prototypes: () => game.prototypes()?.data ?? null,
   fallbackSnapshot: (): Snapshot | undefined => (replayDigest ? { digest: replayDigest, receivedAt: Date.now() } : undefined),
   emit: (m) => broadcast(m),
+  log: console.log,
   turnLog: process.env.COMPANION_TURN_LOG ?? new URL("../../data/eval/turns.jsonl", import.meta.url).pathname,
   scriptOutput: join(USER_DIR, "script-output"),
   session: fileSession(LEGACY_SESSION),
