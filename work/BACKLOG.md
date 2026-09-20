@@ -10,7 +10,7 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 4 — Voice and extras
 
-- [ ] FC-237 Engine as a config value, and the eval suite run on Splash + Qwen3.8-27B
+- [~] FC-237 Engine as a config value, and the eval suite run on Splash + Qwen3.8-27B
   - Notes: the player's oMLX-vs-Splash report (`~/projects/omlx/reports/2026-09-19-omlx-vs-splash.md`, 2026-09-19): quality tied on 300 paired MMLU-Pro (83.7% both, McNemar p=0.86); Splash-27B 1.5× decode, 1.85× at four concurrent, 0.26 s warm replay at a 32k prefix, in 17 GB against Flash-Next's 69.5 GB; oMLX faster at cold prefill (1,038 vs 772 tok/s). Three gaps before "switch" means anything here: the speed arm compared oMLX-27B, not our Flash-Next (52–67 tok/s decode, PLAN §5); the replay figure is at 32k where our hot path is a ~4k cached prefix plus a ~2k uncached tail (visible first token 1.0–1.5 s); and MMLU-Pro doesn't cover tool calls with our guards, the block-aligned prefix, the register or the corrections layer — which our eval suite does. `server/src/main.ts` hardcodes `http://127.0.0.1:8888`, so the report's "keep the engine a config value" isn't true of us yet. Blockers to check first: Splash must honour `chat_template_kwargs.enable_thinking`, OpenAI tool calling, and the `reasoning_content` split the stream parser expects (the report verified the last).
   - Acceptance: `COMPANION_MODEL_URL` (default unchanged) and the API key read only when the URL is oMLX's; a note in CLAUDE.md. With Splash running on the player's start (`splash serve`, :8000): `latency-report` at our prompt shape, then `eval-grounding`, `eval-requests`, `eval-register`, `eval-ratios`, `eval-voice-session`, `e2e-spidertron`, `e2e-packing`, `e2e-train-stops` against Splash-27B, the same runs on oMLX-Flash-Next the same day, and the two columns plus resident memory in PLAN §5 with a verdict: switch, keep, or keep with Splash as the low-memory option. Nothing in this item changes the default engine.
 - [ ] FC-235 Echo cancellation on the mic tap, measured against false stops
@@ -63,6 +63,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
   - Dropped (player, 2026-09-15) before any work: "drop FC-169 for now". Storage-chest filters only decide where *incoming* items land, so they don't consolidate what's already in 20 mixed chests — nothing moves until something pulls it. Once the chests are on the network, `get_supply_counts` says which one holds what, so finding things stops being the problem FC-169 was for. Revisit only if sorting still annoys the player after FC-168
 
 ## Tech debt and risks
+
+- [x] FC-238 whisper-server outlives the server that started it
+  - Notes: found 2026-09-19 while starting Splash for FC-237: three `whisper-server` processes at 1.8 GB each, one per server restart of the day — `pkill` of the Bun server never reached its child, and the next server saw the port answering and logged "ready in 0.0 s" over the orphan. 3.5 GB of the player's memory gone to nothing.
+  - Done: SIGINT/SIGTERM stop whisper-server before the server exits; a whisper-server already answering on the port is used as is (one left by a crash), rather than a second one that can't bind. Checked by restarting the server and counting `whisper-server` processes: one.
 
 - [x] FC-229 It said the machines were highlighted on a turn where it ran nothing
   - Notes: the diagnosis eval on the shared harness (2026-09-18): "Show me the stuck iron gear wheel assemblers" → "The 6 are highlighted in-game for 60 s…" with no tool call at all, and the turn before it wrote "Run `find_stuck_machines`" as prose instead of calling it. The player would go and look for a highlight that isn't there. Counts and names already get correction lines; actions didn't

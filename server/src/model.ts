@@ -58,7 +58,7 @@ export class OmlxClient implements ChatModel {
     const res = await fetch(`${this.opts.baseUrl}/v1/chat/completions`, {
       method: "POST",
       signal,
-      headers: { Authorization: `Bearer ${this.opts.apiKey}`, "Content-Type": "application/json" },
+      headers: { ...(this.opts.apiKey ? { Authorization: `Bearer ${this.opts.apiKey}` } : {}), "Content-Type": "application/json" },
       body: JSON.stringify({
         model: this.opts.model,
         messages,
@@ -71,7 +71,7 @@ export class OmlxClient implements ChatModel {
         ...(thinking ? { temperature: 0.6, top_p: 0.95, top_k: 20 } : { temperature: 0.7, top_p: 0.8, top_k: 20 }),
       }),
     });
-    if (!res.ok || !res.body) throw new Error(`oMLX ${res.status}: ${await res.text()}`);
+    if (!res.ok || !res.body) throw new Error(`model server ${res.status}: ${await res.text()}`);
 
     let text = "";
     let usage: Usage | undefined;

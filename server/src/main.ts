@@ -28,9 +28,14 @@ import { parseClientMessage } from "@companion/interfaces";
 
 const PORT = Number(process.env.COMPANION_PORT ?? 5170);
 const MODEL = process.env.COMPANION_MODEL ?? "Qwen3.8-Flash-Next-oQ4e-mtp";
+// The engine is a config value (FC-237): any OpenAI-compatible server. oMLX's key is read from its settings only
+// when the URL is oMLX's; another engine gets COMPANION_MODEL_KEY, or no key.
+const MODEL_URL = (process.env.COMPANION_MODEL_URL ?? "http://127.0.0.1:8888").replace(/\/$/, "");
+const isOmlx = MODEL_URL === "http://127.0.0.1:8888";
 
 const game = new GameLink({ pollMs: 2000, historySize: 1800, cacheDir: new URL("../../data/cache", import.meta.url).pathname });
-const model = new OmlxClient({ baseUrl: "http://127.0.0.1:8888", apiKey: await readOmlxApiKey(), model: MODEL });
+const model = new OmlxClient({ baseUrl: MODEL_URL, apiKey: isOmlx ? await readOmlxApiKey() : (process.env.COMPANION_MODEL_KEY ?? ""), model: MODEL });
+console.log(`Model server: ${MODEL_URL} (${MODEL})`);
 let modelState: { state: "loading" | "ready" | "error"; error?: string } = { state: "loading" };
 let busy: Promise<void> = Promise.resolve();
 let asking = 0;
@@ -108,6 +113,9 @@ const watcher = new Watcher({
  */
 const stt = new WhisperService(console.log);
 void stt.start();
+// whisper-server is our child: it goes when we go (FC-238: three of them, 1.8 GB each, were found running after a
+// day of restarts).
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { stt.stop(); process.exit(0); });
 
 const clips = new VoiceClips(join(import.meta.dir, "..", "..", "data", "captures", "voice"));
 

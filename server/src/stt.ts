@@ -70,6 +70,9 @@ export class WhisperService {
     if (reason) { this.log(`Local transcription off: ${reason}.`); return; }
     const vad = existsSync(VAD_MODEL) ? ["--vad", "-vm", VAD_MODEL] : [];
     if (!vad.length) this.log(`Local transcription: no VAD model at ${VAD_MODEL}; silence is judged by loudness only.`);
+    // One already answering on the port — left by a server that died without cleaning up (FC-238) — is used as is,
+    // rather than starting a second that can't bind and restarts forever.
+    try { const r = await fetch(`http://127.0.0.1:${STT_PORT}/`); if (r.status < 500) { this.ready = true; this.log(`Local transcription ready: using the whisper-server already on :${STT_PORT}.`); return; } } catch {}
     this.proc = Bun.spawn(["whisper-server", "-m", WHISPER_MODEL, "--host", "127.0.0.1", "--port", String(STT_PORT), "-l", "en", "-nth", "0.6", ...vad], { stdout: "ignore", stderr: "ignore" });
     const proc = this.proc;
     proc.exited.then((code) => {

@@ -136,7 +136,9 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun scripts/benchmark.ts [--ticks N --runs N]` (game closed) benchmarks the dev save with and
   without the mod using mirrored mod folders. Run it after every mod change.
 - `bun run start` runs the server (web chat on http://127.0.0.1:5170). It reconnects to the game
-  on its own and warms the model at startup. The e2e and eval scripts talk to this running server, so
+  on its own and warms the model at startup. `COMPANION_MODEL_URL` and `COMPANION_MODEL` point it at another
+  OpenAI-compatible engine and model (FC-237; e.g. Splash on `http://127.0.0.1:8000`, `COMPANION_MODEL_KEY` if it
+  wants one); the default is oMLX. The e2e and eval scripts talk to this running server, so
   **restart it after any server change** before trusting their results (it doesn't reload code).
 - `bun test`, `bun run typecheck`, `bun run check` (all of it), `bun run board` (sprint progress).
 - Website: `bun run site:dev` / `site:build` / `site:serve` locally; `bun run site:deploy` publishes to https://second-shift.wilytoad.com (outward-facing: only when the player asks).
