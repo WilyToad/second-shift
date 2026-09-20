@@ -29,7 +29,9 @@ export function spawnFactorio(args: string[], opts: { logPath?: string; wait?: b
 }
 
 export function isFactorioRunning(): boolean {
-  const r = Bun.spawnSync(["pgrep", "-f", "factorio.app/Contents/MacOS/factorio"]);
+  // Anchored on the executable path: an unanchored match once found a shell whose command line merely mentioned
+  // the binary (a script being written by heredoc), and refused to launch.
+  const r = Bun.spawnSync(["pgrep", "-f", "^/.*factorio\\.app/Contents/MacOS/factorio( |$)"]);
   return r.stdout.toString().trim().length > 0;
 }
 

@@ -593,7 +593,28 @@ report promised — and its prefill of the uncached tail is slower per token tha
 come out about even. The 60 GB of memory it hands back is the biggest single number in the table. Not measured yet: the
 game-side set — `eval-requests`, `eval-register`, `eval-voice-session`, `e2e-spidertron`, `e2e-packing`,
 `e2e-train-stops` — which is where tool guards, the register and the corrections layer are actually exercised; the
-verdict waits on those (FC-237). `server ttft` is blank on Splash: that column reads an oMLX-only usage field.
+verdict waited on those. `server ttft` is blank on Splash: that column reads an oMLX-only usage field.
+
+The game-side set, same evening, dev save hosted, each engine alone (the launcher first refused: its running-check
+matched a shell whose command line mentioned the binary, FC-239):
+
+| suite, visible first token median | oMLX + Flash-Next | Splash + Qwen3.8-27B |
+|---|---|---|
+| eval-requests (cards and actions only when asked) | 18/18 · 2.15 s | 18/18 · **1.30 s** |
+| eval-register (Ballast's register by turn kind) | 12/12 · **1.81 s** | 12/12 · 2.02 s |
+| eval-voice-session (S27's odd replies stay gone) | 7/8 · 1.97 s — highlighted the silo instead of pointing at it after "I meant the rocket silo"; a model choice, passed before | 8/8 · **1.49 s** |
+| e2e-spidertron (card, confirm, stop) | 4/4 · 0.95 s | 4/4 · **0.67 s** |
+| e2e-packing (a build becomes a list that ticks itself off) | **5/5** · 5.24 s | 4/5 · **3.10 s** — the list said "20 smelting furnace" and "a power source", not the save's names, so the chest count could never tick it; it also added 25 substations nobody asked for |
+| e2e-train-stops (limit through a card) | 3/3 | 3/3 · 2.63 s |
+
+**Verdict: keep oMLX + Flash-Next as the default; Splash + 27B is now a supported low-memory option, not the
+default.** Level or better on five of six suites, faster on every card flow (0.67 vs 0.95, 1.30 vs 2.15, 3.10 vs
+5.24 s), no unasked tool calls, and 60 GB handed back — against one gap that is the rule this project holds
+hardest: the 27B named list items in its own words where Flash-Next used the save's, and a list the game can't
+match is a list that never ticks off. That's a grounding fix (the FC-171/224 name corrections don't yet reach
+list items) before it could be default, filed as FC-240. Switching is `COMPANION_MODEL_URL=http://127.0.0.1:8000
+COMPANION_MODEL=incoai/Qwen3.8-27B-Splash` with `splash serve` up and oMLX stopped; the two won't fit together with
+the macOS reserve Splash insists on (17.4 + 13.7 GB against 25 GB free beside a 70 GB oMLX).
 
 **Jev-style option scoring, measured (FC-233, 2026-09-19):** the player's second research pass found open MLX
 implementations of the technique behind Jev (one prefill, every option scored from its logits; §8 item 5 "Second
