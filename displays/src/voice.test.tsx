@@ -57,7 +57,7 @@ beforeEach(async () => {
   voice.readAloud.value = false;
 });
 
-test("FC-149: Talk keeps listening: each pause sends a question, the mic waits for the answer, then listens again until Talk is clicked", async () => {
+test("FC-149: Talk keeps listening: each pause sends a question, the mic stays open through the answer (FC-217), until Talk is clicked", async () => {
   const { render } = await import("preact");
   const { Composer } = await import("./chat");
   const { onMessage } = await import("./store");
@@ -86,19 +86,18 @@ test("FC-149: Talk keeps listening: each pause sends a question, the mic waits f
   first.say([{ text: "how many rails are near me", final: true }]);
   await new Promise((r) => setTimeout(r, 60)); // the pause
   expect(asked).toEqual(["how many rails are near me"]);
-  expect(first.aborted).toBe(true); // the mic stops while the answer comes
+  expect(first.aborted).toBe(false); // the mic stays open while the answer comes: the player can talk over it (FC-217, FC-242)
   expect(voice.listenState.value).toBe("waiting");
 
-  // The answer arrives and finishes (not read aloud): the mic listens again with a fresh recognition.
+  // The answer arrives and finishes (not read aloud): the same recognition carries on.
   onMessage({ type: "user", text: "how many rails are near me" });
   onMessage({ type: "token", text: "6 rails." });
   expect(made.length).toBe(1); // still just the first one
   onMessage({ type: "done", totalMs: 1 });
   await new Promise((r) => setTimeout(r, 5));
-  expect(made.length).toBe(2);
+  expect(made.length).toBe(1);
   expect(voice.listenState.value).toBe("listening");
-  const second = made.at(-1);
-  second.say([{ text: "mark them", final: true }]);
+  first.say([{ text: "mark them", final: true }], { append: true });
   await new Promise((r) => setTimeout(r, 60));
   expect(asked).toEqual(["how many rails are near me", "mark them"]);
   onMessage({ type: "user", text: "mark them" });
@@ -106,10 +105,9 @@ test("FC-149: Talk keeps listening: each pause sends a question, the mic waits f
   await new Promise((r) => setTimeout(r, 5));
 
   // Chrome ending recognition on its own restarts it while the session is on.
-  const third = made.at(-1);
-  third.onend();
+  first.onend();
   await new Promise((r) => setTimeout(r, 5));
-  expect(made.length).toBe(4);
+  expect(made.length).toBe(2);
 
   // Clicking Talk again ends the session; words not yet sent go out first.
   made.at(-1).say([{ text: "thanks", final: false }]);
@@ -121,7 +119,7 @@ test("FC-149: Talk keeps listening: each pause sends a question, the mic waits f
   render(null, root);
 });
 
-test("FC-149: while an answer is read aloud the mic stays off, so it never hears the companion", async () => {
+test("FC-149/FC-217: while an answer is read aloud the mic stays open on the same recognition (headset required, FC-242)", async () => {
   const synth = fakeSynthesis();
   const { ctor, made } = fakeRecognition("unavailable");
   const voice = await import("./voice");
@@ -135,11 +133,13 @@ test("FC-149: while an answer is read aloud the mic stays off, so it never hears
   onMessage({ type: "done", totalMs: 1 });
   await new Promise((r) => setTimeout(r, 5));
   expect(synth.spoken.length).toBeGreaterThan(0);
-  expect(made.length).toBe(1); // still speaking: no new recognition
-  // The fake synth never ends utterances by itself: stopping speech (or it finishing) resumes listening.
+  expect(made.length).toBe(1); // still speaking: the same recognition is listening for the player
+  expect(made[0].aborted).toBe(false);
+  // The fake synth never ends utterances by itself: stopping speech (or it finishing) keeps the same recognition.
   voice.stopSpeaking();
   await new Promise((r) => setTimeout(r, 5));
-  expect(made.length).toBe(2);
+  expect(made.length).toBe(1);
+  expect(voice.listenState.value).toBe("listening");
   voice.stopTalking({ send: false });
   voice.readAloud.value = false;
 });
@@ -652,13 +652,12 @@ test("FC-209: a runaway repeat is collapsed, and the real sentence survives", as
   expect(voice.collapseRepeats("okay I'm running wire")).toBe("okay I'm running wire");
 });
 
-test("FC-217: with barge-in on, speaking over the answer stops it and starts the next question (headset required, FC-242); off, the mic waits", async () => {
+test("FC-217: speaking over the answer stops it and starts the next question (headset required, FC-242)", async () => {
   const synth = fakeSynthesis();
   const voice = await import("./voice");
   const said: string[] = [];
   const { ctor, made } = fakeRecognition("unavailable");
   voice.readAloud.value = true;
-  voice.setBargeIn(true);
   voice.setSilenceSeconds(0.06);
   try {
     voice.startTalking((t) => said.push(t), ctor);
@@ -685,16 +684,8 @@ test("FC-217: with barge-in on, speaking over the answer stops it and starts the
     expect(said).toEqual(["how many rails are near me", "how many chests are near me"]);
     voice.stopTalking({ send: false });
 
-    // Off: the recognition is aborted when the question goes out, as before (FC-149).
-    voice.setBargeIn(false);
-    const second = fakeRecognition("unavailable");
-    voice.startTalking(() => {}, second.ctor);
-    second.made[0].say([{ text: "what is this", final: true }]);
-    await new Promise((r) => setTimeout(r, 120));
-    expect(second.made[0].aborted).toBe(true);
     voice.stopTalking({ send: false });
   } finally {
-    voice.setBargeIn(false);
     voice.readAloud.value = false;
     voice.setSilenceSeconds(2);
   }
@@ -728,7 +719,6 @@ test("FC-241: an interim word over him doesn't swallow the final cut-in it becom
   const said: string[] = [];
   const { ctor, made } = fakeRecognition("unavailable");
   voice.readAloud.value = true;
-  voice.setBargeIn(true);
   voice.setSilenceSeconds(0.06);
   try {
     voice.startTalking((t) => said.push(t), ctor);
@@ -750,7 +740,6 @@ test("FC-241: an interim word over him doesn't swallow the final cut-in it becom
     expect(said).toEqual(["how many rails are near me", "never mind"]);
     voice.stopTalking({ send: false });
   } finally {
-    voice.setBargeIn(false);
     voice.readAloud.value = false;
   }
 });

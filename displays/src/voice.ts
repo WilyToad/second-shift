@@ -119,16 +119,8 @@ export const recognizedWhere = signal<Where>("unknown");
 /** On-device recognition for the page language, as the browser reports it (null: not asked or not supported). */
 export const deviceStatus = signal<Availability | null>(null);
 export const readAloud = signal(loadSetting("second-shift.readAloud", false));
-/**
- * Barge-in (FC-217): keep listening while the answer is read aloud, and treat the player's speech as "stop, I'm
- * talking". Off by default until its false-stop rate has been measured on the player's voice, because a companion
- * that stops mid-sentence on its own voice is worse than one you can't interrupt.
- */
-export const bargeIn = signal(loadSetting("second-shift.bargeIn", false));
-export function setBargeIn(on: boolean): void {
-  bargeIn.value = on;
-  saveSetting("second-shift.bargeIn", on);
-}
+// Barge-in (FC-217) is always on: the mic stays open while the answer is read, and the player's speech is "stop, I'm
+// talking". The player's call (FC-242): "It should just be on always. A cough or something interruptive isn't terrible."
 /** The word (browser voice) or sentence (ElevenLabs, approximate) being spoken right now (FC-216). */
 export const spokenNow = signal<{ sentence: string; char: number } | null>(null);
 /** What the voice has said in the last minute, so the recognizer hearing it back isn't taken for the player. */
@@ -332,7 +324,7 @@ export function startTalking(onUtterance: (text: string) => void, ctor = recogni
 
 function listen(): void {
   const s = session;
-  if (!s || (awaitingAnswer && !bargeIn.value)) return;
+  if (!s) return;
   const rec = new s.ctor();
   rec.lang = s.lang;
   rec.continuous = true;
@@ -414,7 +406,7 @@ function listen(): void {
     active = null;
     // With barge-in the answer is exactly when the mic must stay open: the on-device engine ends recognition right
     // after every sent question, and the first live try found nobody listening while he read (FC-217).
-    if (session && (!awaitingAnswer || bargeIn.value)) listen();
+    if (session) listen();
   };
   active = run;
   heard.value = carried; // a restart mid-sentence keeps what the player already said on screen
@@ -496,9 +488,10 @@ function send(text: string): void {
 function pauseForAnswer(): void {
   awaitingAnswer = true;
   answerDone = false;
-  // With barge-in the recognition keeps running through the answer; its results are judged in onresult (FC-217).
-  if (!bargeIn.value) endRecognition();
-  else { if (silence) { clearTimeout(silence); silence = null; } carried = ""; holds = 0; }
+  // The recognition keeps running through the answer; its results are judged in onresult (FC-217).
+  if (silence) { clearTimeout(silence); silence = null; }
+  carried = "";
+  holds = 0;
   if (session) listenState.value = "waiting";
 }
 

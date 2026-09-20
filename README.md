@@ -78,7 +78,7 @@ Tick **Read answers aloud** to hear each answer sentence by sentence as it strea
 Mac's own voice (download a Premium or Enhanced one in System Settings → Accessibility → Spoken Content for better
 sound), or an [ElevenLabs](https://elevenlabs.io) voice if you add a key.
 
-Tick **Talk over him** to interrupt: speak while he's reading and he stops within a beat, and what you said is the next
+To interrupt, just talk: speak while he's reading and he stops within a beat, and what you said is the next
 question — a bare "stop" or "nevermind" just stops him (every third time he may have a word to say about it). **A headset is
 required** for this: the console treats any voice on the microphone while he's reading as you, so speakers next to the mic
 would make him stop on his own echo. That setup isn't handled; wear the headset.
