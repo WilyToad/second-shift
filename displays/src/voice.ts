@@ -210,7 +210,8 @@ export function describeError(code: string): string | null {
   }
 }
 
-type Run = { rec: Recognition; aborted: boolean; pending: () => string; markSent: () => void; record: (sent: string) => HeardDetail };
+type Run = { rec: Recognition; aborted: boolean; pending: () => string; markSent: () => void;
+  dropEcho: () => void; record: (sent: string) => HeardDetail };
 let active: Run | null = null;
 /**
  * Words heard by a recognition that has already ended, not yet sent (FC-183). The engine decides when a recognition
@@ -375,6 +376,9 @@ function listen(): void {
     // Everything heard and not yet sent: what earlier recognitions left behind, then this one's own words.
     pending: () => collapseRepeats([carried, textFrom(latest)].filter(Boolean).join(" ")),
     markSent: () => { sentUpTo = latest.length; carried = ""; },
+    // An echo is dropped only once it's final: an interim "never" marked as sent would swallow the final "never mind"
+    // that replaces it at the same index — which is how "nevermind" over him was ignored twice, live (FC-241).
+    dropEcho: () => { let n = latest.length; while (n > 0 && !latest[n - 1]!.isFinal) n--; sentUpTo = Math.max(sentUpTo, n); carried = ""; },
     record: (sent: string) => ({
       first: lastOffered[0] ?? sent, picked: sent, alternatives: lastOffered.length, offered: lastOffered,
       phrases: applied, where: recognizedWhere.value, carried: Boolean(carried),
@@ -396,7 +400,7 @@ function listen(): void {
       // The answer is in progress (FC-217). His own voice coming back is dropped; anything else is the player
       // cutting in: the reading stops and their words start the next question.
       const text = run.pending();
-      if (isSpeaking() && looksLikeEcho(text)) { run.markSent(); heard.value = ""; return; }
+      if (isSpeaking() && looksLikeEcho(text)) { run.dropEcho(); heard.value = ""; return; }
       awaitingAnswer = false;
       // What he was saying when cut off goes with the words, so he can take it as an interruption (FC-241).
       interrupted = { during: spokenNow.value?.sentence ?? recentlySpoken.at(-1)?.text ?? "", stopOnly: isStopOnly(text) };

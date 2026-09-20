@@ -762,3 +762,37 @@ test("FC-241: only stop words count as a bare stop", async () => {
   for (const t of ["stop", "No, stop.", "wait", "hold on", "okay stop", "hang on a sec", "Ballast, stop", "nevermind", "never mind", "forget it", "okay, enough"]) expect(isStopOnly(t)).toBe(true);
   for (const t of ["no, which one?", "stop, what do you mean", "wait, how many?", ""]) expect(isStopOnly(t)).toBe(false);
 });
+
+test("FC-241: an interim word over him doesn't swallow the final cut-in it becomes", async () => {
+  const synth = fakeSynthesis();
+  const voice = await import("./voice");
+  const said: string[] = [];
+  const { ctor, made } = fakeRecognition("unavailable");
+  voice.readAloud.value = true;
+  voice.setBargeIn(true);
+  voice.setSilenceSeconds(0.06);
+  try {
+    voice.startTalking((t) => said.push(t), ctor);
+    made[0].say([{ text: "how many rails are near me", final: true }]);
+    await new Promise((r) => setTimeout(r, 120));
+    voice.answerSpeech.onQuestion();
+    voice.answerSpeech.onToken("Zero rails within 32 tiles around you. ");
+    made[0].onend();
+    const rec = made[1];
+    const cancelsBefore = synth.cancels();
+    // The engine offers "never" first, not final: one unknown word, so not a cut-in yet — and not consumed either.
+    rec.say([{ text: "never", final: false }]);
+    expect(synth.cancels()).toBe(cancelsBefore);
+    // It finalizes in place as "never mind": that's the player, the reading stops, and the words go out.
+    rec.results[rec.results.length - 1] = Object.assign([{ transcript: "never mind" }], { isFinal: true });
+    rec.onresult({ resultIndex: 0, results: rec.results });
+    expect(synth.cancels()).toBe(cancelsBefore + 1);
+    expect(voice.takeInterrupted()).toEqual({ during: "Zero rails within 32 tiles around you.", stopOnly: true });
+    await new Promise((r) => setTimeout(r, 120));
+    expect(said).toEqual(["how many rails are near me", "never mind"]);
+    voice.stopTalking({ send: false });
+  } finally {
+    voice.setBargeIn(false);
+    voice.readAloud.value = false;
+  }
+});
