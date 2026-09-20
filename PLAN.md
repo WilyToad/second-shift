@@ -659,6 +659,11 @@ companion back is called echo 34 times in 60 ("no, not from yumako processing"),
 is this") was eaten by word overlap — filed as FC-234, a code fix. The script stays as the yardstick for any
 later scorer: it must beat 652/687 on the same cases before it touches the console.
 
+*Closed the same evening (FC-242): the player is on a headset, where no echo exists, and decided that's the
+requirement — "if the user starts speaking, he's interrupting." The echo rule, the word lists and the scorer script
+are gone; any voice over him is the player. The numbers above stand as the record of why a text model was never the
+answer to a question that turned out not to need asking.*
+
 **S31's experiment, run (2026-09-18, the player's Chrome session, ten test sentences; 35 clips kept by the end of the night):** the two
 mechanisms were tested on both engines and the verdict is clean. **Chrome's online service refuses a phrase list
 outright** (`phrases-not-supported`, the moment recognition starts) — biasing is on-device only, as the explainer

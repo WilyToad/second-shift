@@ -73,7 +73,7 @@ export function takeInterrupted(): { during: string; stopOnly: boolean } | null 
   return it;
 }
 /** Only words that mean "stop": nothing to answer, but something to have been stopped by. */
-// One word over him that means "stop" (FC-217): the player said "nevermind" three times live and was ignored (FC-241).
+// Words that only mean "stop" (FC-241): a cut-in made of these has nothing in it to answer.
 const BARGE_WORDS = new Set(["stop", "wait", "hold", "no", "hang", "quiet", "shush", "ballast", "nevermind", "cancel", "enough", "skip", "forget", "pause", "hush"]);
 const STOP_ONLY = new Set([...BARGE_WORDS, "on", "okay", "ok", "that's", "thats", "it", "hey", "a", "sec", "second", "moment", "never", "mind", "that", "then"]);
 export function isStopOnly(text: string): boolean {
@@ -133,33 +133,11 @@ export function setBargeIn(on: boolean): void {
 export const spokenNow = signal<{ sentence: string; char: number } | null>(null);
 /** What the voice has said in the last minute, so the recognizer hearing it back isn't taken for the player. */
 const recentlySpoken: { text: string; at: number }[] = [];
-const ECHO_WINDOW_MS = 60_000;
-/** A single word that is never an echo: the player cutting in. */
-/** Words the player opens or closes a cut-in with; an echo repeats the sentence, it doesn't lead with one of these. */
-const CUT_IN_LEADS = new Set([...BARGE_WORDS, "what", "which", "why", "how", "when", "where", "who", "say", "sorry", "hey", "okay", "actually", "hmm"]);
-const CUT_IN_TAILS = new Set(["what", "which", "why", "how", "when", "where", "who", "again", "right"]);
-
 /**
- * Is this the companion's own voice coming back through the microphone (FC-217)? Most of its words are in what
- * was just spoken. A lone word is the player unless it's one he just said. The player quoting
- * him back — "no, not from yumako processing", "wait, me to queue that research?" — shares most of its words with
- * the echo but opens or closes with a word he didn't say (FC-234); an echo of a sentence that itself starts with
- * "what" still falls through to the overlap.
+ * A headset is required for hands-free (FC-242): the mic never hears his voice, so anyone speaking while he reads
+ * is the player. Speakers next to the mic would make him stop on his own echo; that's the player's setup to fix,
+ * and nothing here tries to tell the two voices apart.
  */
-export function looksLikeEcho(text: string, spoken: string[] = recentlySpoken.filter((s) => Date.now() - s.at < ECHO_WINDOW_MS).map((s) => s.text)): boolean {
-  const said = new Set(spoken.join(" ").toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean));
-  const heardWords = text.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
-  if (!heardWords.length) return true;
-  // A lone word is the player — on headphones there is no echo at all, and "nevermind" was dropped live for not
-  // being on a list — unless it's one of the words he just said and not a stop word (FC-241).
-  if (heardWords.length === 1) return said.has(heardWords[0]!) && !BARGE_WORDS.has(heardWords[0]!);
-  const first = heardWords[0]!;
-  if (CUT_IN_LEADS.has(first) && !said.has(first)) return false;
-  const tail = heardWords.slice(-2);
-  if (tail.some((w) => CUT_IN_TAILS.has(w) && !said.has(w))) return false;
-  const overlap = heardWords.filter((w) => said.has(w)).length / heardWords.length;
-  return overlap >= 0.6;
-}
 /**
  * Which engine turns the voice into text (FC-174). The browser's own service sends the audio off the machine;
  * on-device keeps it here. The player picks, because it's their tradeoff — before this, installing the on-device
@@ -212,8 +190,7 @@ export function describeError(code: string): string | null {
   }
 }
 
-type Run = { rec: Recognition; aborted: boolean; pending: () => string; markSent: () => void;
-  dropEcho: () => void; record: (sent: string) => HeardDetail };
+type Run = { rec: Recognition; aborted: boolean; pending: () => string; markSent: () => void; record: (sent: string) => HeardDetail };
 let active: Run | null = null;
 /**
  * Words heard by a recognition that has already ended, not yet sent (FC-183). The engine decides when a recognition
@@ -378,9 +355,7 @@ function listen(): void {
     // Everything heard and not yet sent: what earlier recognitions left behind, then this one's own words.
     pending: () => collapseRepeats([carried, textFrom(latest)].filter(Boolean).join(" ")),
     markSent: () => { sentUpTo = latest.length; carried = ""; },
-    // An echo is dropped only once it's final: an interim "never" marked as sent would swallow the final "never mind"
-    // that replaces it at the same index — which is how "nevermind" over him was ignored twice, live (FC-241).
-    dropEcho: () => { let n = latest.length; while (n > 0 && !latest[n - 1]!.isFinal) n--; sentUpTo = Math.max(sentUpTo, n); carried = ""; },
+
     record: (sent: string) => ({
       first: lastOffered[0] ?? sent, picked: sent, alternatives: lastOffered.length, offered: lastOffered,
       phrases: applied, where: recognizedWhere.value, carried: Boolean(carried),
@@ -399,10 +374,9 @@ function listen(): void {
       lastOffered = offered;
     }
     if (awaitingAnswer) {
-      // The answer is in progress (FC-217). His own voice coming back is dropped; anything else is the player
-      // cutting in: the reading stops and their words start the next question.
+      // The answer is in progress (FC-217): the player is cutting in — the reading stops and their words start the
+      // next question. Headset required (FC-242), so nothing here is his own voice.
       const text = run.pending();
-      if (isSpeaking() && looksLikeEcho(text)) { run.dropEcho(); heard.value = ""; return; }
       awaitingAnswer = false;
       // What he was saying when cut off goes with the words, so he can take it as an interruption (FC-241).
       interrupted = { during: spokenNow.value?.sentence ?? recentlySpoken.at(-1)?.text ?? "", stopOnly: isStopOnly(text) };
