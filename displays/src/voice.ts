@@ -65,6 +65,19 @@ export function setPhrases(list: string[], name = ""): void {
 export type HeardDetail = { first: string; picked: string; alternatives: number; offered: string[]; phrases: number; where: string; carried: boolean; browser?: string; localMs?: number };
 let detail: HeardDetail | null = null;
 export const heardDetail = (): HeardDetail | null => detail;
+/** Set when the player spoke over the answer (FC-217); taken by the next send so the companion knows (FC-241). */
+let interrupted: { during: string; stopOnly: boolean } | null = null;
+export function takeInterrupted(): { during: string; stopOnly: boolean } | null {
+  const it = interrupted;
+  interrupted = null;
+  return it;
+}
+/** Only words that mean "stop": nothing to answer, but something to have been stopped by. */
+const STOP_ONLY = new Set([...["stop", "wait", "hold", "no", "hang", "quiet", "shush", "ballast"], "on", "okay", "ok", "enough", "that's", "thats", "it", "hey", "a", "sec", "second", "moment"]);
+export function isStopOnly(text: string): boolean {
+  const words = text.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
+  return words.length > 0 && words.length <= 4 && words.every((w) => STOP_ONLY.has(w));
+}
 
 /** "Ballast Ballast Ballast…" forty times is an engine failure, not a sentence: three of the same word in a row become one (FC-209). */
 export function collapseRepeats(text: string): string {
@@ -384,6 +397,8 @@ function listen(): void {
       const text = run.pending();
       if (isSpeaking() && looksLikeEcho(text)) { run.markSent(); heard.value = ""; return; }
       awaitingAnswer = false;
+      // What he was saying when cut off goes with the words, so he can take it as an interruption (FC-241).
+      interrupted = { during: spokenNow.value?.sentence ?? recentlySpoken.at(-1)?.text ?? "", stopOnly: isStopOnly(text) };
       stopSpeaking();
       listenState.value = "listening";
     }

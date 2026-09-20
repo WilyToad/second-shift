@@ -1,3 +1,4 @@
+import type { Interrupted } from "@companion/interfaces";
 // The agent loop: retrieval + snapshot → model → tools → answer, with approvals for map changes.
 // Looks run immediately; map changes wait for the player to confirm a card in the web page.
 import { join } from "node:path";
@@ -11,7 +12,7 @@ import { describeRow, productionRow, type RowBuild } from "./blueprint-template"
 import { stageFor, stageLines, tookAThrowback } from "./stages";
 import { materialCorrections, nameCorrections } from "./names";
 import { actionClaims } from "./claims";
-import { turnNotes } from "./guidance";
+import { remarkDue, turnNotes } from "./guidance";
 import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, ASKS_FOR, askedFor, parseTarget, anchorFor, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 export { bareFollowUp, needsWorldTools, PICTURE, ASKS_FOR, askedFor, parseTarget, targetRate, anchorFor, SELECTED_PREFIX, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 import type { BlueprintCard } from "./messages";
@@ -59,7 +60,7 @@ export type TurnRecord = {
 
 const MAX_TOOL_ROUNDS = 3;
 export type TranscriptItem = { kind: "user" | "agent"; text: string };
-export type SessionData = { savedAt: string; history: ChatMessage[]; transcript: TranscriptItem[]; lists?: ListsData; throwbacks?: number };
+export type SessionData = { savedAt: string; history: ChatMessage[]; transcript: TranscriptItem[]; lists?: ListsData; throwbacks?: number; interruptions?: number; remarkedAt?: number };
 export type SessionStore = { load(): SessionData | null; save(data: SessionData): void; clear(): void };
 const MAX_TRANSCRIPT = 60;
 
@@ -349,6 +350,9 @@ export class Agent {
   private notes: string[] = [];
   /** Throwbacks to his own past already spent this conversation (FC-182): one, and never on an urgent turn. */
   private throwbacks = 0;
+  /** Times the player has spoken over an answer, and at which of them he last remarked on it (FC-241). */
+  private interruptions = 0;
+  private remarkedAt = 0;
 
   constructor(
     private readonly deps: {
@@ -382,6 +386,8 @@ export class Agent {
       this.shown.push(...saved.transcript);
       this.lists.load(saved.lists);
       this.throwbacks = saved.throwbacks ?? 0;
+      this.interruptions = saved.interruptions ?? 0;
+      this.remarkedAt = saved.remarkedAt ?? 0;
       this.showLists();
     }
   }
@@ -424,7 +430,7 @@ export class Agent {
   }
 
   private saveSession(): void {
-    this.session?.save({ savedAt: new Date(this.now()).toISOString(), history: this.history, transcript: this.shown.slice(-MAX_TRANSCRIPT), lists: this.lists.save(), throwbacks: this.throwbacks });
+    this.session?.save({ savedAt: new Date(this.now()).toISOString(), history: this.history, transcript: this.shown.slice(-MAX_TRANSCRIPT), lists: this.lists.save(), throwbacks: this.throwbacks, interruptions: this.interruptions, remarkedAt: this.remarkedAt });
   }
 
   private now(): number {
@@ -439,6 +445,8 @@ export class Agent {
     this.pending.clear();
     this.notes = [];
     this.throwbacks = 0; // a new conversation is a new shift
+    this.interruptions = 0;
+    this.remarkedAt = 0;
     // Lists are part of this conversation's state, so clearing it clears them (FC-163): a stale packing list
     // outliving the conversation it was made in confused both the answers and the evals.
     this.lists.clear();
@@ -446,8 +454,24 @@ export class Agent {
     this.deps.emit({ type: "reset" });
   }
 
-  async ask(rawQuestion: string, thinking = false, spoken = false): Promise<void> {
+  async ask(rawQuestion: string, thinking = false, spoken = false, interrupted?: Interrupted): Promise<void> {
     const started = performance.now();
+    // Spoken over the answer (FC-241): he may remark on it once in a few; a bare "stop" with no remark due is just
+    // that — the reading has stopped, nothing to answer, no model call.
+    let cutIn: { during: string; stopOnly: boolean; remark: boolean } | undefined;
+    if (interrupted) {
+      this.interruptions++;
+      const remark = remarkDue(this.interruptions, this.remarkedAt);
+      if (remark) this.remarkedAt = this.interruptions;
+      cutIn = { ...interrupted, remark };
+      if (interrupted.stopOnly && !remark) {
+        this.deps.emit({ type: "user", text: rawQuestion });
+        this.shown.push({ kind: "user", text: rawQuestion });
+        this.saveSession();
+        this.deps.emit({ type: "done", ttftMs: 0, totalMs: performance.now() - started });
+        return;
+      }
+    }
     // Pasted blueprint strings never reach the model: they become checked summaries.
     const pasted = summarizePasted(rawQuestion, this.deps.prototypes());
     const question = pasted.question;
@@ -550,6 +574,7 @@ export class Agent {
       stock: stockLines.length > 0, packing: Boolean(packing),
     });
     const notes = turnNotes({
+      interrupted: cutIn,
       question, plain, measured: Boolean(measuredLine), world, answeredFromData, around: Boolean(around), searchAgain, loot: lootNote(status, around), chart,
       carryOver: carryOver ? { label: carryOver.label, where: carryOver.where } : null, bare, start,
       playerLines: playerLines.length > 0, character: Boolean(status?.character), recipeLines: Boolean(found?.lines.length),

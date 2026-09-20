@@ -3,6 +3,10 @@
 // point is robustness rather than security — a bad message is dropped and logged instead of throwing mid-turn.
 import { z } from "zod";
 
+/** The player spoke over the answer being read aloud (FC-241): what he was saying, and whether they only said stop. */
+export const InterruptedSchema = z.object({ during: z.string().max(400), stopOnly: z.boolean() });
+export type Interrupted = z.infer<typeof InterruptedSchema>;
+
 const HeardSchema = z.object({
   first: z.string(),
   picked: z.string(),
@@ -20,7 +24,7 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("watch"), on: z.boolean() }),
   // `spoken` marks a question that came through speech recognition (FC-175); `heard` is its diagnostic record
   // (FC-185): logged, never put in the prompt.
-  z.object({ type: z.literal("ask"), text: z.string().max(8000), thinking: z.boolean().optional(), spoken: z.boolean().optional(), heard: HeardSchema.optional() }),
+  z.object({ type: z.literal("ask"), text: z.string().max(8000), thinking: z.boolean().optional(), spoken: z.boolean().optional(), heard: HeardSchema.optional(), interrupted: InterruptedSchema.optional() }),
   z.object({ type: z.literal("approve"), id: z.string().min(1).max(64) }),
   z.object({ type: z.literal("decline"), id: z.string().min(1).max(64) }),
   z.object({ type: z.literal("reset") }),

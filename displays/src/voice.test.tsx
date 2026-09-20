@@ -714,9 +714,12 @@ test("FC-217: with barge-in on, speaking over the answer stops it and starts the
     await new Promise((r) => setTimeout(r, 120));
     expect(said).toHaveLength(1);
     expect(synth.cancels()).toBe(cancelsBefore);
-    // The player cuts in: the reading stops and their words go out after the pause.
+    // The player cuts in: the reading stops and their words go out after the pause, marked as a cut-in with what
+    // he was saying (FC-241); taking the mark clears it.
     made[1].say([{ text: "how many chests are near me", final: true }], { append: true });
     expect(synth.cancels()).toBe(cancelsBefore + 1);
+    expect(voice.takeInterrupted()).toEqual({ during: "Zero rails within 32 tiles around you.", stopOnly: false });
+    expect(voice.takeInterrupted()).toBeNull();
     await new Promise((r) => setTimeout(r, 120));
     expect(said).toEqual(["how many rails are near me", "how many chests are near me"]);
     voice.stopTalking({ send: false });
@@ -749,4 +752,11 @@ test("FC-216: the sentence and word being spoken are found in the answer's text"
   expect(markSpoken(text, { sentence: "Zero rails within 32 tiles of you.", char: -1 }).find((m) => m.mark === "sentence")?.text).toBe("Zero rails within 32 tiles of you.");
   expect(markSpoken(text, { sentence: "Something from another answer.", char: 0 })).toEqual([{ text, mark: null }]);
   expect(markSpoken(text, null)).toEqual([{ text, mark: null }]);
+});
+
+
+test("FC-241: only stop words count as a bare stop", async () => {
+  const { isStopOnly } = await import("./voice");
+  for (const t of ["stop", "No, stop.", "wait", "hold on", "okay stop", "hang on a sec", "Ballast, stop"]) expect(isStopOnly(t)).toBe(true);
+  for (const t of ["no, which one?", "stop, what do you mean", "wait, how many?", ""]) expect(isStopOnly(t)).toBe(false);
 });

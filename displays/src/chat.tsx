@@ -6,7 +6,7 @@ import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 import { setSoundsOn, soundsOn } from "./sounds";
 import { capturing, captureError, clipCount, lastClip, lastLocal, localStt, probeStt, sayTruth, setCapturing, setLocalStt, sttStatus } from "./capture";
-import { bargeIn, markSpoken, setBargeIn, spokenNow, phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
+import { bargeIn, markSpoken, setBargeIn, spokenNow, takeInterrupted, phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
 
 const SILENCE_CHOICES = [1, 1.5, 2, 3, 4, 5];
 
@@ -19,6 +19,8 @@ export function Emphasis({ text }: { text: string }) {
 }
 
 /** The answer's prose with the sentence and word being read aloud marked (FC-216); plain when nothing is. */
+const interruptedField = () => { const it = takeInterrupted(); return it ? { interrupted: it } : {}; };
+
 function SpokenText({ text }: { text: string }) {
   const marked = markSpoken(text, spokenNow.value);
   if (marked.length === 1 && !marked[0]!.mark) return <Emphasis text={text} />;
@@ -145,7 +147,7 @@ export function TruthRow({ heard }: { heard: string }) {
   );
 }
 
-export function Composer({ onAsk = (text: string, thinking: boolean, spoken = false) => send({ type: "ask", text, thinking, ...(spoken ? { spoken: true, ...(heardDetail() ? { heard: heardDetail()! } : {}) } : {}) }), recognition = recognitionCtor() }: { onAsk?: (text: string, thinking: boolean, spoken?: boolean) => void; recognition?: ReturnType<typeof recognitionCtor> } = {}) {
+export function Composer({ onAsk = (text: string, thinking: boolean, spoken = false) => send({ type: "ask", text, thinking, ...(spoken ? { spoken: true, ...(heardDetail() ? { heard: heardDetail()! } : {}), ...interruptedField() } : {}) }), recognition = recognitionCtor() }: { onAsk?: (text: string, thinking: boolean, spoken?: boolean) => void; recognition?: ReturnType<typeof recognitionCtor> } = {}) {
   const text = useSignal("");
   const thinking = useSignal(false);
   const submit = () => {

@@ -5,8 +5,14 @@
 // A pure function of what the turn found: nothing in here looks anything up, which is what makes it testable
 // against a corpus of real questions (FC-199).
 
+/** He may remark on being cut off once in this many interruptions; the rest pass without comment (FC-241). */
+export const REMARK_EVERY = 3;
+export const remarkDue = (interruptions: number, remarkedAt: number): boolean => interruptions - remarkedAt >= REMARK_EVERY;
+
 export type TurnFacts = {
   question: string;
+  /** The player spoke over the answer being read (FC-241): what he was on, whether they only said stop, and whether a remark is his to make this time. */
+  interrupted?: { during: string; stopOnly: boolean; remark: boolean };
   /** Flat register: the player is about to act on this (FC-179). */
   plain: boolean;
   /** A measured line is in the turn: the machines' own craft counts (FC-162). */
@@ -49,8 +55,17 @@ export type TurnFacts = {
   referenceWord: string;
 };
 
+function interruptionNote(f: TurnFacts): string {
+  const it = f.interrupted;
+  if (!it) return "";
+  const on = it.during ? ` while you were saying "${it.during}"` : " while you were reading your answer";
+  if (it.stopOnly) return `the player cut you off${on} with just "${f.question}": one short line about being stopped, in character, then wait; nothing about what you were saying`;
+  return `the player cut in${on} and said this instead: answer it, and don't resume or restate what you were saying${it.remark ? "; you were mid-thought, so one dry line about being cut off first is yours to take, or not" : ""}`;
+}
+
 export function turnNotes(f: TurnFacts): string[] {
   return [
+    interruptionNote(f),
     // Was "say this one flat: …", which the model echoed as a heading ("Numbers, flat:") — the player heard it (FC-212).
     f.plain ? "keep this answer plain and don't announce that you're doing so: only the facts, the numbers, or what to confirm; no aside, no remark, nothing about yourself, the ship or the manifest" : "",
     f.world || !f.answeredFromData ? "" : "no tool call is needed",

@@ -244,7 +244,8 @@ const server = Bun.serve({
           console.log(`Heard (${h.where}, ${h.alternatives} alternative${h.alternatives === 1 ? "" : "s"}, ${h.phrases} phrase${h.phrases === 1 ? "" : "s"}${h.carried ? ", carried across a restart" : ""}${h.localMs !== undefined ? `, ${h.localMs} ms` : ""}): "${h.picked}"${h.browser !== undefined && h.browser !== h.picked ? ` — browser heard "${h.browser}"` : h.first !== h.picked ? ` — engine's first guess was "${h.first}"` : ""}${others.length ? ` · also offered: ${others.map((t) => `"${t}"`).join(", ")}` : ""}`);
         }
         try {
-          await agent.ask(msg.text.trim(), msg.thinking ?? false, msg.spoken === true);
+          if (msg.interrupted) console.log(`Cut in${msg.interrupted.stopOnly ? " (stop only)" : ""} while reading: "${msg.interrupted.during}"`);
+          await agent.ask(msg.text.trim(), msg.thinking ?? false, msg.spoken === true, msg.interrupted);
         } finally {
           asking--;
         }
