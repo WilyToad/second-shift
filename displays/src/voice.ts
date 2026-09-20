@@ -416,7 +416,9 @@ function listen(): void {
     if (run.aborted || !current()) return;
     carried = run.pending();
     active = null;
-    if (session && !awaitingAnswer) listen();
+    // With barge-in the answer is exactly when the mic must stay open: the on-device engine ends recognition right
+    // after every sent question, and the first live try found nobody listening while he read (FC-217).
+    if (session && (!awaitingAnswer || bargeIn.value)) listen();
   };
   active = run;
   heard.value = carried; // a restart mid-sentence keeps what the player already said on screen

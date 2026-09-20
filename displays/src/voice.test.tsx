@@ -704,14 +704,18 @@ test("FC-217: with barge-in on, speaking over the answer stops it and starts the
     voice.answerSpeech.onQuestion(); // the store does this when the question echoes back
     voice.answerSpeech.onToken("Zero rails within 32 tiles around you. ");
     expect(synth.spoken).toEqual(["Zero rails within 32 tiles around you."]);
+    // The engine ends recognition on its own right after the question (the on-device one always does): with
+    // barge-in a new one starts at once, so the mic is open while he reads. The first live try found it wasn't.
+    made[0].onend();
+    expect(made).toHaveLength(2);
     // His own voice comes back through the mic: dropped, nothing sent, nothing cancelled.
     const cancelsBefore = synth.cancels(); // onQuestion cancels any earlier speech; count from here
-    made[0].say([{ text: "zero rails within 32 tiles around you", final: true }], { append: true });
+    made[1].say([{ text: "zero rails within 32 tiles around you", final: true }]);
     await new Promise((r) => setTimeout(r, 120));
     expect(said).toHaveLength(1);
     expect(synth.cancels()).toBe(cancelsBefore);
     // The player cuts in: the reading stops and their words go out after the pause.
-    made[0].say([{ text: "how many chests are near me", final: true }], { append: true });
+    made[1].say([{ text: "how many chests are near me", final: true }], { append: true });
     expect(synth.cancels()).toBe(cancelsBefore + 1);
     await new Promise((r) => setTimeout(r, 120));
     expect(said).toEqual(["how many rails are near me", "how many chests are near me"]);
