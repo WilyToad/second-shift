@@ -468,6 +468,9 @@ function armSend(): void {
       const chosen = local?.text ?? text;
       detail = { ...run.record(chosen), ...(local ? { where: `local ${local.engine}`, browser: text, localMs: Math.round(local.ms) } : {}) };
       run.markSent();
+      // Whether the cut-in was only a stop is judged on what actually goes out, not on the first provisional word:
+      // "Okay, I get it." was flagged stop-only from its "Okay" (live, FC-241).
+      if (interrupted) interrupted = { ...interrupted, stopOnly: isStopOnly(chosen) };
       send(chosen);
     })();
   }, silenceSeconds.value * 1000);
