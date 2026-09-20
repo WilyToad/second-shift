@@ -663,6 +663,8 @@ test("FC-217: the companion's own voice coming back is an echo; the player cutti
   expect(looksLikeEcho("stop", spoken)).toBe(false);
   expect(looksLikeEcho("Ballast", spoken)).toBe(false);
   expect(looksLikeEcho("", spoken)).toBe(true);
+  // "nevermind" said three times over him, live, and ignored (FC-241).
+  for (const w of ["nevermind", "never mind", "cancel", "forget it", "enough"]) expect(looksLikeEcho(w, spoken)).toBe(false);
 });
 
 test("FC-234: the player quoting him back is the player, not an echo", async () => {
@@ -757,6 +759,6 @@ test("FC-216: the sentence and word being spoken are found in the answer's text"
 
 test("FC-241: only stop words count as a bare stop", async () => {
   const { isStopOnly } = await import("./voice");
-  for (const t of ["stop", "No, stop.", "wait", "hold on", "okay stop", "hang on a sec", "Ballast, stop"]) expect(isStopOnly(t)).toBe(true);
+  for (const t of ["stop", "No, stop.", "wait", "hold on", "okay stop", "hang on a sec", "Ballast, stop", "nevermind", "never mind", "forget it", "okay, enough"]) expect(isStopOnly(t)).toBe(true);
   for (const t of ["no, which one?", "stop, what do you mean", "wait, how many?", ""]) expect(isStopOnly(t)).toBe(false);
 });

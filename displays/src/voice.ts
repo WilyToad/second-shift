@@ -73,7 +73,9 @@ export function takeInterrupted(): { during: string; stopOnly: boolean } | null 
   return it;
 }
 /** Only words that mean "stop": nothing to answer, but something to have been stopped by. */
-const STOP_ONLY = new Set([...["stop", "wait", "hold", "no", "hang", "quiet", "shush", "ballast"], "on", "okay", "ok", "enough", "that's", "thats", "it", "hey", "a", "sec", "second", "moment"]);
+// One word over him that means "stop" (FC-217): the player said "nevermind" three times live and was ignored (FC-241).
+const BARGE_WORDS = new Set(["stop", "wait", "hold", "no", "hang", "quiet", "shush", "ballast", "nevermind", "cancel", "enough", "skip", "forget", "pause", "hush"]);
+const STOP_ONLY = new Set([...BARGE_WORDS, "on", "okay", "ok", "that's", "thats", "it", "hey", "a", "sec", "second", "moment", "never", "mind", "that", "then"]);
 export function isStopOnly(text: string): boolean {
   const words = text.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
   return words.length > 0 && words.length <= 4 && words.every((w) => STOP_ONLY.has(w));
@@ -133,7 +135,6 @@ export const spokenNow = signal<{ sentence: string; char: number } | null>(null)
 const recentlySpoken: { text: string; at: number }[] = [];
 const ECHO_WINDOW_MS = 60_000;
 /** A single word that is never an echo: the player cutting in. */
-const BARGE_WORDS = new Set(["stop", "wait", "hold", "no", "hang", "quiet", "shush", "ballast"]);
 /** Words the player opens or closes a cut-in with; an echo repeats the sentence, it doesn't lead with one of these. */
 const CUT_IN_LEADS = new Set([...BARGE_WORDS, "what", "which", "why", "how", "when", "where", "who", "say", "sorry", "hey", "okay", "actually", "hmm"]);
 const CUT_IN_TAILS = new Set(["what", "which", "why", "how", "when", "where", "who", "again", "right"]);
