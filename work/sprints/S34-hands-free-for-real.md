@@ -42,7 +42,7 @@
   - Notes: seen live 2026-09-19 (VERIFY row 21): the answer to "send the spidertron to the nearest roboport" was read to the end but the mark stayed on "The card is up — confirm or cancel it in the app." The ElevenLabs player only marked a sentence when it was queued while nothing played, and never moved or cleared it.
   - Done: `ElevenPlayer` reports `onPlay(text)` as each sentence's audio starts and `onIdle` when the queue runs dry; the mark moves with the first and clears with the second. Unit test on the player.
   - Acceptance: with an ElevenLabs voice, the marked sentence advances with the audio and no mark is left once the answer has been read.
-- [ ] FC-232 whisper-server's first call after idling is slow
+- [~] FC-232 whisper-server's first call after idling is slow
   - Notes: live 2026-09-19: the first `/stt` call after a 30-minute idle took 666 ms (356 ms after startup; 130 ms otherwise) — under the 700 ms wait but 34 ms from the browser's text being sent instead. The model is paged back in on the first request.
   - Acceptance: measured first call after a 30-minute idle under 300 ms (a periodic short no-op transcription, or the wait raised with the reason written down); `scripts/test-stt.ts` unchanged.
 

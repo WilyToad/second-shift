@@ -5,7 +5,9 @@
 //
 // Absent without complaint: if whisper.cpp or the model isn't installed, `available()` says why and the console
 // keeps using the browser's transcript, exactly as before.
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 export const STT_PORT = Number(process.env.WHISPER_PORT) || 8890;
 const MODEL_DIR = `${process.env.HOME}/.cache/whisper`;
@@ -37,9 +39,34 @@ export const QUIET = 0.003;
 
 export type Transcript = { text: string; ms: number; engine: "whisper.cpp" } | { text: ""; ms: number; engine: "whisper.cpp"; gated: "quiet" | "no-speech" | "invented" };
 
+/** How long whisper-server may sit idle before a warm-up clip goes through it (FC-232). */
+export const KEEP_WARM_MS = 3 * 60_000;
+
+/**
+ * A short clip of the Mac's own voice, made once with `say`, for keeping the model paged in (FC-232). Nothing the
+ * player said is reused for this. Null where `say` isn't available.
+ */
+export function warmupClip(): Uint8Array | null {
+  const dir = mkdtempSync(join(tmpdir(), "second-shift-warm-"));
+  const path = join(dir, "warm.wav");
+  try {
+    const r = Bun.spawnSync(["say", "-o", path, "--file-format=WAVE", "--data-format=LEI16@16000", "keeping the transcriber warm"]);
+    if (r.exitCode !== 0 || !existsSync(path)) return null;
+    const bytes = new Uint8Array(readFileSync(path));
+    return bytes.length > 44 ? bytes : null;
+  } catch {
+    return null;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 export class WhisperService {
   private proc: ReturnType<typeof Bun.spawn> | null = null;
   private ready = false;
+  private lastCall = 0;
+  private warm: Uint8Array | null = null;
+  private warmTimer: ReturnType<typeof setInterval> | null = null;
   private starting: Promise<void> | null = null;
   private failures = 0;
   private stopped = false;
@@ -61,8 +88,47 @@ export class WhisperService {
   /** Brings the server up if it can, once; later calls wait on the same start. */
   start(): Promise<void> {
     if (this.starting) return this.starting;
-    this.starting = this.spawn();
+    this.starting = this.spawn().then(() => this.keepWarm());
     return this.starting;
+  }
+
+  /**
+   * The first call after the model has sat idle runs the whole model back in: 356 ms after startup, 526 ms after
+   * 17 minutes, 666 ms after 30 — against ~130 ms warm, and a 700 ms wait after which the browser's text goes
+   * instead (FC-232). A short clip through it every few idle minutes keeps it at ~130 ms.
+   */
+  private keepWarm(): void {
+    if (!this.ready || this.warmTimer) return;
+    this.warm ??= warmupClip();
+    if (!this.warm) { this.log("Local transcription: no warm-up clip (`say` unavailable); the first call after idling will be slow."); return; }
+    const warm = this.warm;
+    const tick = async () => {
+      if (!this.ready || Date.now() - this.lastCall < KEEP_WARM_MS) return;
+      const started = performance.now();
+      await this.post(warm);
+      const ms = performance.now() - started;
+      this.lastCall = Date.now();
+      if (ms > 300) this.log(`Local transcription warm-up took ${ms.toFixed(0)} ms.`);
+    };
+    this.warmTimer = setInterval(() => void tick(), KEEP_WARM_MS);
+    this.warmTimer.unref?.();
+    void tick();
+    this.log(`Local transcription kept warm every ${KEEP_WARM_MS / 60_000} idle minutes.`);
+  }
+
+  private async post(wav: Uint8Array, prompt?: string): Promise<{ text?: string } | null> {
+    const form = new FormData();
+    form.append("file", new Blob([wav as unknown as BlobPart], { type: "audio/wav" }), "clip.wav");
+    form.append("response_format", "json");
+    form.append("temperature", "0");
+    if (prompt) form.append("prompt", prompt);
+    try {
+      const res = await fetch(`http://127.0.0.1:${STT_PORT}/inference`, { method: "POST", body: form });
+      if (!res.ok) return null;
+      return (await res.json().catch(() => ({}))) as { text?: string };
+    } catch {
+      return null;
+    }
   }
 
   private async spawn(): Promise<void> {
@@ -98,6 +164,7 @@ export class WhisperService {
 
   stop(): void {
     this.stopped = true;
+    if (this.warmTimer) { clearInterval(this.warmTimer); this.warmTimer = null; }
     this.proc?.kill();
     this.proc = null;
     this.ready = false;
@@ -108,22 +175,13 @@ export class WhisperService {
     if (!this.ready) return null;
     const started = performance.now();
     if (loudness(wav) < QUIET) return { text: "", ms: performance.now() - started, engine: "whisper.cpp", gated: "quiet" };
-    const form = new FormData();
-    form.append("file", new Blob([wav as unknown as BlobPart], { type: "audio/wav" }), "clip.wav");
-    form.append("response_format", "json");
-    form.append("temperature", "0");
-    if (prompt) form.append("prompt", prompt);
-    try {
-      const res = await fetch(`http://127.0.0.1:${STT_PORT}/inference`, { method: "POST", body: form });
-      if (!res.ok) return null;
-      const json = (await res.json().catch(() => ({}))) as { text?: string };
-      const text = (json.text ?? "").trim();
-      const ms = performance.now() - started;
-      if (!text) return { text: "", ms, engine: "whisper.cpp", gated: "no-speech" };
-      if (looksInvented(text)) return { text: "", ms, engine: "whisper.cpp", gated: "invented" };
-      return { text, ms, engine: "whisper.cpp" };
-    } catch {
-      return null;
-    }
+    this.lastCall = Date.now();
+    const json = await this.post(wav, prompt);
+    if (!json) return null;
+    const text = (json.text ?? "").trim();
+    const ms = performance.now() - started;
+    if (!text) return { text: "", ms, engine: "whisper.cpp", gated: "no-speech" };
+    if (looksInvented(text)) return { text: "", ms, engine: "whisper.cpp", gated: "invented" };
+    return { text, ms, engine: "whisper.cpp" };
   }
 }

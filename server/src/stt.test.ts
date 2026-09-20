@@ -34,3 +34,15 @@ test("FC-230: the save's names are put back the way the save spells them", () =>
   expect(normalizeNames("Whereas the spider charm", phrases)).toBe("Whereas the spider charm");
   expect(normalizeNames("the iron plant is busy", [...phrases, "iron plate"])).toBe("the iron plant is busy");
 });
+
+test("FC-232: the warm-up clip is the Mac's own voice as a 16 kHz WAV with speech in it, nothing of the player's", async () => {
+  const { warmupClip, loudness, QUIET } = await import("./stt");
+  const clip = warmupClip();
+  if (!clip) return; // no `say` on this machine
+  expect(String.fromCharCode(...clip.slice(0, 4))).toBe("RIFF");
+  expect(String.fromCharCode(...clip.slice(8, 12))).toBe("WAVE");
+  const view = new DataView(clip.buffer, clip.byteOffset);
+  expect(view.getUint32(24, true)).toBe(16000);
+  expect(view.getUint16(22, true)).toBe(1);
+  expect(loudness(clip)).toBeGreaterThan(QUIET);
+});
