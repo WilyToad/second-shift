@@ -106,7 +106,7 @@ export function turnNotes(f: TurnFacts): string[] {
     f.packing && f.aboutList ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",
     // Asked "do you ever miss flying?", it answered and then added "The list is 0 of 4 done: 1 of 20 furnace…" — the
     // list rides in every turn so it can answer list questions, not so it can report on it unasked (FC-219).
-    f.listActive && !f.aboutList ? "the player's list isn't in this turn: don't mention the list or its progress unless the question is about it" : "",
+    f.listActive && !f.aboutList ? "the player's list isn't in this turn: nothing about the list, the build it's for, what's short or what's in reach — the question isn't about it, and a line about it on the end gets cut" : "",
     // Asked for a real rate with the measurement in the lines, it answered about idle labs from the diagnosis hint
     // instead — "lead with the root cause" outranked the thing they asked (FC-223, the player's session 2026-09-18).
     f.measured ? "the measured line answers a rate question: quote its per-minute numbers and machine counts first and say they were measured from the machines' own craft counts, not estimated; any diagnosis hint comes after, in one clause at most" : "",

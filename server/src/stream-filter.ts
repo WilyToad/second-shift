@@ -218,4 +218,6 @@ export const LIST_REPORT = [
   /what'?s (on your plate|left on the list|still short)/i,
   /\b(still|remain|remaining) (short|unaccounted|missing|outstanding)\b/i,
   /\bunaccounted\b/i,
+  /\b(in reach|nearby stock|still 0)\b/i,
+  /\bback to the (outpost|list|build)\b/i,
 ];

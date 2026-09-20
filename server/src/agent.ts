@@ -16,7 +16,7 @@ import { remarkDue, turnNotes } from "./guidance";
 import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, ASKS_FOR, askedFor, parseTarget, anchorFor, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 export { bareFollowUp, needsWorldTools, PICTURE, ASKS_FOR, askedFor, parseTarget, targetRate, anchorFor, SELECTED_PREFIX, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 import type { BlueprintCard } from "./messages";
-import { HiddenBlockFilter, RepeatFilter, stripChartBlocks } from "./stream-filter";
+import { HiddenBlockFilter, LIST_REPORT, RepeatFilter, TailCutFilter, stripChartBlocks } from "./stream-filter";
 import { pruneShots, waitForShot } from "./screenshots";
 import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
 import type { Snapshot } from "./game";
@@ -53,6 +53,8 @@ export type TurnRecord = {
   corrected?: number;
   /** The answer started over and was cut to one copy (FC-130). */
   repeated?: boolean;
+  /** A list report was cut off the end (FC-219). */
+  listCut?: boolean;
   /** Tool calls dropped because the player didn't ask for them (FC-126). */
   dropped?: number;
   totalMs: number;
@@ -669,8 +671,11 @@ export class Agent {
           ttftMs ??= performance.now() - started;
           this.deps.emit({ type: "token", text });
         };
-        // An answer that starts over is cut to one copy and the stream stopped (FC-130).
+        // An answer that starts over is cut to one copy and the stream stopped (FC-130). With a list up and a question
+        // that isn't about it, a paragraph reporting the list is cut the same way (FC-219).
         const repeat = new RepeatFilter();
+        const tailCut = this.lists.all().length > 0 && !aboutList ? new TailCutFilter(LIST_REPORT) : null;
+        const pass = (text: string) => (tailCut ? tailCut.push(text) : text);
         const stop = new AbortController();
         const roundStarted = performance.now();
         let result: StreamResult;
@@ -680,18 +685,19 @@ export class Agent {
             tools,
             signal: stop.signal,
             onToken: (text) => {
-              show(repeat.push(filter.push(text)));
-              if (repeat.repeated && !stop.signal.aborted) stop.abort();
+              show(repeat.push(pass(filter.push(text))));
+              if ((repeat.repeated || tailCut?.cut) && !stop.signal.aborted) stop.abort();
             },
           });
         } catch (e) {
-          if (!repeat.repeated) throw e;
+          if (!repeat.repeated && !tailCut?.cut) throw e;
           result = { text: repeat.text(), toolCalls: [], totalMs: performance.now() - roundStarted };
         }
-        if (!repeat.repeated) show(repeat.push(filter.end()));
+        if (!repeat.repeated && !tailCut?.cut) show(repeat.push(pass(filter.end()) + (tailCut?.end() ?? "")));
         show(repeat.end());
-        if (repeat.repeated) {
-          record.repeated = true;
+        if (repeat.repeated || tailCut?.cut) {
+          if (repeat.repeated) record.repeated = true;
+          if (tailCut?.cut) { record.listCut = true; this.deps.log?.("Cut a list report off the end of an answer that wasn't about the list (FC-219)."); }
           result = { ...result, text: repeat.text(), toolCalls: [] };
         }
         record.rounds.push({
