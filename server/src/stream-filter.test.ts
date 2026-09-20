@@ -80,3 +80,17 @@ test("FC-226: a bare HTML tag on its own line, or trailing the answer, never rea
   expect(streamed(["Use `<br>` for a line break."])).toBe("Use `<br>` for a line break.");
   expect(streamed(["The pipe <-> the tank"])).toBe("The pipe <-> the tank");
 });
+
+test("FC-219: a later paragraph that reports the list is cut with everything after it; the first paragraph always streams", async () => {
+  const { TailCutFilter, LIST_REPORT } = await import("./stream-filter");
+  const run = (pieces: string[]) => { const f = new TailCutFilter(LIST_REPORT); let out = ""; for (const p of pieces) out += f.push(p); out += f.end(); return { out, cut: f.cut, text: f.text() }; };
+  // The live answer, token by token.
+  const live = "I don't dwell on it. There's a hauler in a crater.\n\nWhat's on your plate: 200 belts, 16 assembling machine 1 still short, and no free bots.".match(/.{1,7}/gs)!;
+  expect(run(live)).toEqual({ out: "I don't dwell on it. There's a hauler in a crater.\n\n", cut: true, text: "I don't dwell on it. There's a hauler in a crater." });
+  expect(run(["The manifest is what I miss.\n\nPacking list is 3 of 11 ticked; foundries still unaccounted."]).cut).toBe(true);
+  // An innocent second paragraph is released once its first sentence is in, and the rest streams.
+  const fine = run(["No rails near you.\n\nThe nearest ", "patch is west", ". Want it marked?"]);
+  expect(fine).toEqual({ out: "No rails near you.\n\nThe nearest patch is west. Want it marked?", cut: false, text: "No rails near you.\n\nThe nearest patch is west. Want it marked?" });
+  // A first paragraph that mentions the list is the answer itself and is never cut.
+  expect(run(["The list is 3 of 11 done."]).cut).toBe(false);
+});

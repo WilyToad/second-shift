@@ -148,3 +148,74 @@ export class RepeatFilter {
     return this.emitted.trimEnd();
   }
 }
+
+/**
+ * Cuts the tail of an answer at a paragraph that shouldn't be there (FC-219): with a list up and a question that
+ * isn't about it, the model kept ending answers with the list's progress — "What's on your plate: 200 belts…" —
+ * whatever the notes said, because the previous turn's answer had it. The first paragraph always streams; each
+ * later one is held until its first sentence (or `peek` characters) is in, judged against the patterns, and either
+ * released or dropped with everything after it.
+ */
+export class TailCutFilter {
+  private emitted = "";
+  private held = "";
+  private paragraphs = 0;
+  private judging = false;
+  cut = false;
+
+  constructor(private readonly patterns: RegExp[], private readonly peek = 120) {}
+
+  private offends(text: string): boolean {
+    return this.patterns.some((p) => p.test(text));
+  }
+
+  /** Text that is safe to show now. */
+  push(text: string): string {
+    if (this.cut || !text) return "";
+    this.held += text;
+    let out = "";
+    for (;;) {
+      if (!this.judging) {
+        const gap = this.held.search(/\n\s*\n/);
+        if (gap < 0) { out += this.held; this.held = ""; break; }
+        const boundary = gap + this.held.slice(gap).match(/\n\s*\n/)![0].length;
+        out += this.held.slice(0, boundary);
+        this.held = this.held.slice(boundary);
+        this.paragraphs++;
+        this.judging = true;
+      }
+      // A paragraph under judgement: wait for its first sentence or enough of it to know.
+      const sentenceEnd = this.held.search(/[.!?:](\s|$)/);
+      if (sentenceEnd < 0 && this.held.length < this.peek) break;
+      const seen = sentenceEnd >= 0 ? this.held.slice(0, sentenceEnd + 1) : this.held;
+      if (this.offends(seen)) { this.cut = true; this.held = ""; break; }
+      this.judging = false; // released: the rest of this paragraph streams as it comes
+    }
+    this.emitted += out;
+    return out;
+  }
+
+  /** What's left when the answer ends: a held paragraph start that never offended. */
+  end(): string {
+    if (this.cut) return "";
+    const rest = this.offends(this.held) ? "" : this.held;
+    if (!rest && this.held) this.cut = true;
+    this.emitted += rest;
+    this.held = "";
+    return rest;
+  }
+
+  /** Everything shown so far. */
+  text(): string {
+    return this.emitted.trimEnd();
+  }
+}
+
+/** A paragraph that reports the player's list when the question wasn't about it (FC-219). */
+export const LIST_REPORT = [
+  /\b\d+ of \d+ (ticked|done|checked)\b/i,
+  /\b(packing )?list\b.*\b(ticked|done|short|unaccounted|missing|left)\b/i,
+  /what'?s (on your plate|left on the list|still short)/i,
+  /\b(still|remain|remaining) (short|unaccounted|missing|outstanding)\b/i,
+  /\bunaccounted\b/i,
+];
