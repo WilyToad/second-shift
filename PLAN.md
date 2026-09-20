@@ -563,6 +563,38 @@ The caveats stand: one voice, one evening, 23 of 24 truths from the log rather t
 lesson that a single run is not a measurement — the next session's clips re-run through the same harness are the
 check.
 
+**Splash + Qwen3.8-27B against oMLX + Flash-Next, on our own evals (FC-237, 2026-09-19):** the player's engine
+report (`~/projects/omlx/reports/2026-09-19-omlx-vs-splash.md`) tied the two on MMLU-Pro and measured Splash faster at
+everything interactive — on the 27B on both engines, at a 32k prefix. Our shape is different (a ~4k cached prefix and a
+~0.2–1.4k uncached tail), our model on oMLX is Flash-Next, and MMLU-Pro doesn't cover tool guards, the register or the
+corrections layer, so the same evals ran on both through the server, game closed, one engine at a time (oMLX stopped
+with the player's `omlx stop`). The engine is a config value now (`COMPANION_MODEL_URL`, `COMPANION_MODEL`), and
+Splash needed one adapter: it ignores `chat_template_kwargs.enable_thinking` (and every other spelling tried — top-level
+`enable_thinking`, `reasoning`, `thinking`, `/no_think`, an empty think block) and reads only `reasoning_effort: "none"`;
+the client sends whichever the engine reads. Tool calls stream in the OpenAI shape (6 parts, correct call), the prefix
+cache reports `cached_tokens` (3,648 of 3,668 on a repeat, 3.9 s → 0.14 s), and `reasoning_content` stays out of
+`content`.
+
+| same 19 eval turns, game closed | oMLX + Flash-Next | Splash + Qwen3.8-27B |
+|---|---|---|
+| eval-grounding | 10/10 | 9/10 — the miss is the checker's: "Six steel plates, ten copper cables, twelve holmium plates" is the right recipe spelled out, and the check wants `6 steel-plate` |
+| eval-ratios | 8/8 | 8/8 |
+| visible first token, median | **1.27 s** (0.91–1.54; one tool turn 2.51) | **1.09 s** (0.39–1.83) |
+| first token vs uncached tail | ≈ 0.55 s + 0.7 ms/token | ≈ 0.2 s + 1.2 ms/token — faster under ~1,000 uncached tokens, slower above |
+| fully cached turn (5 uncached tokens) | — (none in the run) | **0.15 s** |
+| decode through the server, median | 58 tok/s (33–89) | 66 tok/s (60–124) |
+| unasked tool calls dropped by the guard | 9 in 20 turns | 0 in 19 |
+| resident footprint | 69.5 GB (Flash-Next) | **8.6 GB** engine process (17 GB pack) |
+
+**What that says.** Quality is level on what we check, and the 27B made no unasked tool calls where Flash-Next made nine
+(all dropped by `ASKS_FOR`, so the player never saw them; still, a model that doesn't reach is easier to keep honest).
+Splash's advantage is at the short end — a 0.15 s first token when the tail is already cached is the "instant" the
+report promised — and its prefill of the uncached tail is slower per token than Flash-Next's, so long planning questions
+come out about even. The 60 GB of memory it hands back is the biggest single number in the table. Not measured yet: the
+game-side set — `eval-requests`, `eval-register`, `eval-voice-session`, `e2e-spidertron`, `e2e-packing`,
+`e2e-train-stops` — which is where tool guards, the register and the corrections layer are actually exercised; the
+verdict waits on those (FC-237). `server ttft` is blank on Splash: that column reads an oMLX-only usage field.
+
 **Jev-style option scoring, measured (FC-233, 2026-09-19):** the player's second research pass found open MLX
 implementations of the technique behind Jev (one prefill, every option scored from its logits; §8 item 5 "Second
 look"), so the spike PLAN asked for ran on the one judgement in the app that is a real two-way choice with a hard

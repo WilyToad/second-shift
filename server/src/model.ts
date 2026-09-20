@@ -48,7 +48,12 @@ export async function* sseData(body: ReadableStream<Uint8Array>): AsyncGenerator
 }
 
 export class OmlxClient implements ChatModel {
-  constructor(private readonly opts: { baseUrl: string; apiKey: string; model: string }) {}
+  /**
+   * `thinkingSwitch`: how the engine is told to skip reasoning on quick lookups. oMLX reads Qwen's
+   * `chat_template_kwargs.enable_thinking`; Splash ignores that and reads `reasoning_effort: "none"` (FC-237, measured:
+   * every other spelling left it reasoning through the whole token budget).
+   */
+  constructor(private readonly opts: { baseUrl: string; apiKey: string; model: string; thinkingSwitch?: "chat_template_kwargs" | "reasoning_effort" }) {}
 
   async stream(
     messages: ChatMessage[],
@@ -66,7 +71,7 @@ export class OmlxClient implements ChatModel {
         stream_options: { include_usage: true },
         max_tokens: maxTokens,
         ...(tools?.length ? { tools } : {}),
-        chat_template_kwargs: { enable_thinking: thinking },
+        ...(this.opts.thinkingSwitch === "reasoning_effort" ? (thinking ? {} : { reasoning_effort: "none" }) : { chat_template_kwargs: { enable_thinking: thinking } }),
         // Qwen's recommended sampling; oMLX's default temperature (1.0) is too loose for factual answers.
         ...(thinking ? { temperature: 0.6, top_p: 0.95, top_k: 20 } : { temperature: 0.7, top_p: 0.8, top_k: 20 }),
       }),

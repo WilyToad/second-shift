@@ -34,7 +34,7 @@ const MODEL_URL = (process.env.COMPANION_MODEL_URL ?? "http://127.0.0.1:8888").r
 const isOmlx = MODEL_URL === "http://127.0.0.1:8888";
 
 const game = new GameLink({ pollMs: 2000, historySize: 1800, cacheDir: new URL("../../data/cache", import.meta.url).pathname });
-const model = new OmlxClient({ baseUrl: MODEL_URL, apiKey: isOmlx ? await readOmlxApiKey() : (process.env.COMPANION_MODEL_KEY ?? ""), model: MODEL });
+const model = new OmlxClient({ baseUrl: MODEL_URL, apiKey: isOmlx ? await readOmlxApiKey() : (process.env.COMPANION_MODEL_KEY ?? ""), model: MODEL, thinkingSwitch: isOmlx ? "chat_template_kwargs" : "reasoning_effort" });
 console.log(`Model server: ${MODEL_URL} (${MODEL})`);
 let modelState: { state: "loading" | "ready" | "error"; error?: string } = { state: "loading" };
 let busy: Promise<void> = Promise.resolve();
