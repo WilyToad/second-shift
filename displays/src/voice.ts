@@ -141,7 +141,7 @@ const CUT_IN_TAILS = new Set(["what", "which", "why", "how", "when", "where", "w
 
 /**
  * Is this the companion's own voice coming back through the microphone (FC-217)? Most of its words are in what
- * was just spoken. A lone word is treated as echo or noise unless it's one of the cut-in words. The player quoting
+ * was just spoken. A lone word is the player unless it's one he just said. The player quoting
  * him back — "no, not from yumako processing", "wait, me to queue that research?" — shares most of its words with
  * the echo but opens or closes with a word he didn't say (FC-234); an echo of a sentence that itself starts with
  * "what" still falls through to the overlap.
@@ -150,7 +150,9 @@ export function looksLikeEcho(text: string, spoken: string[] = recentlySpoken.fi
   const said = new Set(spoken.join(" ").toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean));
   const heardWords = text.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
   if (!heardWords.length) return true;
-  if (heardWords.length === 1) return !BARGE_WORDS.has(heardWords[0]!);
+  // A lone word is the player — on headphones there is no echo at all, and "nevermind" was dropped live for not
+  // being on a list — unless it's one of the words he just said and not a stop word (FC-241).
+  if (heardWords.length === 1) return said.has(heardWords[0]!) && !BARGE_WORDS.has(heardWords[0]!);
   const first = heardWords[0]!;
   if (CUT_IN_LEADS.has(first) && !said.has(first)) return false;
   const tail = heardWords.slice(-2);

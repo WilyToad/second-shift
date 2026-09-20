@@ -658,8 +658,9 @@ test("FC-217: the companion's own voice coming back is an echo; the player cutti
   expect(looksLikeEcho("zero rails within 32 tiles around you", spoken)).toBe(true);
   expect(looksLikeEcho("nothing to survey yet", spoken)).toBe(true);
   expect(looksLikeEcho("how many chests are near me", spoken)).toBe(false);
-  // One word: noise or echo, unless it's a cut-in word.
-  expect(looksLikeEcho("okay", spoken)).toBe(true);
+  // One word is the player (headphones: no echo exists), unless it's one he just said; a stop word always is.
+  expect(looksLikeEcho("okay", spoken)).toBe(false);
+  expect(looksLikeEcho("rails", spoken)).toBe(true);
   expect(looksLikeEcho("stop", spoken)).toBe(false);
   expect(looksLikeEcho("Ballast", spoken)).toBe(false);
   expect(looksLikeEcho("", spoken)).toBe(true);
@@ -780,14 +781,13 @@ test("FC-241: an interim word over him doesn't swallow the final cut-in it becom
     made[0].onend();
     const rec = made[1];
     const cancelsBefore = synth.cancels();
-    // The engine offers "never" first, not final: one unknown word, so not a cut-in yet — and not consumed either.
+    // The engine offers "never" first, not final: a word he didn't say, so the player — the reading stops at once.
     rec.say([{ text: "never", final: false }]);
-    expect(synth.cancels()).toBe(cancelsBefore);
-    // It finalizes in place as "never mind": that's the player, the reading stops, and the words go out.
-    rec.results[rec.results.length - 1] = Object.assign([{ transcript: "never mind" }], { isFinal: true });
-    rec.onresult({ resultIndex: 0, results: rec.results });
     expect(synth.cancels()).toBe(cancelsBefore + 1);
     expect(voice.takeInterrupted()).toEqual({ during: "Zero rails within 32 tiles around you.", stopOnly: true });
+    // It finalizes in place as "never mind": the words that go out are the final ones, not the provisional.
+    rec.results[rec.results.length - 1] = Object.assign([{ transcript: "never mind" }], { isFinal: true });
+    rec.onresult({ resultIndex: 0, results: rec.results });
     await new Promise((r) => setTimeout(r, 120));
     expect(said).toEqual(["how many rails are near me", "never mind"]);
     voice.stopTalking({ send: false });
