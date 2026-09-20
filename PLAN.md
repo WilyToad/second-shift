@@ -616,6 +616,12 @@ list items) before it could be default, filed as FC-240. Switching is `COMPANION
 COMPANION_MODEL=incoai/Qwen3.8-27B-Splash` with `splash serve` up and oMLX stopped; the two won't fit together with
 the macOS reserve Splash insists on (17.4 + 13.7 GB against 25 GB free beside a 70 GB oMLX).
 
+**whisper-server's cold call (FC-232, 2026-09-19):** the first `/stt` call after the model has sat idle was 356 ms
+after startup, 526 ms after 17 idle minutes and 666 ms after 30 — 34 ms from the 700 ms wait after which the
+browser's text is sent instead — against ~130 ms warm. A short clip of the Mac's own `say` voice through
+whisper every 3 idle minutes keeps it paged in: **152 ms first call after 30 idle minutes**, 129–139 ms after.
+Cost: one 1.7 s clip's inference (~130 ms of GPU) per 3 idle minutes, nothing while the player is talking.
+
 **Jev-style option scoring, measured (FC-233, 2026-09-19):** the player's second research pass found open MLX
 implementations of the technique behind Jev (one prefill, every option scored from its logits; §8 item 5 "Second
 look"), so the spike PLAN asked for ran on the one judgement in the app that is a real two-way choice with a hard
