@@ -622,6 +622,16 @@ browser's text is sent instead — against ~130 ms warm. A short clip of the Mac
 whisper every 3 idle minutes keeps it paged in: **152 ms first call after 30 idle minutes**, 129–139 ms after.
 Cost: one 1.7 s clip's inference (~130 ms of GPU) per 3 idle minutes, nothing while the player is talking.
 
+**Intents are not a Jev question (FC-245, 2026-09-20).** The first slice of the epic was meant to be the 22 regex
+classifiers in `intent.ts`, since every misroute bug came from them. Benchmarked before routing anything
+(`scripts/bench-intents.ts`, 62 reviewed questions × 22 classifiers, one call each, 182 ms p50): **regex 1364/1364,
+Jev 1311/1364**, ahead on none, behind on eight, and all 53 of its errors are false positives — asked "does this
+need a look at the player's factory?" in isolation, almost everything sounds like it does (25 wrong on `world`
+alone: "Am I ready to head out?", "Build me 120 iron gear wheels a minute"). So nothing is routed and `intent.ts` is
+untouched. The caveat is that the corpus cannot discriminate: every regex was written until those rows passed, so a
+perfect score is its definition, not a measurement. The rows worth scoring are the ones the regexes get wrong in a
+real session, and FC-236's label capture is where they come from.
+
 **Jev batching, measured (FC-244, 2026-09-20):** their "adding questions barely changes the response time" holds on
 our shape, and it is the whole design. One intent question: 203 ms. Twenty in one call: **156 ms** — the same call,
 within noise. The same twenty sequentially: 3,757 ms. Tokens: 706 batched against 6,480 (at $0.042 a million, so a
