@@ -211,8 +211,15 @@ export class TailCutFilter {
   }
 }
 
-/** A paragraph that reports the player's list when the question wasn't about it (FC-219). */
+/**
+ * A paragraph that brings up the player's list when the question wasn't about it (FC-219). On such a turn the list
+ * isn't in the prompt at all, so any later paragraph that mentions it is the model carrying it over from its own
+ * last answer — which is why a bare mention is enough: enumerating the phrasings lost to "Whenever you're ready,
+ * the packing list is waiting" (2026-09-20). The first paragraph always streams, so an answer that is genuinely
+ * about the list is never touched.
+ */
 export const LIST_REPORT = [
+  /\b(packing |shopping |to-?do )?list\b/i,
   /\b\d+ of \d+ (ticked|done|checked)\b/i,
   /\b(packing )?list\b.*\b(ticked|done|short|unaccounted|missing|left)\b/i,
   /what'?s (on your plate|left on the list|still short)/i,

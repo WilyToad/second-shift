@@ -88,9 +88,14 @@ test("FC-219: a later paragraph that reports the list is cut with everything aft
   const live = "I don't dwell on it. There's a hauler in a crater.\n\nWhat's on your plate: 200 belts, 16 assembling machine 1 still short, and no free bots.".match(/.{1,7}/gs)!;
   expect(run(live)).toEqual({ out: "I don't dwell on it. There's a hauler in a crater.\n\n", cut: true, text: "I don't dwell on it. There's a hauler in a crater." });
   expect(run(["The manifest is what I miss.\n\nPacking list is 3 of 11 ticked; foundries still unaccounted."]).cut).toBe(true);
+  // A bare mention on the end is the same bug wearing a friendlier face (live, 2026-09-20).
+  expect(run(["I was flying when it came down.\n\nWhenever you're ready, the packing list is waiting."]).cut).toBe(true);
+  // His own words for the job are not the list: "manifest" is Ballast's, and it stays.
+  expect(run(["I don't dwell on it.\n\nI keep the manifest level now instead — same job, different cargo."]).cut).toBe(false);
   // An innocent second paragraph is released once its first sentence is in, and the rest streams.
   const fine = run(["No rails near you.\n\nThe nearest ", "patch is west", ". Want it marked?"]);
   expect(fine).toEqual({ out: "No rails near you.\n\nThe nearest patch is west. Want it marked?", cut: false, text: "No rails near you.\n\nThe nearest patch is west. Want it marked?" });
   // A first paragraph that mentions the list is the answer itself and is never cut.
   expect(run(["The list is 3 of 11 done."]).cut).toBe(false);
+  expect(run(["Your list is 3 of 11 done.\n\nThe belts are what's left."]).cut).toBe(false);
 });
