@@ -139,7 +139,6 @@ test("FC-247: noise is never said, the worst thing is what gets said, and a bad 
   const watcher = new Watcher({
     digest: () => digest({ idleLabs: 47 }),
     decisions,
-    labels: null,
     say: async (fresh) => { asked.push(fresh.map((f) => f.kind)); return fresh[0]!.line; },
     emit: (n) => notes.push(n.text),
     now: () => now,
@@ -178,7 +177,6 @@ test("FC-247: the most important finding is the one offered, and a bad enough on
   const watcher = new Watcher({
     digest: () => state,
     decisions,
-    labels: null,
     say: async (fresh) => { asked.push(fresh.map((f) => f.kind)); return fresh[0]!.line; },
     emit: (n) => notes.push(n.text),
     now: () => now,
@@ -195,7 +193,6 @@ test("FC-247: the most important finding is the one offered, and a bad enough on
   const w2 = new Watcher({
     digest: () => state,
     decisions,
-    labels: null,
     say: async (fresh) => { asked.push(fresh.map((f) => f.kind)); return fresh[0]!.line; },
     emit: (n) => notes.push(n.text),
     now: () => now,

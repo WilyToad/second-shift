@@ -20,7 +20,7 @@ import { SHOT_NAME } from "./screenshots";
 import { ElevenLabs, elevenLabsKey } from "./tts";
 import { SOUND_NAMES, type SoundName } from "./sfx";
 import { ModelWaker } from "./wake";
-import { howLongAgo, Watcher } from "./watch";
+import { LABELS, Watcher, howLongAgo } from "./watch";
 import { nameCorrections } from "./names";
 import { existsSync } from "node:fs";
 
@@ -88,6 +88,7 @@ const tts = elevenLabsKey() ? new ElevenLabs({ key: elevenLabsKey()!, model: pro
 const watcher = new Watcher({
   digest: () => game.latest()?.digest,
   decisions,
+  labels: LABELS,
   say: async (found, sinceMs) => {
     const protos = game.prototypes()?.data ?? null;
     const lines = found.map((f) => `- ${f.line}`).join("\n");

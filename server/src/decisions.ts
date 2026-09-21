@@ -149,6 +149,7 @@ export class Decisions {
       ),
     };
     const fetcher = this.opts.fetch ?? fetch;
+    const started = performance.now();
     let reply: z.infer<typeof ReplySchema> | null = null;
     this.counts.calls++;
     try {
@@ -177,6 +178,7 @@ export class Decisions {
       return out;
     }
     this.counts.inputTokens += reply.usage?.input_tokens ?? 0;
+    const asked = names.length;
     for (const [name, q] of Object.entries(questions)) {
       const answer = reply.answers[name];
       const threshold = q.threshold ?? DEFAULT_THRESHOLD;
@@ -202,6 +204,8 @@ export class Decisions {
       }
       this.counts[slot.via]++;
     }
+    const byJev = Object.values(out as Record<string, Answer<unknown>>).filter((a) => a.via === "jev").length;
+    this.opts.log?.(`Decisions: ${asked} question${asked === 1 ? "" : "s"} in ${(performance.now() - started).toFixed(0)} ms — ${byJev} by Jev, ${asked - byJev} left to the code.`);
     return out;
   }
 }

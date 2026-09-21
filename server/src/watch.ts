@@ -50,8 +50,8 @@ const LEVELS = [
 const LOCAL_LEVEL = 3;
 const WORTH = 2;
 const BREAK_FLOOR = 4;
-/** Every finding and its verdict, whether or not it was said: the first labels of real play (FC-236). */
-const LABELS = new URL("../../data/labels/watch.jsonl", import.meta.url).pathname;
+/** Where the server keeps them: every finding and its verdict, said or not — the first labels of real play (FC-236). */
+export const LABELS = new URL("../../data/labels/watch.jsonl", import.meta.url).pathname;
 
 export type Triaged = Finding & { level: number; via: "local" | "jev"; confidence: number };
 
@@ -108,8 +108,8 @@ export type WatchDeps = {
   digest: () => Digest | undefined;
   /** Typed decisions (FC-247). Absent, every finding is judged at the local level and the quiet floor rules. */
   decisions?: Decisions;
-  /** Where the verdicts are written. Defaults to `data/labels/watch.jsonl`; the tests point it elsewhere. */
-  labels?: string | null;
+  /** Where the verdicts are written. Nothing is written unless a caller asks for it, so a unit test can't. */
+  labels?: string;
   /** Asks the model for one short line. Returns null when it has nothing worth saying. */
   say: (findings: Finding[], sinceMs: number) => Promise<string | null>;
   emit: (note: Note) => void;
@@ -195,7 +195,7 @@ export class Watcher {
 
   /** One line per finding per look, with what was decided about it. Never throws: a label is not worth a crash. */
   private async label(judged: Triaged[], spoken: boolean): Promise<void> {
-    const path = this.deps.labels === undefined ? LABELS : this.deps.labels;
+    const path = this.deps.labels;
     if (!path || !judged.length) return;
     try {
       await mkdir(dirname(path), { recursive: true });
