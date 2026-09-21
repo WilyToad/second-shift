@@ -33,12 +33,17 @@ const QUIET_LOOKS = 2;
 const DROP = 0.3;
 
 /**
- * How much a finding matters, as one ordered question (FC-247). Two thresholds read off the same answer: below
- * `WORTH` it isn't said at all, and at `BREAK_FLOOR` it is said even if something was said recently — which is the
- * judgement `QUIET_LOOKS` can't make, because a rule can't tell a recovered dip from a factory going dark.
+ * How much a finding matters, as one ordered question (FC-247) — used **only to order them**, never to decide
+ * whether to speak.
  *
- * The local answer is `3`: worth saying, not urgent enough to break the floor — exactly what the watcher did before
- * any of this. So no key, a failed call or an unsure answer leaves the old behaviour intact.
+ * Measured on ten real findings from the player's own save (2026-09-20, PLAN §5): a five-level score spreads its
+ * probability, so confidence tops out at 0.44 and the levels compress into 1.2–3.3 — the top of the scale is never
+ * used. It rated "the whole base is browning out: power satisfaction 41%" 3.30 and "a turret is out of ammo" 1.80.
+ * Any absolute cut on that silences an emergency, so the rules that decide whether to speak are the ones that were
+ * there before. What it does get right is the extremes: its top two and bottom two matched a person's, so the
+ * finding offered first is the one that most likely deserves the line.
+ *
+ * Every verdict is written down either way. A week of play is what would make a real threshold possible (FC-236).
  */
 const LEVELS = [
   "noise: the player would rather not have been told",
@@ -48,8 +53,6 @@ const LEVELS = [
   "the factory is losing something badly and they should act",
 ];
 const LOCAL_LEVEL = 3;
-const WORTH = 2;
-const BREAK_FLOOR = 4;
 /** Where the server keeps them: every finding and its verdict, said or not — the first labels of real play (FC-236). */
 export const LABELS = new URL("../../data/labels/watch.jsonl", import.meta.url).pathname;
 
@@ -69,6 +72,8 @@ export async function triage(found: Finding[], decisions?: Decisions): Promise<T
       instructions: `A Factorio companion looked at the player's factory while they were playing and noticed: "${f.line}". The player did not ask. How much does this matter to them right now?`,
       criteria: LEVELS,
       local: LOCAL_LEVEL,
+      // Ordering only, so an unsure answer is still worth having: it sorts beside the local level, harming nothing.
+      threshold: 0,
     };
   });
   const answers = await decisions.decide("The player is playing Factorio and has not asked anything. The companion looks at their factory every few minutes and may say at most one short line.", questions);
@@ -170,17 +175,14 @@ export class Watcher {
       this.before = digest;
       this.lastLookAt = this.now();
       if (!fresh.length) return null;
-      // How much each one matters, all in one call (FC-247). Noise is dropped; the rest is ordered, so the line the
-      // player gets is the thing that matters most rather than whatever the rules happened to list first.
+      // How much each one matters, all in one call (FC-247), and the worst first — so the line the player gets is
+      // the thing most likely to deserve it, rather than whatever the rules happened to list first. Whether to
+      // speak at all is still the quiet floor's call: measured, the scores are not sound enough to overrule it.
       const judged = (await triage(fresh, this.deps.decisions)).sort((a, b) => b.level - a.level);
-      const worth = judged.filter((t) => t.level >= WORTH);
-      // Said something recently: let it be — unless something is bad enough to be worth interrupting for, which is
-      // the one call the quiet floor gets wrong in both directions.
-      const recently = Boolean(this.lastNoteAt) && this.now() - this.lastNoteAt < this.quietMs;
-      const speaking = worth.length > 0 && (!recently || worth[0]!.level >= BREAK_FLOOR);
+      const speaking = !this.lastNoteAt || this.now() - this.lastNoteAt >= this.quietMs;
       await this.label(judged, speaking);
       if (!speaking) return null;
-      const text = await this.deps.say(worth, sinceMs);
+      const text = await this.deps.say(judged, sinceMs);
       if (!text) return null;
       // Everything judged this look stays quiet for a while, said or not: they were all looked at.
       for (const f of judged) this.said.set(f.kind, this.now());

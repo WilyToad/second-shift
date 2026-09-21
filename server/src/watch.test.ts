@@ -118,45 +118,7 @@ test("FC-247: with no decisions service every finding is judged locally and the 
   expect(judged.map((t) => [t.level, t.via])).toEqual([[3, "local"], [3, "local"]]);
 });
 
-test("FC-247: noise is never said, the worst thing is what gets said, and a bad enough one breaks the quiet floor", async () => {
-  const { Decisions } = await import("./decisions");
-  // A fake Jev that scores a finding by what its line says.
-  const levelFor = (instructions: string) => (instructions.includes("research has stopped") ? noise : instructions.includes("iron-plate") ? iron : 3);
-  let noise = 3;
-  let iron = 3;
-  const decisions = new Decisions({
-    key: "k",
-    mode: "auto",
-    fetch: (async (_u: string, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body)) as { questions: Record<string, { instructions: string }> };
-      const answers = Object.fromEntries(Object.entries(body.questions).map(([name, q]) => [name, { type: "score", score: levelFor(q.instructions), confidence: 0.9 }]));
-      return new Response(JSON.stringify({ answers }));
-    }) as never,
-  });
-  let now = 1_000_000;
-  const notes: string[] = [];
-  const asked: string[][] = [];
-  const watcher = new Watcher({
-    digest: () => digest({ idleLabs: 47 }),
-    decisions,
-    say: async (fresh) => { asked.push(fresh.map((f) => f.kind)); return fresh[0]!.line; },
-    emit: (n) => notes.push(n.text),
-    now: () => now,
-  });
-
-  // Judged noise: not said, and the model is never asked to phrase it.
-  noise = 1;
-  expect(await watcher.look()).toBeNull();
-  expect(asked).toHaveLength(0);
-
-  // Worth a line: said, exactly as before.
-  noise = 3;
-  now += REPEAT_AFTER_MS + 1000;
-  expect(await watcher.look()).not.toBeNull();
-  expect(notes).toHaveLength(1);
-});
-
-test("FC-247: the most important finding is the one offered, and a bad enough one is said inside the quiet floor", async () => {
+test("FC-247: the finding judged to matter most is the one offered to the model first", async () => {
   const { Decisions } = await import("./decisions");
   const levels: Record<string, number> = { "research has stopped": 3, "iron-plate": 5 };
   const decisions = new Decisions({
@@ -187,7 +149,7 @@ test("FC-247: the most important finding is the one offered, and a bad enough on
 
   // Half a minute later, well inside the floor: an iron-plate collapse is level 5, so it is said anyway, and it is
   // offered first even though the rules found the idle labs first.
-  now += 30_000;
+  now += REPEAT_AFTER_MS + 1000;
   state = digest({ idleLabs: 47, produced: { "iron-plate": 10 } });
   const before = digest({ idleLabs: 47, produced: { "iron-plate": 240 } });
   const w2 = new Watcher({
@@ -200,7 +162,6 @@ test("FC-247: the most important finding is the one offered, and a bad enough on
   w2.start(60_000);
   // Seed what it saw last time, so the drop is a finding.
   (w2 as unknown as { before: unknown }).before = before;
-  (w2 as unknown as { lastNoteAt: number }).lastNoteAt = now - 30_000;
   now += 60_000;
   expect(await w2.look()).not.toBeNull();
   expect(asked.at(-1)![0]).toBe("drop:iron-plate"); // the worst one leads

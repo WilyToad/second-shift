@@ -637,6 +637,21 @@ paragraph on its first sentence, where a colon counted as the end — so "Back t
 outpost kit" was judged on "Back to work:". A trailing paragraph that mentions the list at all is now cut, and a
 colon no longer ends the sentence being judged.
 
+**A five-level score is not a threshold (FC-247, 2026-09-20).** The watcher's triage was meant to replace its
+blunt quiet floor — "say nothing if you said something in the last two looks" — with a judgement of how much each
+finding matters. The first live run said `0 by Jev, 5 left to the code`, which sent me to measure it: a score over
+five levels spreads its probability, so **confidence tops out at 0.44** and never reaches a 0.6 default; and the
+levels themselves compress into 1.2–3.3, never using the top of the scale. On ten real findings from the dev save
+it rated "the whole base is browning out: power satisfaction 41%" 3.30, "iron-plate is down from 240 to 4 a minute"
+3.24 and "a turret is out of ammo on the eastern wall" 1.80 — so any absolute cut either silences an emergency or
+speaks over the player for noise. Only five of ten were within one level of a person's call even with no threshold
+at all.
+
+What it does get right is the extremes: its top two and bottom two matched. So the scores order the findings —
+the worst one is offered to the model first — and the rules that decide *whether* to speak are the ones that were
+already there. Every verdict is written to `data/labels/watch.jsonl` regardless, said or not; a week of play is
+what would make a real threshold possible (FC-236), and this is the decision most worth a trained head.
+
 **Intents are not a Jev question (FC-245, 2026-09-20).** The first slice of the epic was meant to be the 22 regex
 classifiers in `intent.ts`, since every misroute bug came from them. Benchmarked before routing anything
 (`scripts/bench-intents.ts`, 62 reviewed questions × 22 classifiers, one call each, 182 ms p50): **regex 1364/1364,
