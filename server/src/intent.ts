@@ -65,7 +65,10 @@ export const ASKS_FOR: Record<string, RegExp> = {
   // Lists are the player's own plan, so the model only edits them when the words are about that (FC-126, FC-163).
   // Also a build the player is about to go and make ("I'm building an outpost, I need…"), which is a list even
   // when they don't use the word (FC-166).
-  update_list: /\b(list|checklist|packing|pack|todo|to-do|remind\w*|add\b|added|remove\b|drop\b|cross (it |them )?off|tick\w* off|check\w* off|clear|rename|start (a|the) list|note (it |that )?down|shopping)\b|\b(building|build|set(ting)? up|putting up|outpost)\b[^.?!]{0,80}\b(need|bring|take|gather|grab)\b/i,
+  // Changing a count is asking to change the list, and says none of the words above: the player said "set stone
+  // brick to 250" twice, the call was dropped both times, and the companion answered by telling them to say the
+  // very phrase being dropped (live, 2026-09-20, FC-251).
+  update_list: /\b(set|change|bump|raise|lower|increase|decrease)\b[^.?!]{0,40}\bto\s+\d|\bmake (it|them|that) \d|\b(list|checklist|packing|pack|todo|to-do|remind\w*|add\b|added|remove\b|drop\b|cross (it |them )?off|tick\w* off|check\w* off|clear|rename|start (a|the) list|note (it |that )?down|shopping)\b|\b(building|build|set(ting)? up|putting up|outpost)\b[^.?!]{0,80}\b(need|bring|take|gather|grab)\b/i,
   show_the_way: /\b(show (me|you) the way|point(ing)? (me|you|the way|it out|them out|out|toward\w*|to|at)|which way|what direction|guide (me|you)|lead (me|you)|ping|arrow|how do i get to|direct (me|you)|way to)\b/i,
 };
 /** Is this tool call something the player asked for? Tools not listed in ASKS_FOR always are. */

@@ -104,6 +104,9 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-251 "Set stone-brick to 250" was dropped, and he told the player to say it again
+  - Notes: found live 2026-09-20. The player said it twice (`dropped=1` both turns): the model called `update_list` correctly and `ASKS_FOR.update_list` rejected it, because a count change says none of the guard's words — no "list", "add", "remove". Worse, the answer each time was *"say 'set stone-brick to 250' to change the count"*: the companion was recommending the exact phrasing the guard rejects, so the player could never win. (An earlier e2e passed only because "Make it 30 ovens **and drop the chests**" matched on "drop".)
+  - Done: the guard also reads a count change — `set/change/bump/raise/lower/increase/decrease … to <number>`, and `make it/them/that <number>`. Recipe and rate questions with numbers in them still don't act. Pinned by a test naming both sides.
 - [x] FC-250 "120 piercing-magazine" matched nothing, so it sat on the list untickable
   - Notes: found live 2026-09-20 on the first run where the untracked path fired for real. The model wrote `piercing-magazine`; this save calls it `piercing-rounds-magazine`. No lexical rule reaches a name with a word missing from the middle, and Jev couldn't help because ammunition isn't placeable and so isn't among its candidates. The companion did the honest thing — marked it, kept it out of the count, and asked which item was meant — but it should simply have resolved.
   - Done: `resolveItem` falls back to the one item whose words contain every word said ("piercing magazine" → piercing-rounds-magazine, "electric drill" → electric-mining-drill, "gear wheel" → iron-gear-wheel). Only when exactly one fits, so it is never a guess between candidates; "shooty things" and "a power source" still resolve to nothing.
