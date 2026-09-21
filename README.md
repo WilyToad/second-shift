@@ -182,6 +182,21 @@ change, because in a heavily modded game the model's memory of vanilla is often 
 | **Alt+X** | Stop whatever the companion set moving |
 | Shortcut bar | **Show the companion a build**: drag over part of your factory to have it reviewed |
 
+### Sharper judgement, optional (Jev)
+
+Second Shift makes a lot of small judgement calls: is that question about your factory or about a recipe, did you
+mean the save's `stone-furnace` when you said "ovens", is this hiccup worth saying out loud. All of them are decided
+by code here, and they can be crude.
+
+If you put a [Jev](https://typesafe.ai) key in your `.env` as `JEV_KEY=...`, those calls are asked of Jev instead —
+a model that answers typed questions with calibrated probabilities in about 150 ms — and the code paths stay on as
+the fallback. No key, no network, a slow answer or an unsure one, and you get exactly the behaviour you get today.
+Nothing needs switching on: the server says which way it's running at startup.
+
+**This is the one part that leaves your Mac**, so it's plain what goes: the text of your question, the companion's
+own findings, and the candidate names it's choosing between. Never your microphone audio, never your save, never
+your game state. To keep everything local, leave `JEV_KEY` out, or run the server with `COMPANION_DECISIONS=local`.
+
 ## The helmet rule
 
 **If you can do it, the companion can. If you can't, it can't.** It uses the same tools, reach and map coverage you

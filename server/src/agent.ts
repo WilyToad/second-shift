@@ -12,6 +12,7 @@ import { describeRow, productionRow, type RowBuild } from "./blueprint-template"
 import { stageFor, stageLines, tookAThrowback } from "./stages";
 import { materialCorrections, nameCorrections } from "./names";
 import { actionClaims } from "./claims";
+import type { Decisions } from "./decisions";
 import { remarkDue, turnNotes } from "./guidance";
 import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, ASKS_FOR, askedFor, parseTarget, anchorFor, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 export { bareFollowUp, needsWorldTools, PICTURE, ASKS_FOR, askedFor, parseTarget, targetRate, anchorFor, SELECTED_PREFIX, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
@@ -365,6 +366,8 @@ export class Agent {
       prototypes: () => Prototypes | null;
       fallbackSnapshot?: () => Snapshot | undefined;
       emit: (m: ServerMessage) => void;
+      /** Typed decisions (FC-244), with every question's local answer as its fallback. */
+      decisions?: Decisions;
       /** One line per finished answer, so the server log shows what he said (FC-243). */
       log?: (line: string) => void;
       now?: () => number;

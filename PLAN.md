@@ -622,6 +622,13 @@ browser's text is sent instead — against ~130 ms warm. A short clip of the Mac
 whisper every 3 idle minutes keeps it paged in: **152 ms first call after 30 idle minutes**, 129–139 ms after.
 Cost: one 1.7 s clip's inference (~130 ms of GPU) per 3 idle minutes, nothing while the player is talking.
 
+**Jev batching, measured (FC-244, 2026-09-20):** their "adding questions barely changes the response time" holds on
+our shape, and it is the whole design. One intent question: 203 ms. Twenty in one call: **156 ms** — the same call,
+within noise. The same twenty sequentially: 3,757 ms. Tokens: 706 batched against 6,480 (at $0.042 a million, so a
+turn's whole intent batch costs about 0.003¢). The 356 ms in the FC-233 run was a Python script opening a new
+connection per case, not the service. So every phase batches: one call for a turn's intents, one for a watcher
+pass's findings, one for a list's items.
+
 **Jev-style option scoring, measured (FC-233, 2026-09-19):** the player's second research pass found open MLX
 implementations of the technique behind Jev (one prefill, every option scored from its logits; §8 item 5 "Second
 look"), so the spike PLAN asked for ran on the one judgement in the app that is a real two-way choice with a hard

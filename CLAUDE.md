@@ -135,6 +135,10 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
   autosaves, waits for RCON and checks the mod answers. The mod code reloads only on game restart.
 - `bun scripts/benchmark.ts [--ticks N --runs N]` (game closed) benchmarks the dev save with and
   without the mod using mirrored mod folders. Run it after every mod change.
+- **Typed decisions (FC-244):** every judgement call goes through `server/src/decisions.ts`. With `JEV_KEY` in `.env` it asks Jev
+  (one batched call a phase, ~150 ms for twenty questions); without it, or on any error, timeout or unsure answer, the caller's own
+  code answers exactly as before. Every question carries its local answer with it, so the fallback costs nothing. Pin a run with
+  `COMPANION_DECISIONS=local` (what eval baselines use). Never on the helmet rule, approvals, cards or the stop hotkey.
 - `bun run start` runs the server (web chat on http://127.0.0.1:5170). It reconnects to the game
   on its own and warms the model at startup. `COMPANION_MODEL_URL` and `COMPANION_MODEL` point it at another
   OpenAI-compatible engine and model (FC-237; e.g. Splash on `http://127.0.0.1:8000`, `COMPANION_MODEL_KEY` if it

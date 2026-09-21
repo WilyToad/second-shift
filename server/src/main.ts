@@ -8,6 +8,7 @@ import { OmlxClient, readOmlxApiKey } from "./model";
 import { craftersByCategory, recognitionPhrases } from "./grounding";
 import { VoiceClips } from "./voice-clips";
 import { WhisperService } from "./stt";
+import { Decisions } from "./decisions";
 import { normalizeNames } from "./normalize-names";
 import { COMPANION_NAME } from "./prompt";
 import { alignToCacheBlock, buildMessages, systemPrompt, userTurn } from "./prompt";
@@ -55,8 +56,13 @@ const SESSIONS_DIR = process.env.COMPANION_SESSIONS ?? new URL("../../data/sessi
 const LEGACY_SESSION = new URL("../../data/session.json", import.meta.url).pathname;
 let mapId: string | undefined;
 
+// Typed decisions (FC-244): Jev when a key is in .env, the same code paths as before when it isn't.
+const decisions = new Decisions({ log: console.log });
+console.log(decisions.describe());
+
 const agent = new Agent({
   model,
+  decisions,
   game,
   system: () => system,
   retriever: () => retriever,
