@@ -24,6 +24,8 @@ export function parseNeed(text: string, p: Prototypes | null): Need | null {
 }
 
 const key = (s: string) => s.toLowerCase().replace(/[_\s]+/g, "-").replace(/-+/g, "-").replace(/s$/, "");
+/** A name's words, each singular, for comparing what was said against what the save calls things. */
+const parts = (s: string) => key(s).split("-").map((w) => w.replace(/s$/, "")).filter(Boolean);
 
 /** An item name in this save from what the player or the model called it. */
 export function resolveItem(said: string, p: Prototypes | null): string | null {
@@ -36,8 +38,22 @@ export function resolveItem(said: string, p: Prototypes | null): string | null {
     // "oven" for a furnace, "arms" for inserters: the plural and the odd word out.
     names.find((n) => key(n).endsWith(`-${wanted}`)) ??
     names.find((n) => key(n) === wanted.replace(/^(stone|iron|steel|electric|fast|express|turbo|bulk|long-handed)-/, "")) ??
+    // A name with a word left out of the middle: the model wrote "piercing-magazine" for piercing-rounds-magazine
+    // (live, 2026-09-20), which no rule above reaches and which Jev can't help with either, because ammunition
+    // isn't placeable and so isn't among its candidates. Every word said has to appear in the name, and exactly
+    // one item may fit — otherwise it is a guess between candidates, and the item stays as the player wrote it.
+    onlyFit(parts(said), names) ??
     null
   );
+}
+
+function onlyFit(said: string[], names: string[]): string | null {
+  if (said.length < 2) return null;
+  const fits = names.filter((n) => {
+    const has = parts(n);
+    return said.every((w) => has.includes(w));
+  });
+  return fits.length === 1 ? fits[0]! : null;
 }
 
 /** Does this item place a machine that runs on fuel, on electricity, or on nothing? */

@@ -104,3 +104,20 @@ test("FC-166: what's missing, what's ready, and whether the load fits", () => {
   expect(lines[2]).toContain("2 slots short, so something stays behind or it takes two trips");
   expect(readiness([], slots([], p, 10))).toEqual(["the packing list has nothing on it yet"]);
 });
+
+test("FC-250: a name with a word left out of the middle resolves, but only when one item fits", async () => {
+  const { resolveItem } = await import("./packing");
+  const p = await Bun.file(new URL("../../data/captures/prototypes.json", import.meta.url)).json();
+  // Live 2026-09-20: the model wrote "120 piercing-magazine" and nothing matched it, so the item sat on the list
+  // untickable. Ammunition isn't placeable, so Jev's candidates couldn't help either.
+  expect(resolveItem("piercing-magazine", p)).toBe("piercing-rounds-magazine");
+  expect(resolveItem("uranium magazine", p)).toBe("uranium-rounds-magazine");
+  expect(resolveItem("electric drill", p)).toBe("electric-mining-drill");
+  expect(resolveItem("gear wheel", p)).toBe("iron-gear-wheel");
+  // Words that fit nothing, and a single word, are left alone rather than guessed at.
+  expect(resolveItem("shooty things", p)).toBeNull();
+  expect(resolveItem("a power source", p)).toBeNull();
+  // The plain cases still go the way they did.
+  expect(resolveItem("iron plate", p)).toBe("iron-plate");
+  expect(resolveItem("magazine", p)).toBe("firearm-magazine");
+});
