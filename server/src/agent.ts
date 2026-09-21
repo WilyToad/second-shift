@@ -12,6 +12,7 @@ import { describeRow, productionRow, type RowBuild } from "./blueprint-template"
 import { stageFor, stageLines, tookAThrowback } from "./stages";
 import { materialCorrections, nameCorrections } from "./names";
 import { actionClaims } from "./claims";
+import { renamedNote, resolveListItems } from "./list-items";
 import type { Decisions } from "./decisions";
 import { remarkDue, turnNotes } from "./guidance";
 import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, ASKS_FOR, askedFor, parseTarget, anchorFor, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
@@ -941,8 +942,15 @@ export class Agent {
 
   private checkPacking(list: Checklist, stock: ActionData<"stock">, status: ActionData<"player_status"> | null, asked: boolean): string[] {
     const protos = this.deps.prototypes();
-    const needs = list.items.map((i) => parseNeed(i.text, protos)).filter((n): n is Need => n !== null);
+    const parsed = list.items.map((i) => ({ item: i, need: parseNeed(i.text, protos) }));
+    const needs = parsed.map((p) => p.need).filter((n): n is Need => n !== null);
     const lines: string[] = [];
+    // Words that name nothing in this save can never be ticked, so they don't count towards the total (FC-246).
+    // Without this the list stops at "3 of 11" for ever and the player is never told why.
+    const untracked = parsed.filter((p) => !p.need).map((p) => p.item.text);
+    for (const text of untracked) this.lists.update(list.name, text, { untracked: true });
+    for (const p of parsed) if (p.need && p.item.untracked) this.lists.update(list.name, p.item.text, { untracked: false });
+    if (untracked.length) lines.push(`not counted, because nothing in this save is called that: ${untracked.join(", ")} — ask the player which item they meant`);
     // What the data says is missing goes on the list once, with its reason as the note.
     const additions = essentials(needs, protos, stock).filter((a) => a.text);
     const added = this.lists.addFromRule(list.name, additions.map((a) => ({ text: a.text, note: a.reason })));
@@ -1056,13 +1064,21 @@ export class Agent {
         case "set_train_stop":
           return this.proposeTrainStop(args);
         case "update_list": {
+          // The player's words become this save's names before the list exists (FC-246), so the packing check can
+          // match them against what they carry. Lexical first, Jev only for what that misses.
+          const protos = this.deps.prototypes();
+          const adds = Array.isArray(args.add) ? args.add.map(String) : [];
+          const sets = Array.isArray(args.set) ? args.set.map(String) : [];
+          const resolved = await resolveListItems([...adds, ...sets], protos, this.deps.decisions);
+          const renamed = renamedNote(resolved);
+          const listText = (text: string) => resolved.find((r) => r.text === text)?.listText ?? text;
           const message = this.lists.apply({
             ...(typeof args.list === "string" ? { list: args.list } : {}),
             // A build the player is about to go and make is a packing list whether or not the model says so: it
             // forgot the kind and the list then never ticked itself off (FC-166).
             ...(args.kind === "packing" || args.kind === "plain" ? { kind: args.kind } : wantsPackingList(this.currentQuestion) ? { kind: "packing" as const } : {}),
-            ...(Array.isArray(args.add) ? { add: args.add.map(String) } : {}),
-            ...(Array.isArray(args.set) ? { set: args.set.map(String) } : {}),
+            ...(adds.length ? { add: adds.map(listText) } : {}),
+            ...(sets.length ? { set: sets.map(listText) } : {}),
             ...(Array.isArray(args.done) ? { done: args.done.map(String) } : {}),
             ...(Array.isArray(args.undone) ? { undone: args.undone.map(String) } : {}),
             ...(Array.isArray(args.remove) ? { remove: args.remove.map(String) } : {}),
@@ -1076,7 +1092,7 @@ export class Agent {
           if (args.clear === true || !list) void this.clearRequests(true);
           const extra = list?.kind === "packing" ? await this.checkPackingNow(list) : [];
           this.showLists();
-          const full = [message, ...extra].join(" ");
+          const full = [message, ...(renamed ? [renamed] : []), ...extra].join(" ");
           this.deps.emit({ type: "tool", summary: full });
           return full;
         }

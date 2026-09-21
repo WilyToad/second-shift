@@ -9,12 +9,16 @@ import type { Prototypes, Stock } from "@companion/interfaces";
 export type Need = { item: string; count: number; text: string };
 export type Addition = Need & { reason: string };
 
+/** "20 stone furnace" into its count and its words. A line with no number is one of the thing. */
+export function splitCount(text: string): { count: number; said: string; counted: boolean } {
+  const m = /^\s*(?:x\s*)?(\d[\d,]*)?\s*(?:x\s+)?(.+?)\s*$/.exec(text);
+  if (!m) return { count: 1, said: text.toLowerCase().trim(), counted: false };
+  return { count: m[1] ? Number(m[1].replace(/,/g, "")) : 1, said: m[2]!.toLowerCase().trim(), counted: Boolean(m[1]) };
+}
+
 /** "20 stone furnace", "200 transport belt": what the tool writes on a list, back into an item and a count. */
 export function parseNeed(text: string, p: Prototypes | null): Need | null {
-  const m = /^\s*(?:x\s*)?(\d[\d,]*)?\s*(?:x\s+)?(.+?)\s*$/.exec(text);
-  if (!m) return null;
-  const count = m[1] ? Number(m[1].replace(/,/g, "")) : 1;
-  const said = m[2]!.toLowerCase().trim();
+  const { count, said } = splitCount(text);
   const item = resolveItem(said, p);
   return item ? { item, count, text } : null;
 }

@@ -8,7 +8,12 @@
 //     is ticked when the player says so.
 // Capped, because the active list rides in every turn's tail: a handful of lists, 25 items each, short text.
 
-export type ListItem = { text: string; done: boolean; note?: string };
+/**
+ * `untracked`: a packing item whose words name nothing in this save, so the check can never tick it (FC-246). It
+ * stays on the list — the player wrote it — but it is out of the count, because a list that can never reach "11 of
+ * 11" is a list that never finishes.
+ */
+export type ListItem = { text: string; done: boolean; note?: string; untracked?: boolean };
 /** `kind` says whether something keeps the list current: "packing" is checked against the player's stock. */
 export type Checklist = { name: string; kind: "plain" | "packing"; items: ListItem[]; updatedAt: number };
 
@@ -210,13 +215,19 @@ export class Lists {
   }
 
   /** Sets an item's state and note from a rule (FC-166), without pretending the player asked. */
-  update(listName: string, text: string, state: { done?: boolean; note?: string }): boolean {
+  update(listName: string, text: string, state: { done?: boolean; note?: string; untracked?: boolean }): boolean {
     const list = this.get(listName);
     const item = list ? findItem(list.items, text) : undefined;
     if (!list || !item) return false;
     let changed = false;
     if (state.done !== undefined && item.done !== state.done) { item.done = state.done; changed = true; }
     if (state.note !== undefined && item.note !== state.note) { item.note = clean(state.note); changed = true; }
+    if (state.untracked !== undefined && Boolean(item.untracked) !== state.untracked) {
+      // An untracked item is never "done": nothing can tick it.
+      if (state.untracked) item.done = false;
+      item.untracked = state.untracked || undefined;
+      changed = true;
+    }
     if (changed) list.updatedAt = this.now();
     return changed;
   }
@@ -244,11 +255,15 @@ export class Lists {
   format(): string[] {
     const active = this.active();
     if (!active) return [];
-    const done = active.items.filter((i) => i.done).length;
-    const lines = [`the player's list "${active.name}" (${done} of ${active.items.length} done${active.kind === "packing" ? ", a packing list kept in step with what they carry" : ""}):`];
-    for (const item of active.items) lines.push(`- [${item.done ? "x" : " "}] ${item.text}${item.note ? ` — ${item.note}` : ""}`);
+    const tracked = active.items.filter((i) => !i.untracked);
+    const done = tracked.filter((i) => i.done).length;
+    const lines = [`the player's list "${active.name}" (${done} of ${tracked.length} done${active.kind === "packing" ? ", a packing list kept in step with what they carry" : ""}):`];
+    for (const item of active.items) lines.push(`- [${item.untracked ? "?" : item.done ? "x" : " "}] ${item.text}${item.note ? ` — ${item.note}` : ""}${item.untracked ? " — not a thing in this save, so it isn't counted" : ""}`);
     if (!active.items.length) lines.push("- (empty)");
-    const others = this.lists.filter((l) => l !== active).map((l) => `"${l.name}" (${l.items.filter((i) => i.done).length}/${l.items.length})`);
+    const others = this.lists.filter((l) => l !== active).map((l) => {
+      const t = l.items.filter((i) => !i.untracked);
+      return `"${l.name}" (${t.filter((i) => i.done).length}/${t.length})`;
+    });
     if (others.length) lines.push(`the player's other lists: ${others.join(", ")}`);
     return lines;
   }
