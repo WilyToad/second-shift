@@ -1,6 +1,6 @@
 # S34 — Hands free, for real
 
-- **Status:** active
+- **Status:** done
 - **Started:** 2026-09-18
 - **Goal:** Hands-free that behaves like a coworker: you can talk over him, he stops, and what he says is honest to the last word — no restating the list, no borrowed material names, no stray markup — and the local-transcriber question gets its answer from your own recordings, then its first slice: your voice transcribed on this Mac.
 - **Acceptance:** With read-aloud on, speaking over an answer stops it within a second and becomes the next question, and Ballast's own voice never triggers it; a list is only restated when asked about; a one-word material this save doesn't have gets a correction and a turn of phrase never does; no HTML tag reaches the page; the words being spoken are marked in the thread as the voice reads them; FC-189's three-way comparison is written into PLAN with a verdict — including "keep the browser engine" if the numbers say so — measured on the player's own clips; every eval and the corpus test still green.
@@ -72,3 +72,44 @@ Risks named going in: barge-in's false-stop rate is the whole item — a compani
 Worked through on the player's "get as much done as you can": FC-226 and FC-224 done; FC-216 done but unseen; FC-219 built, its e2e waiting on the game; FC-217 built and switched off, waiting on a measurement only the player's speakers and mic can give; FC-189's harness built and proven on the 35 clips (one with ground truth), the comparison waiting on the installs. The game stayed closed all night on purpose (the player's battery), and nothing was pushed. Every check green: 258 tests, typecheck, lint, work files.
 
 **For the morning, in order:** (1) approve or decline the FC-189 installs — `brew install whisper.cpp` plus one ~0.6–1.6 GB model, and a pip environment for mlx-whisper and parakeet-mlx — then `bun scripts/compare-transcribers.ts --vocab` does the rest; (2) with the game up, `bun scripts/e2e-packing.ts` closes FC-219; (3) VERIFY rows 20–22: ten answers with "Talk over him" on, counting false stops, decides whether barge-in can default on; a glance at the mark while an answer reads; one unrelated question with a list up.
+
+## Review
+
+Twelve items, and the sprint's own goal — "hands-free that behaves like a coworker" — turned out to rest on things
+no test could have told us. Nine of the twelve were built in one overnight pass and looked finished; **five of them
+were wrong in the player's hands**, and only a live session said so.
+
+**Barge-in is the whole story of this sprint.** FC-217 shipped behind a switch, off by default, waiting on a
+false-stop rate nobody had measured. The first time the player turned it on, *nothing heard them* — the on-device
+engine ends recognition after every sent question and the restart was skipped while an answer was pending, so the
+mic was closed for exactly the window the feature exists for. Fixed, and the fake recognizer in the test now ends
+the way the real one does, so it would have caught it. Then "nevermind" was swallowed twice: an interim "never" was
+judged as echo and marked consumed, so the final "never mind" that replaced it at the same index was never looked
+at again. Then the player said the thing that dissolved the feature's hardest problem — *"I'm using headphones…
+let's just require headset. If the user starts speaking, he's interrupting."* The echo rule, its word lists, the
+687-case benchmark and the scorer script all went (FC-242), and with no echo to guess at, the switch had nothing
+left to protect: it defaults on, and there is no switch (FC-217 closed).
+
+**FC-219 took four attempts and each one was a smaller misunderstanding than the last.** The list was in the prompt
+on every turn and a guidance note asked the model not to mention it — it mentioned it anyway. Taking the list out
+of turns that aren't about it wasn't enough: the model carried the shortages from its own previous answer. A tail
+cutter fixed that, and then missed "Whenever you're ready, the packing list is waiting" because it only knew
+progress-report phrasings; and then judged each paragraph on its first sentence, where a colon counted as the end,
+so "Back to work: you're still short on the outpost kit" was judged on "Back to work:". It is now judged a sentence
+at a time. Worth recording plainly: **the e2e that "verified" FC-219 had no check that could fail this way**, and
+the item was marked done on it. The check exists now.
+
+**What measurement bought.** FC-189 ran three transcribers over the player's own clips before any of them shipped —
+whisper 19/24 exact at 120 ms, the vocabulary prompt making it *worse*, Parakeet 16/24 — and FC-230 built the
+verdict: local transcription, resident, VAD-gated, names put back. Its two costs were both found by measuring
+rather than guessing: the cold call after idling (666 ms, 34 ms from the browser's text going instead) became 152 ms
+with a warm-up clip (FC-232), and three orphaned whisper-servers at 1.8 GB each were found only because Splash
+refused to start for want of memory (FC-238).
+
+**FC-241 came from the player watching it work.** Barge-in landed, and the first thing they noticed was that "No,
+stop." was treated as an ordinary next question: *"I'd like to give the companion the chance to respond to being
+cut off… I wouldn't want them to say it EVERY time."* So a cut-in now carries what he was saying when it happened,
+a bare stop makes no model call at all, and he may remark on it once in three.
+
+**Left for the player:** VERIFY rows 10, 11 and 16 — two hover questions from S27 that no session has got to, and
+one that needs a map with bots. Nothing in this sprint depends on them.
