@@ -622,6 +622,21 @@ browser's text is sent instead — against ~130 ms warm. A short clip of the Mac
 whisper every 3 idle minutes keeps it paged in: **152 ms first call after 30 idle minutes**, 129–139 ms after.
 Cost: one 1.7 s clip's inference (~130 ms of GPU) per 3 idle minutes, nothing while the player is talking.
 
+**Typed decisions, live (FC-244/246/247, 2026-09-20).** The epic's three slices ran on the dev save, each suite both
+ways — `COMPANION_DECISIONS` pins a run to the code paths, which is what a baseline needs now that a key is present:
+
+| | with Jev | pinned local |
+|---|---|---|
+| `e2e-packing` (a build becomes a list that ticks itself off) | 6/6 | 6/6 |
+| `e2e-watch` (the background pass) | 10/10 | 10/10 |
+| `eval-requests` (cards and actions only when asked) | 18/18 | — |
+
+Two bugs the Jev runs surfaced, both in the FC-219 tail cutter and neither caused by Jev: it only knew the
+progress-report phrasings, so "Whenever you're ready, the packing list is waiting" went through; and it judged each
+paragraph on its first sentence, where a colon counted as the end — so "Back to work: you're still short on the
+outpost kit" was judged on "Back to work:". A trailing paragraph that mentions the list at all is now cut, and a
+colon no longer ends the sentence being judged.
+
 **Intents are not a Jev question (FC-245, 2026-09-20).** The first slice of the epic was meant to be the 22 regex
 classifiers in `intent.ts`, since every misroute bug came from them. Benchmarked before routing anything
 (`scripts/bench-intents.ts`, 62 reviewed questions × 22 classifiers, one call each, 182 ms p50): **regex 1364/1364,
