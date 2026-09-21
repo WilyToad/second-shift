@@ -26,16 +26,25 @@ local function draw(player)
   local s = state()
   destroy(player)
   if not s.shown or not s.name or s.name == "" or #s.items == 0 then return end
-  local done = 0
-  for _, item in pairs(s.items) do if item.done then done = done + 1 end end
+  -- An untracked item can never be ticked, so it is not part of the count: the panel has to say the same number
+  -- the companion says (FC-246).
+  local done, tracked = 0, 0
+  for _, item in pairs(s.items) do
+    if not item.untracked then
+      tracked = tracked + 1
+      if item.done then done = done + 1 end
+    end
+  end
   local frame = player.gui.left.add({ type = "frame", name = FRAME, direction = "vertical", caption = s.name })
-  frame.add({ type = "label", caption = done .. " of " .. #s.items .. " done", style = "bold_label" })
+  frame.add({ type = "label", caption = done .. " of " .. tracked .. " done", style = "bold_label" })
   local list = frame.add({ type = "flow", direction = "vertical" })
   for i, item in ipairs(s.items) do
     if i > MAX_SHOWN then break end
     local text = item.text
     if item.note and item.note ~= "" then text = text .. "  (" .. item.note .. ")" end
-    if item.done then
+    if item.untracked then
+      list.add({ type = "label", caption = "? " .. text })
+    elseif item.done then
       list.add({ type = "label", caption = TICK .. DONE_COLOUR .. text .. "[/color]" })
     else
       list.add({ type = "label", caption = "○ " .. text })

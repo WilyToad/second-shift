@@ -30,25 +30,28 @@ export function ListPanel() {
   const { lists: all, active } = lists.value;
   if (!all.length) return null;
   const current = all.find((l) => l.name === active) ?? all[0]!;
-  const done = current.items.filter((i) => i.done).length;
+  // An item whose words name nothing in this save can never be ticked, so it isn't part of the count — the
+  // companion says "3 of 9" and the panel has to agree with him (FC-246).
+  const tracked = current.items.filter((i) => !i.untracked);
+  const done = tracked.filter((i) => i.done).length;
   return (
     <section class="panel list-panel" aria-label="Lists the companion keeps">
       <div class="panel-head">
         <span class="label">{current.name}</span>
-        <span class="label-sub num">{done} of {current.items.length} done</span>
+        <span class="label-sub num">{done} of {tracked.length} done</span>
       </div>
       <ul class="check-list">
         {current.items.length === 0 && <li class="empty">Ask for items and they show up here.</li>}
         {current.items.map((item) => (
-          <li key={item.text} class="check" data-done={item.done ? "yes" : "no"}>
-            <span class="tick" aria-hidden="true">{item.done ? "✓" : "○"}</span>
-            <span class="check-text"><RichName text={item.text} />{item.note ? <span class="check-note"> — {item.note}</span> : null}</span>
+          <li key={item.text} class="check" data-done={item.untracked ? "untracked" : item.done ? "yes" : "no"}>
+            <span class="tick" aria-hidden="true">{item.untracked ? "?" : item.done ? "✓" : "○"}</span>
+            <span class="check-text"><RichName text={item.text} />{item.note ? <span class="check-note"> — {item.note}</span> : null}{item.untracked ? <span class="check-note"> — not a thing in this save, so it isn't counted</span> : null}</span>
           </li>
         ))}
       </ul>
       {all.length > 1 && (
         <div class="panel-foot label-sub">
-          also: {all.filter((l) => l !== current).map((l) => `${l.name} (${l.items.filter((i) => i.done).length}/${l.items.length})`).join(", ")}
+          also: {all.filter((l) => l !== current).map((l) => { const t = l.items.filter((i) => !i.untracked); return `${l.name} (${t.filter((i) => i.done).length}/${t.length})`; }).join(", ")}
         </div>
       )}
     </section>

@@ -260,7 +260,7 @@ export const actions = {
   // FC-164: the active list, pushed to the game for its read-only panel. The player shows or hides it; only the
   // companion changes what's on it.
   set_list: {
-    args: z.object({ name: z.string(), items: luaArray(z.object({ text: z.string(), done: z.boolean(), note: z.string().optional() })) }),
+    args: z.object({ name: z.string(), items: luaArray(z.object({ text: z.string(), done: z.boolean(), note: z.string().optional(), untracked: z.boolean().optional() })) }),
     data: z.object({ shown: z.number(), name: z.string() }),
     kind: "look",
   },

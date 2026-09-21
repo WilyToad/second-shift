@@ -124,3 +124,14 @@ test("FC-244: one call carries the whole batch, in Jev's own shape", async () =>
   expect(d.counts.calls).toBe(1);
   expect(d.counts.inputTokens).toBe(0); // this reply carried no usage
 });
+
+test("FC-244: the counts are per question, so a turn can record which path answered it", async () => {
+  const d = new Decisions({
+    key: "k",
+    mode: "auto",
+    fetch: (async () => new Response(JSON.stringify({ answers: { world: { type: "noul", noul: 0.95 }, pick: { type: "choice", choice: "inserter", confidence: 0.2 } } }))) as never,
+  });
+  const before = { ...d.counts };
+  await d.decide("state", { world: questions.world, pick: questions.pick });
+  expect({ jev: d.counts.jev - before.jev, local: d.counts.local - before.local }).toEqual({ jev: 1, local: 1 });
+});

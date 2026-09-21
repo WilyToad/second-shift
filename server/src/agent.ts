@@ -57,6 +57,8 @@ export type TurnRecord = {
   repeated?: boolean;
   /** A list report was cut off the end (FC-219). */
   listCut?: boolean;
+  /** How many of the turn's judgement calls Jev answered, and how many fell to the code (FC-244). */
+  decisions?: { jev: number; local: number };
   /** Tool calls dropped because the player didn't ask for them (FC-126). */
   dropped?: number;
   totalMs: number;
@@ -410,7 +412,7 @@ export class Agent {
     this.deps.emit({ type: "lists", lists: this.lists.all(), active: this.lists.active()?.name });
     void this.deps.game.call("set_list", {
       name: this.lists.active()?.name ?? "",
-      items: (this.lists.active()?.items ?? []).map((i) => ({ text: i.text, done: i.done, ...(i.note ? { note: i.note } : {}) })),
+      items: (this.lists.active()?.items ?? []).map((i) => ({ text: i.text, done: i.done, ...(i.note ? { note: i.note } : {}), ...(i.untracked ? { untracked: true } : {}) })),
     }).catch(() => {}); // an older mod or no game: the console still shows it
   }
 
@@ -464,6 +466,7 @@ export class Agent {
 
   async ask(rawQuestion: string, thinking = false, spoken = false, interrupted?: Interrupted): Promise<void> {
     const started = performance.now();
+    const decisionsBefore = { ...(this.deps.decisions?.counts ?? { jev: 0, local: 0 }) };
     // Spoken over the answer (FC-241): he may remark on it once in a few; a bare "stop" with no remark due is just
     // that — the reading has stopped, nothing to answer, no model call.
     let cutIn: { during: string; stopOnly: boolean; remark: boolean } | undefined;
@@ -747,6 +750,14 @@ export class Agent {
           this.deps.log?.(`Answer (${result.usage?.completion_tokens ?? "?"} tok, ${Math.round(performance.now() - started)} ms): ${full.replace(/\s*\n+\s*/g, " | ")}`);
           record.visibleTtftMs = ttftMs;
           record.totalMs = performance.now() - started;
+          // Which path answered this turn's judgement calls, so a session says plainly whether Jev was up, how
+          // often it declined, and what it was asked (FC-244).
+          const counts = this.deps.decisions?.counts;
+          if (counts) {
+            const jev = counts.jev - decisionsBefore.jev;
+            const local = counts.local - decisionsBefore.local;
+            if (jev || local) record.decisions = { jev, local };
+          }
           this.logTurn(record);
           await this.compactIfNeeded();
           this.saveSession();

@@ -30,4 +30,6 @@ console.log(`median gap visible − server ttft (single-round): ${fmt(median(sin
 // Model misses cut in code (FC-126, FC-130): how often they happen.
 const repeats = turns.filter((t) => t.repeated).length;
 const droppedTurns = turns.filter((t) => t.dropped).length;
+const decided = turns.reduce((n, t) => ({ jev: n.jev + (t.decisions?.jev ?? 0), local: n.local + (t.decisions?.local ?? 0) }), { jev: 0, local: 0 });
+if (decided.jev || decided.local) console.log(`typed decisions: ${decided.jev} answered by Jev, ${decided.local} by the code paths (FC-244)`);
 console.log(`answers cut for repeating: ${repeats} of ${turns.length} · turns with unasked actions dropped: ${droppedTurns} (${turns.reduce((n, t) => n + (t.dropped ?? 0), 0)} calls) · answers corrected: ${turns.filter((t) => t.corrected).length}`);
