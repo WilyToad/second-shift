@@ -103,6 +103,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-248 The in-game list panel stays blank after a game restart
+  - Notes: found by the player, 2026-09-20, checking the console against the game: "I don't see a list in-game even if I hit ALT+L. I see one in the console." The mod's panel lives in the save's own storage, so restarting the game empties it — while the server and the console still hold the list. `showLists()` only fires when the list changes, and a restart of the *same* map doesn't even count as a map change, so the panel stayed blank for the rest of the session and Alt+X/Alt+L had nothing to draw.
+  - Done: the server watches the game's connection and re-sends the active list whenever it comes back (`agent.resendLists()`); unit test on the reconnect.
+
 - [x] FC-238 whisper-server outlives the server that started it
   - Notes: found 2026-09-19 while starting Splash for FC-237: three `whisper-server` processes at 1.8 GB each, one per server restart of the day — `pkill` of the Bun server never reached its child, and the next server saw the port answering and logged "ready in 0.0 s" over the orphan. 3.5 GB of the player's memory gone to nothing.
   - Done: SIGINT/SIGTERM stop whisper-server before the server exits; a whisper-server already answering on the port is used as is (one left by a crash), rather than a second one that can't bind. Checked by restarting the server and counting `whisper-server` processes: one.

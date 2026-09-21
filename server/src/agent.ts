@@ -405,6 +405,16 @@ export class Agent {
   /** The console shows every list; the active one also goes to the game's panel (FC-164). */
   private listsShown = false;
 
+  /**
+   * Pushes the active list to the game again (FC-248). The mod's panel lives in the save's storage, so a game
+   * restart empties it while the server and the console still have the list — and `showLists` only fires when the
+   * list changes, so the in-game panel stayed blank for the rest of the session and Alt+L had nothing to draw.
+   */
+  resendLists(): void {
+    this.listsShown = this.lists.all().length > 0;
+    if (this.listsShown) this.showLists();
+  }
+
   private showLists(): void {
     // Nothing to show and nothing shown before: stay quiet, so a conversation without lists is unchanged.
     if (!this.lists.all().length && !this.listsShown) return;

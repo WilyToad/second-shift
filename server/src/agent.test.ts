@@ -1054,3 +1054,18 @@ test("FC-219: with a list up, an unrelated question is told not to report on it;
   await agent.ask("am I ready?");
   expect(model.seen.at(-1)!.at(-1)!.content as string).not.toContain("the player's list isn't in this turn");
 });
+
+test("FC-248: the list is pushed to the game again when it reconnects, because the save's panel is empty", async () => {
+  const { agent, calls } = setup([
+    { tool: "update_list", args: { list: "packing", kind: "packing", add: ["20 stone furnace", "200 transport belt"] } },
+    { text: "List started." },
+  ]);
+  await agent.ask("start a packing list: 20 stone furnace and 200 transport belt");
+  const sent = () => calls.filter((c) => c.action === "set_list").length;
+  const afterFirst = sent();
+  expect(afterFirst).toBeGreaterThan(0);
+  // A reconnect with nothing else changing: the panel is blank in the game, so it is drawn again.
+  agent.resendLists();
+  expect(sent()).toBe(afterFirst + 1);
+  expect(calls.at(-1)!.args).toMatchObject({ name: "packing" });
+});

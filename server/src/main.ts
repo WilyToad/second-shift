@@ -302,7 +302,11 @@ async function warmUp(): Promise<void> {
 }
 
 let lastDigestSent: Snapshot | undefined;
+let wasConnected = false;
 game.onStatus((s) => {
+  // The game came back: its panel is whatever the save had, so the list has to be sent again (FC-248).
+  if (s.connected && !wasConnected) agent.resendLists();
+  wasConnected = s.connected;
   const id = s.latest?.digest.map_id;
   if (id && id !== mapId) {
     const first = mapId === undefined;
