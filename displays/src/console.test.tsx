@@ -42,3 +42,43 @@ test("alert feed and live panel render events, research, rates and stalled scien
   expect(root.querySelector(".rate-row .spark path.line")).not.toBeNull(); // sparkline drawn from 2 points
   expect(root.querySelector(".delta-down")?.textContent).toContain("0 · 15.6"); // stalled science flagged
 });
+
+test("FC-163/FC-246: the list panel ticks what's done and leaves untrackable items out of the count", async () => {
+  const { render } = await import("preact");
+  const { ListPanel } = await import("./console");
+  const { onMessage } = await import("./store");
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  onMessage({
+    type: "lists",
+    active: "smelting outpost",
+    lists: [
+      {
+        name: "smelting outpost",
+        kind: "packing",
+        updatedAt: 1,
+        items: [
+          { text: "20 stone-furnace", done: true, note: "have 24" },
+          { text: "200 transport-belt", done: false },
+          // Words that name nothing in this save: shown, but never part of "1 of 2".
+          { text: "a power source", done: false, untracked: true },
+        ],
+      },
+      { name: "other", kind: "plain", updatedAt: 1, items: [{ text: "x", done: true }, { text: "a wish", done: false, untracked: true }] },
+    ],
+  });
+  render(<ListPanel />, root);
+  await new Promise((r) => setTimeout(r, 5));
+  const text = root.textContent ?? "";
+  // Two trackable items, one done — the number the companion says out loud.
+  expect(text).toContain("1 of 2 done");
+  expect(text).not.toContain("1 of 3 done");
+  expect(text).toContain("a power source");
+  expect(text).toContain("not a thing in this save");
+  // The untracked row is marked apart from done and not-done, so nothing reads as ticked that can't be.
+  const marks = [...root.querySelectorAll("li.check")].map((li) => li.getAttribute("data-done"));
+  expect(marks).toEqual(["yes", "no", "untracked"]);
+  // Other lists count the same way: one item, one done.
+  expect(text).toContain("other (1/1)");
+  render(null, root);
+});
