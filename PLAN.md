@@ -688,6 +688,30 @@ FC-236 (labels from play) points at, with the honest correction that the labels 
 that the training path is CUDA notebooks, not this Mac, today. Verdict unchanged: nothing adopted; the shape and the
 model to train are now known.
 
+**Jev itself, hosted (2026-09-20).** The player got API access (key in the gitignored `.env`, read by the benchmark
+script and never printed). Same 717 cases, `POST /v1/systemone`, one choice question per case, sequential:
+
+| | rule | Laya base | **Jev (hosted)** |
+|---|---|---|---|
+| overall | 717/717 | 512/717 | **694/717 (96.8%)** |
+| echo / player | 480 / 237 | 397 / 115 | 476 / 480 · 218 / 237 |
+| p50 / p95 per decision | µs | 6 ms | **356 / 455 ms** (network) |
+| wrong at ≥0.8 confidence | — | 1 of 205 | 6 of 23; confidence median 0.97 |
+| data sent | — | — | 305k input tokens for 717 calls (~425 a call) |
+
+Zero-shot, it does what the untrained locals couldn't and Laya's base can't: 15 of its 23 misses are on the
+"quoting him back" templates, half of which are garbage strings ("say that again, spoils even faster 3 min"), and it
+answered those at 0.08–0.49, i.e. unsure. The claims hold on our data: typed decisions, calibrated, ~350 ms.
+
+**What it changes, and what it doesn't.** The barge-in question no longer exists (headset required, FC-242). The
+decisions left that no code rule expresses — the watcher's "worth mentioning" (FC-193), correction arbitration
+(FC-171/224/229), read-aloud speakability (FC-220) — are all ones Jev would plausibly do well at, and the first is
+in the background where 356 ms is nobody's wait. Against it: the project's premise is that nothing leaves the machine.
+A Jev call sends a finding line or a sentence, not the save, but it's the one thing in the stack that would leave.
+Pricing wasn't retrievable (their pricing page 404s; the account shows it). Not adopted by default; if the player
+wants it, it is an opt-in hosted decision service, off unless a key is present and a switch is on, for the watcher
+first — filed only on their word.
+
 **S31's experiment, run (2026-09-18, the player's Chrome session, ten test sentences; 35 clips kept by the end of the night):** the two
 mechanisms were tested on both engines and the verdict is clean. **Chrome's online service refuses a phrase list
 outright** (`phrases-not-supported`, the moment recognition starts) — biasing is on-device only, as the explainer
