@@ -61,7 +61,9 @@ export async function resolveListItems(texts: string[], protos: Prototypes | nul
     const item = protos ? resolveItem(splitCount(text).said, protos) : null;
     return { text, item, listText: item ? rename(text, item) : text, via: "local" as const, confidence: 0 };
   });
-  if (!protos || !decisions?.available()) return out;
+  // Note `decisions.decide` is called even when it will answer locally: it is the one place the paths are counted,
+  // and a session with Jev down has to show that in its turn log (FC-244).
+  if (!protos || !decisions) return out;
   const open = out.map((r, i) => ({ r, i })).filter(({ r }) => !r.item);
   if (!open.length) return out;
 

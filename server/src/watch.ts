@@ -61,7 +61,7 @@ export type Triaged = Finding & { level: number; via: "local" | "jev"; confidenc
  */
 export async function triage(found: Finding[], decisions?: Decisions): Promise<Triaged[]> {
   const out: Triaged[] = found.map((f) => ({ ...f, level: LOCAL_LEVEL, via: "local", confidence: 0 }));
-  if (!found.length || !decisions?.available()) return out;
+  if (!found.length || !decisions) return out;
   const questions: Record<string, Score> = {};
   found.forEach((f, i) => {
     questions[`f${i}`] = {

@@ -86,7 +86,7 @@ test("FC-219: a later paragraph that reports the list is cut with everything aft
   const run = (pieces: string[]) => { const f = new TailCutFilter(LIST_REPORT); let out = ""; for (const p of pieces) out += f.push(p); out += f.end(); return { out, cut: f.cut, text: f.text() }; };
   // The live answer, token by token.
   const live = "I don't dwell on it. There's a hauler in a crater.\n\nWhat's on your plate: 200 belts, 16 assembling machine 1 still short, and no free bots.".match(/.{1,7}/gs)!;
-  expect(run(live)).toEqual({ out: "I don't dwell on it. There's a hauler in a crater.\n\n", cut: true, text: "I don't dwell on it. There's a hauler in a crater." });
+  expect(run(live)).toEqual({ out: "I don't dwell on it. There's a hauler in a crater.", cut: true, text: "I don't dwell on it. There's a hauler in a crater." });
   expect(run(["The manifest is what I miss.\n\nPacking list is 3 of 11 ticked; foundries still unaccounted."]).cut).toBe(true);
   // A bare mention on the end is the same bug wearing a friendlier face (live, 2026-09-20).
   expect(run(["I was flying when it came down.\n\nWhenever you're ready, the packing list is waiting."]).cut).toBe(true);
@@ -97,6 +97,15 @@ test("FC-219: a later paragraph that reports the list is cut with everything aft
   expect(fine).toEqual({ out: "No rails near you.\n\nThe nearest patch is west. Want it marked?", cut: false, text: "No rails near you.\n\nThe nearest patch is west. Want it marked?" });
   // A colon is not the end of the sentence being judged (live, 2026-09-20).
   expect(run(["I keep the loads level.\n\nBack to work: you're still short on the outpost kit, and there's an hour of daylight."]).cut).toBe(true);
+  // The drift arrives in the same paragraph as the answer just as often (live, 2026-09-20), so it is judged a
+  // sentence at a time — and the opening sentence always survives, so nothing is ever cut to nothing.
+  expect(run(["Every day, in the way you miss a sound you can't hear anymore. But that's not the question that gets the outpost built. When you're ready to move on, the packing list is waiting."])).toEqual({
+    out: "Every day, in the way you miss a sound you can't hear anymore. But that's not the question that gets the outpost built.",
+    cut: true,
+    text: "Every day, in the way you miss a sound you can't hear anymore. But that's not the question that gets the outpost built.",
+  });
+  // A decimal point is not the end of a sentence.
+  expect(run(["A biochamber runs at 3.5 items a second. That is the whole of it."]).cut).toBe(false);
   // A first paragraph that mentions the list is the answer itself and is never cut.
   expect(run(["The list is 3 of 11 done."]).cut).toBe(false);
   expect(run(["Your list is 3 of 11 done.\n\nThe belts are what's left."]).cut).toBe(false);

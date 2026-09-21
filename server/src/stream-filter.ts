@@ -150,16 +150,20 @@ export class RepeatFilter {
 }
 
 /**
- * Cuts the tail of an answer at a paragraph that shouldn't be there (FC-219): with a list up and a question that
- * isn't about it, the model kept ending answers with the list's progress — "What's on your plate: 200 belts…" —
- * whatever the notes said, because the previous turn's answer had it. The first paragraph always streams; each
- * later one is held until its first sentence (or `peek` characters) is in, judged against the patterns, and either
- * released or dropped with everything after it.
+ * Cuts the tail of an answer where it turns to something that shouldn't be there (FC-219): with a list up and a
+ * question that isn't about it, the model kept ending answers with the list — "What's on your plate: 200 belts…",
+ * "When you're ready to move on, the packing list is waiting" — whatever the notes said, because its own previous
+ * answer had it.
+ *
+ * Judged a sentence at a time, not a paragraph: the drift arrived in the same paragraph as the answer often enough
+ * (live, 2026-09-20). The opening sentence always streams, so an answer can never be cut to nothing; each one after
+ * it is held until it is complete (or `peek` characters are in), judged, and either released or dropped with
+ * everything after it. This only runs on turns where the subject isn't the list, so there is nothing legitimate for
+ * it to catch.
  */
 export class TailCutFilter {
   private emitted = "";
   private held = "";
-  private paragraphs = 0;
   private judging = false;
   cut = false;
 
@@ -169,6 +173,13 @@ export class TailCutFilter {
     return this.patterns.some((p) => p.test(text));
   }
 
+  /**
+   * The end of a sentence. A colon is not one — "Back to work: you're still short on the outpost kit" was judged
+   * on "Back to work:" and let through (live, 2026-09-20) — and a decimal point isn't either, because a terminator
+   * only counts with whitespace or the end of the text after it.
+   */
+  private static readonly END = /[.!?](\s|$)/;
+
   /** Text that is safe to show now. */
   push(text: string): string {
     if (this.cut || !text) return "";
@@ -176,28 +187,26 @@ export class TailCutFilter {
     let out = "";
     for (;;) {
       if (!this.judging) {
-        const gap = this.held.search(/\n\s*\n/);
-        if (gap < 0) { out += this.held; this.held = ""; break; }
-        const boundary = gap + this.held.slice(gap).match(/\n\s*\n/)![0].length;
-        out += this.held.slice(0, boundary);
-        this.held = this.held.slice(boundary);
-        this.paragraphs++;
+        // Inside a sentence already cleared — the opening one, or one just released: it streams as it arrives.
+        const end = this.held.search(TailCutFilter.END);
+        if (end < 0) { out += this.held; this.held = ""; break; }
+        out += this.held.slice(0, end + 1);
+        this.held = this.held.slice(end + 1);
         this.judging = true;
+        continue;
       }
-      // A paragraph under judgement: wait for its first sentence or enough of it to know. A colon does not end
-      // one — "Back to work: you're still short on the outpost kit" was judged on "Back to work:" and let through
-      // (live, 2026-09-20).
-      const sentenceEnd = this.held.search(/[.!?](\s|$)/);
-      if (sentenceEnd < 0 && this.held.length < this.peek) break;
-      const seen = sentenceEnd >= 0 ? this.held.slice(0, sentenceEnd + 1) : this.held;
+      // The next sentence, held back until there is enough of it to judge.
+      const end = this.held.search(TailCutFilter.END);
+      if (end < 0 && this.held.length < this.peek) break;
+      const seen = end >= 0 ? this.held.slice(0, end + 1) : this.held;
       if (this.offends(seen)) { this.cut = true; this.held = ""; break; }
-      this.judging = false; // released: the rest of this paragraph streams as it comes
+      this.judging = false;
     }
     this.emitted += out;
     return out;
   }
 
-  /** What's left when the answer ends: a held paragraph start that never offended. */
+  /** What's left when the answer ends: a held sentence that never offended. */
   end(): string {
     if (this.cut) return "";
     const rest = this.offends(this.held) ? "" : this.held;
