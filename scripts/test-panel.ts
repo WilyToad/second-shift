@@ -33,11 +33,15 @@ try {
     { text: "20 stone furnace", done: true, note: "have 24" },
     { text: "200 transport belt", done: false, note: "0 of 200 in reach" },
     { text: "100 coal", done: false, note: "stone-furnace burns fuel" },
+    // Words that name nothing in this save: shown with a "?" and left out of the count (FC-246).
+    { text: "a power source", done: false, untracked: true },
   ];
   const set = await call("set_list", { name: "smelting outpost", items });
   const shown = await panel();
   check("the panel shows the list the companion pushed", set.ok && shown.exists && shown.caption === "smelting outpost" && shown.labels.length === items.length + 1,
     `${set.data?.shown} items in ${set.profile}; labels ${JSON.stringify(shown.labels)}`);
+  check("an untracked item is marked and left out of the count", String(shown.labels[0]).includes("1 of 3 done") && shown.labels.some((l: string) => String(l).startsWith("? a power source")),
+    `${shown.labels[0]} | ${shown.labels.find((l: string) => String(l).startsWith("?")) ?? "(no untracked row)"}`);
   check("done items are ticked and dimmed, and the count is there", String(shown.labels[0]).includes("1 of 3 done") && String(shown.labels[1]).includes("✔") && String(shown.labels[1]).includes("color=0.55"),
     `${shown.labels[0]} | ${shown.labels[1]}`);
   check("nothing in the panel is clickable", shown.clickable === 0, `${shown.clickable} clickable elements`);

@@ -76,7 +76,11 @@ function M.register(handlers)
     s.items = {}
     for _, item in pairs(args.items or {}) do
       if type(item) == "table" and type(item.text) == "string" then
-        s.items[#s.items + 1] = { text = item.text, done = item.done == true, note = type(item.note) == "string" and item.note or nil }
+        -- `untracked` has to survive the copy or the panel counts rows the companion doesn't (FC-246). An explicit
+        -- if, not `x and true or nil`: that idiom turns false into nil and has bitten this mod three times.
+        local untracked = nil
+        if item.untracked == true then untracked = true end
+        s.items[#s.items + 1] = { text = item.text, done = item.done == true, note = type(item.note) == "string" and item.note or nil, untracked = untracked }
       end
     end
     if player then draw(player) end

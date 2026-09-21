@@ -230,7 +230,10 @@ export class TailCutFilter {
  * about the list is never touched.
  */
 export const LIST_REPORT = [
-  /\b(packing |shopping |to-?do )?list\b/i,
+  // The player's list by name or by possessive — not the bare word, which is ordinary English ("the whole list of
+  // ingredients") and would silently truncate an answer.
+  /\b(packing|shopping|to-?do)[- ]list\b/i,
+  /\b(your|the)\s+list\s+(is|has|still|now)\b/i,
   /\b\d+ of \d+ (ticked|done|checked)\b/i,
   /\b(packing )?list\b.*\b(ticked|done|short|unaccounted|missing|left)\b/i,
   /what'?s (on your plate|left on the list|still short)/i,

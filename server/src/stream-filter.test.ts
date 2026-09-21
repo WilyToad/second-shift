@@ -104,6 +104,9 @@ test("FC-219: a later paragraph that reports the list is cut with everything aft
     cut: true,
     text: "Every day, in the way you miss a sound you can't hear anymore. But that's not the question that gets the outpost built.",
   });
+  // "list" is an ordinary word: an answer that uses it plainly is not a list report and is never cut.
+  expect(run(["Carbon comes from coal.\n\nThat's the whole list of ingredients, and you have all of them."]).cut).toBe(false);
+  expect(run(["It needs three techs.\n\nI can read you the list of prerequisites if you want."]).cut).toBe(false);
   // A decimal point is not the end of a sentence.
   expect(run(["A biochamber runs at 3.5 items a second. That is the whole of it."]).cut).toBe(false);
   // A first paragraph that mentions the list is the answer itself and is never cut.
