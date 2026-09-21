@@ -87,6 +87,7 @@ const tts = elevenLabsKey() ? new ElevenLabs({ key: elevenLabsKey()!, model: pro
  */
 const watcher = new Watcher({
   digest: () => game.latest()?.digest,
+  decisions,
   say: async (found, sinceMs) => {
     const protos = game.prototypes()?.data ?? null;
     const lines = found.map((f) => `- ${f.line}`).join("\n");
