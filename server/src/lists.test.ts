@@ -103,3 +103,22 @@ test("FC-163: items that merely share a word are not the same item", () => {
   expect(l.apply({ done: ["the gear wheels"] })).toContain("ticked off 50 iron gear wheel");
   expect(l.apply({ remove: ["plate"] })).toContain("removed 20 iron plate");
 });
+
+test("FC-246: an untracked item survives being saved and loaded, and stays out of the count", () => {
+  const lists = new Lists(() => 1);
+  lists.apply({ list: "packing", kind: "packing", add: ["20 stone-furnace", "a power source"] });
+  lists.update("packing", "20 stone-furnace", { done: true });
+  lists.update("packing", "a power source", { untracked: true });
+  expect(lists.format()[0]).toContain("1 of 1 done");
+
+  const reloaded = new Lists(() => 1);
+  reloaded.load(JSON.parse(JSON.stringify(lists.save())));
+  expect(reloaded.active()!.items.map((i) => [i.text, i.done, i.untracked ?? false])).toEqual([
+    ["20 stone-furnace", true, false],
+    ["a power source", false, true],
+  ]);
+  expect(reloaded.format()[0]).toContain("1 of 1 done");
+  // Nothing can tick an untracked item, even if something tries.
+  reloaded.update("packing", "a power source", { done: true });
+  expect(reloaded.active()!.items.at(-1)!.done).toBe(false);
+});

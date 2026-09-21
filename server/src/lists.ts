@@ -94,7 +94,9 @@ export class Lists {
     this.lists = data.lists.slice(0, MAX_LISTS).map((l) => ({
       name: clean(l.name, MAX_NAME) || "list",
       kind: l.kind === "packing" ? "packing" : "plain",
-      items: (l.items ?? []).slice(0, MAX_ITEMS).map((i) => ({ text: clean(i.text), done: Boolean(i.done), ...(i.note ? { note: clean(i.note) } : {}) })),
+      // Every field the item has, or the flag is lost on the next server start: `untracked` went that way once
+      // already (FC-246), as did the mod's copy of it, so list items are rebuilt in one place only.
+      items: (l.items ?? []).slice(0, MAX_ITEMS).map((i) => ({ text: clean(i.text), done: Boolean(i.done), ...(i.note ? { note: clean(i.note) } : {}), ...(i.untracked ? { untracked: true as const } : {}) })),
       updatedAt: typeof l.updatedAt === "number" ? l.updatedAt : this.now(),
     }));
     this.activeName = this.lists.find((l) => same(l.name, data.active ?? ""))?.name ?? this.lists[0]?.name;
@@ -220,14 +222,15 @@ export class Lists {
     const item = list ? findItem(list.items, text) : undefined;
     if (!list || !item) return false;
     let changed = false;
-    if (state.done !== undefined && item.done !== state.done) { item.done = state.done; changed = true; }
-    if (state.note !== undefined && item.note !== state.note) { item.note = clean(state.note); changed = true; }
     if (state.untracked !== undefined && Boolean(item.untracked) !== state.untracked) {
-      // An untracked item is never "done": nothing can tick it.
-      if (state.untracked) item.done = false;
       item.untracked = state.untracked || undefined;
       changed = true;
     }
+    if (state.note !== undefined && item.note !== state.note) { item.note = clean(state.note); changed = true; }
+    // An untracked item is never ticked, whichever order the two arrive in: nothing in the save can match it, so
+    // a tick would be a claim the data doesn't support.
+    if (state.done !== undefined && !item.untracked && item.done !== state.done) { item.done = state.done; changed = true; }
+    if (item.untracked && item.done) { item.done = false; changed = true; }
     if (changed) list.updatedAt = this.now();
     return changed;
   }
