@@ -95,6 +95,8 @@ test("FC-219: a later paragraph that reports the list is cut with everything aft
   // An innocent second paragraph is released once its first sentence is in, and the rest streams.
   const fine = run(["No rails near you.\n\nThe nearest ", "patch is west", ". Want it marked?"]);
   expect(fine).toEqual({ out: "No rails near you.\n\nThe nearest patch is west. Want it marked?", cut: false, text: "No rails near you.\n\nThe nearest patch is west. Want it marked?" });
+  // A colon is not the end of the sentence being judged (live, 2026-09-20).
+  expect(run(["I keep the loads level.\n\nBack to work: you're still short on the outpost kit, and there's an hour of daylight."]).cut).toBe(true);
   // A first paragraph that mentions the list is the answer itself and is never cut.
   expect(run(["The list is 3 of 11 done."]).cut).toBe(false);
   expect(run(["Your list is 3 of 11 done.\n\nThe belts are what's left."]).cut).toBe(false);

@@ -184,8 +184,10 @@ export class TailCutFilter {
         this.paragraphs++;
         this.judging = true;
       }
-      // A paragraph under judgement: wait for its first sentence or enough of it to know.
-      const sentenceEnd = this.held.search(/[.!?:](\s|$)/);
+      // A paragraph under judgement: wait for its first sentence or enough of it to know. A colon does not end
+      // one — "Back to work: you're still short on the outpost kit" was judged on "Back to work:" and let through
+      // (live, 2026-09-20).
+      const sentenceEnd = this.held.search(/[.!?](\s|$)/);
       if (sentenceEnd < 0 && this.held.length < this.peek) break;
       const seen = sentenceEnd >= 0 ? this.held.slice(0, sentenceEnd + 1) : this.held;
       if (this.offends(seen)) { this.cut = true; this.held = ""; break; }
