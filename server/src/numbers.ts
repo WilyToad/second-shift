@@ -4,7 +4,13 @@
 
 const NUM = String.raw`(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)`;
 const OP = String.raw`(×|x|\*|times|\+|plus|÷|/|divided by)`;
-const IS = "(?:=|equals|is|are|makes|gives|comes to|→)";
+/**
+ * What says "and the answer is". An arrow is **not** one of them: in this game it means "produces", and a recipe
+ * written tersely — "bioflux 15+12 → 4 per 6 s" — is ingredients and a yield, not a sum. Live 2026-09-20, that
+ * earned the player a "Correction: 15 + 12 = 27, not 4." The same recipe with its item names in between was
+ * already safe; without them the arrow was the only thing making it look like arithmetic.
+ */
+const IS = "(?:=|equals|is|are|makes|gives|comes to)";
 const EXPR = new RegExp(String.raw`(?<![\w.,-])${NUM}\s*${OP}\s*${NUM}\s*${IS}\s*(about |roughly |around |~|≈)?${NUM}(?![\d,]*\.\d)`, "gi");
 
 const value = (s: string) => Number(s.replace(/,/g, ""));

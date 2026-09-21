@@ -104,6 +104,10 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-249 It queued research nobody asked for, and corrected a recipe that wasn't arithmetic
+  - Notes: both found by the player walking through a live session, 2026-09-20. (1) "What should I research next?" queued moon-discovery-cerys — `ASKS_FOR.queue_research` listed `should i research` as a request form, so an advice question read as an instruction and ran immediately, which is the approval model's own rule broken ("small requests run immediately" means *asked for*). (2) "Chain on gleba: … bioflux 15+12 → 4 per 6 s" got "Correction: 15 + 12 = 27, not 4." — the arithmetic checker took `→` as an equals sign, when in this game it means "produces". The same recipe with its item names in between was already safe; the terse form was the gap.
+  - Done: `shall i`/`should i` are gone from the research request forms — the player deliberating about their own move is never a request to act — and `→` is no longer an equals sign. Two corpus rows pin the advice questions; `numbers.test.ts` pins the recipe arrows. The real request forms ("queue X", "research X", "can you research X", "yes, research it") all still act.
+
 - [x] FC-248 The in-game list panel stays blank after a game restart
   - Notes: found by the player, 2026-09-20, checking the console against the game: "I don't see a list in-game even if I hit ALT+L. I see one in the console." The mod's panel lives in the save's own storage, so restarting the game empties it — while the server and the console still hold the list. `showLists()` only fires when the list changes, and a restart of the *same* map doesn't even count as a map change, so the panel stayed blank for the rest of the session and Alt+X/Alt+L had nothing to draw.
   - Done: the server watches the game's connection and re-sends the active list whenever it comes back (`agent.resendLists()`); unit test on the reconnect.

@@ -21,3 +21,13 @@ test("FC-153: recipes, ranges and names aren't read as arithmetic", () => {
     "assembling-machine-3 x 2 = 6 slots",
   ]) expect(arithmeticCorrections(text)).toEqual([]);
 });
+
+test("FC-249: an arrow is a recipe's yield, not a sum", () => {
+  // Live 2026-09-20: "Chain on gleba: … bioflux 15+12 → 4 per 6 s" earned a "Correction: 15 + 12 = 27, not 4."
+  expect(arithmeticCorrections("bioflux 15+12 → 4 per 6 s")).toEqual([]);
+  expect(arithmeticCorrections("1 carbon + 10 yumako-mash → 1 carbon-fiber")).toEqual([]);
+  expect(arithmeticCorrections("6 steel-plate + 10 copper-cable + 12 holmium-plate → 1")).toEqual([]);
+  // A real sum is still checked, however it's written.
+  expect(arithmeticCorrections("You have 15 + 12 = 30 plates.")).toEqual(["Correction: 15 + 12 = 27, not 30."]);
+  expect(arithmeticCorrections("15 + 12 makes 30")).toEqual(["Correction: 15 + 12 = 27, not 30."]);
+});

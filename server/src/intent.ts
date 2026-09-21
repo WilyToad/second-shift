@@ -58,7 +58,7 @@ export const ASKS_FOR: Record<string, RegExp> = {
   mark_upgrade: /\b(upgrad\w*|replace)\b/i,
   set_recipe: /\b(set|switch|change|swap)\b.*\b(recipe|to make|to craft|to produce|to)\b|\bmake (it|them|those|these) (make|craft|produce)\b/i,
   // "What do I need before I can research X?" is a question, not a request to queue it.
-  queue_research: /\b(queue|start research\w*|begin research\w*|research (it|that|this|them)\b|go research|(want me to|shall i|should i|can you|could you|will you|would you) research)|^\s*(please |ok,? |okay,? |yes,? )?research\b/i,
+  queue_research: /\b(queue|start research\w*|begin research\w*|research (it|that|this|them)\b|go research|(want me to|can you|could you|will you|would you) research)|^\s*(please |ok,? |okay,? |yes,? )?research\b/i,
   // "Can you point it out to me" is asking for a map marker or a camera jump, and wasn't listed (FC-227).
   map_action: /\b(tag|pin|label|mark\w* (it |them |that |this |the [\w -]{1,24})?on (the |your |my )?map|map (tag|marker|pin)|(drop|put|place|add) a (marker|flag|pin)|marker|camera|jump|take me|go to|show me where|look at|point (it|that|them|this|him|her) (out|at)|point me (to|at)|point (to|at) (it|that|them|the))\b/i,
   set_train_stop: /\b(limit|priority|prioriti[sz]e|rename|name (it|them|those|these|the stops?)|call (it|them))\b/i,

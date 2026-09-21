@@ -94,6 +94,10 @@ export const CORPUS: [question: string, expected: string[]][] = [
   ["where are my 200 steel?", ["world","stock"]],
   ["how many labs do I have?", ["world","stock"]],
   ["research automation", ["research"]],
+  // Asking which technology to pick is advice, not an instruction to queue one: live 2026-09-20 it queued
+  // moon-discovery-cerys off the back of "what should I research next?" (FC-249).
+  ["What should I research next?", []],
+  ["Should I research automation or logistics first?", []],
   ["what am I holding?", ["status","pointed"]],
   ["what's in my inventory?", ["status"]],
   // From the player's live session (2026-09-18): the spoken form of their own packing example, no "need", no commas,
