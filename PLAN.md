@@ -708,9 +708,14 @@ decisions left that no code rule expresses — the watcher's "worth mentioning" 
 (FC-171/224/229), read-aloud speakability (FC-220) — are all ones Jev would plausibly do well at, and the first is
 in the background where 356 ms is nobody's wait. Against it: the project's premise is that nothing leaves the machine.
 A Jev call sends a finding line or a sentence, not the save, but it's the one thing in the stack that would leave.
-Pricing wasn't retrievable (their pricing page 404s; the account shows it). Not adopted by default; if the player
-wants it, it is an opt-in hosted decision service, off unless a key is present and a switch is on, for the watcher
-first — filed only on their word.
+Pricing: $0.042 per million input tokens, output free (their docs); the 717-call run was ~1.3¢.
+
+**Decided 2026-09-20 (the player): adopt Jev for typed decisions, with today's code as the fallback.** "If a Jev key
+is available, we use Jev. If not, then we fall back to our current methods." Epic FC-244 (the decisions service with
+the fallback rules), first slices FC-245 (intents, benchmarked on the classifier corpus before any routing changes),
+FC-246 (packing-list items resolved to the save's names), FC-247 (watcher triage). The helmet rule, approvals and
+the stop hotkey stay deterministic code. What leaves the Mac with a key present is written in the README when the
+service ships: question text, transcripts, finding lines, candidate names — never audio, never the save.
 
 **S31's experiment, run (2026-09-18, the player's Chrome session, ten test sentences; 35 clips kept by the end of the night):** the two
 mechanisms were tested on both engines and the verdict is clean. **Chrome's online service refuses a phrase list
