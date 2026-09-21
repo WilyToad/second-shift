@@ -184,18 +184,21 @@ change, because in a heavily modded game the model's memory of vanilla is often 
 
 ### Sharper judgement, optional (Jev)
 
-Second Shift makes a lot of small judgement calls: is that question about your factory or about a recipe, did you
-mean the save's `stone-furnace` when you said "ovens", is this hiccup worth saying out loud. All of them are decided
-by code here, and they can be crude.
+Second Shift makes small judgement calls all the time, and code is bad at two of them: did you mean this save's
+`stone-furnace` when you wrote "ovens" on a list, and is this hiccup in your factory worth interrupting you for.
 
-If you put a [Jev](https://typesafe.ai) key in your `.env` as `JEV_KEY=...`, those calls are asked of Jev instead —
-a model that answers typed questions with calibrated probabilities in about 150 ms — and the code paths stay on as
-the fallback. No key, no network, a slow answer or an unsure one, and you get exactly the behaviour you get today.
-Nothing needs switching on: the server says which way it's running at startup.
+Put a [Jev](https://typesafe.ai) key in your `.env` as `JEV_KEY=...` and those two go to Jev — a model that answers
+typed questions with calibrated probabilities in about 150 ms — with the code that did the job before still sitting
+behind it. No key, no network, a slow answer or an unsure one, and you get exactly what you get without it. There's
+nothing to switch on, and the server says which way it's running at startup.
 
-**This is the one part that leaves your Mac**, so it's plain what goes: the text of your question, the companion's
-own findings, and the candidate names it's choosing between. Never your microphone audio, never your save, never
-your game state. To keep everything local, leave `JEV_KEY` out, or run the server with `COMPANION_DECISIONS=local`.
+Deliberately **not** routed through it: working out what your question is about. Measured over 62 reviewed
+questions and 22 classifiers, the hand-written rules scored 1364/1364 and Jev 1311/1364 — so the rules kept the job.
+
+**This is the one part that leaves your Mac**, and it is a narrow part: the words written on your list, and the
+companion's own findings about your factory ("iron-plate is down from 240 to 40 a minute"). Never your questions,
+never your microphone audio, never your save or your game state. To keep everything local, leave `JEV_KEY` out, or
+run the server with `COMPANION_DECISIONS=local`.
 
 ## The helmet rule
 
@@ -222,7 +225,14 @@ So it can't place real buildings, delete things, teleport, spawn items, finish r
 | **Browser** | Any modern browser for the console; Chrome for voice |
 | **Model** | oMLX (a local MLX model server) on `127.0.0.1:8888` serving a model with tool calling. Tested with Qwen3.8 Flash-Next (4-bit), which needs about 70 GB of memory. Smaller models haven't been tested |
 
-Other model providers (OpenAI-compatible servers, hosted APIs) are planned but not built yet.
+Optional, and off unless you add a key: **ElevenLabs** (`ELEVENLABS_API_KEY`) for a better read-aloud voice,
+**whisper.cpp** (`brew install whisper.cpp`) to transcribe your voice on this Mac instead of in the browser, and
+**Jev** (`JEV_KEY`) for the two judgement calls described above. None of them is needed, and the companion behaves
+the same without them.
+
+Other model providers are part-built: the engine is a config value, so `COMPANION_MODEL_URL` and `COMPANION_MODEL`
+point the server at any OpenAI-compatible server. Splash + Qwen3.8-27B is measured and works (PLAN §5); oMLX stays
+the default.
 
 ## Setup
 

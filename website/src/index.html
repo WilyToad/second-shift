@@ -209,8 +209,9 @@
       <dl class="stats">
         <div><dt class="mono">&lt;&thinsp;0.1 ms</dt><dd>added per game tick on a large Space Age base (0.05 ms of script time in the latest profile). No map scans on a timer, only a one-time scan when a save first loads.</dd></div>
         <div><dt class="mono">~1.5 s</dt><dd>to the first words of an answer, with the model's prompt cache kept warm and the model kept awake while you talk.</dd></div>
-        <div><dt class="mono">0</dt><dd>calls to the cloud needed. The game, the mod, the server and the model all run locally; voice can use online services if you turn them on.</dd></div>
+        <div><dt class="mono">0</dt><dd>calls to the cloud needed. The game, the mod, the server and the model all run locally; voice, and the optional judgement layer below, use online services only if you turn them on.</dd></div>
       </dl>
+      <p class="note"><strong>One optional exception.</strong> Two judgement calls are ones code is bad at: which item in your save you meant when you wrote “ovens” on a list, and whether a hiccup in your factory is worth interrupting you for. Add a <a href="https://typesafe.ai">Jev</a> key and those two are asked of it — typed questions, calibrated answers, about 150&thinsp;ms — with the code that did the job before still sitting behind it, so no key or no network changes nothing. What leaves your Mac is narrow and stated: the words on your list, and the companion’s own findings. Never your questions, your microphone, your save or your game state.</p>
     </section>
 
     <section id="start" class="section wrap" aria-labelledby="start-title">
