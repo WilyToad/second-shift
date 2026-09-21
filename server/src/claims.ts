@@ -10,6 +10,14 @@ const CLAIMS: { says: RegExp; needs: string[]; correction: string }[] = [
   // "Nothing is queued" is a report, not a claim: the claim needs an agent ("I've queued", "queued it for you").
   { says: /\b(I'?ve|I have|I just|just) queued\b|\bqueued (it|that|them|the research|[\w-]+ for you)\b|\bresearch (has been|was) queued\b/i, needs: ["queue_research"], correction: "Correction: nothing was queued this turn — say the word and I'll queue it." },
   { says: /\b(pasted|placed) (it|them|the ghosts|the blueprint|ghosts)\b/i, needs: ["place_blueprint"], correction: "Correction: nothing was pasted this turn; a paste puts up a card to confirm first." },
+  // Sending the player to a card that isn't there (FC-252). Live 2026-09-20, on being told "Confirmed.": "I can't
+  // write it in on a spoken 'confirmed' — the app needs the approval on the card." Lists have no card, so the
+  // player was sent to look for one and then told the magic words. Only the tools that raise one count.
+  {
+    says: /\b(the|that|this) (approval )?card\b|\bconfirm (it |them )?(in|on) the app\b|\bapprove (it|them|that) in the app\b/i,
+    needs: ["map_action", "place_blueprint", "set_recipe", "mark_upgrade", "set_train_stop", "send_spidertron", "take_spidertron_back", "fill_requests"],
+    correction: "Correction: there's no card up this turn — say what you want changed and it happens, or ask for the thing that needs approving.",
+  },
 ];
 
 /** Corrections for actions the answer says happened that no tool of this turn performed. */

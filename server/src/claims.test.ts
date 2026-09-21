@@ -23,3 +23,16 @@ test("FC-229: talking about an action isn't claiming it", () => {
     "That would need a paste, which puts up a card first.",
   ]) expect(actionClaims(text, [])).toEqual([]);
 });
+
+test("FC-252: sending the player to a card that isn't there is corrected", async () => {
+  const { actionClaims } = await import("./claims");
+  // Live 2026-09-20, answering a spoken "Confirmed." about a list, which has no card at all.
+  const said = "I can't write it in on a spoken \"confirmed\" — the app needs the approval on the card.";
+  expect(actionClaims(said, ["update_list"])).toEqual(["Correction: there's no card up this turn — say what you want changed and it happens, or ask for the thing that needs approving."]);
+  expect(actionClaims("Confirm it in the app and I'll send it.", [])).toHaveLength(1);
+  // A turn that really did raise one says so freely.
+  expect(actionClaims(said, ["send_spidertron"])).toEqual([]);
+  expect(actionClaims("The card is up — confirm or cancel it in the app.", ["map_action"])).toEqual([]);
+  // Ordinary uses of the word are not a claim about the app.
+  expect(actionClaims("A card reader isn't a thing in this save.", [])).toEqual([]);
+});

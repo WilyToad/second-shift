@@ -5,6 +5,12 @@ import { openConsole } from "./lib/console";
 
 const { ws, got, until, check, results } = await openConsole({ ready: false });
 
+/** Every finding the pass judged is written here, said or not (FC-247) — so a look leaves a trace even when a
+ *  healthy factory gives it nothing to say. */
+const LABELS = new URL("../data/labels/watch.jsonl", import.meta.url).pathname;
+const judged = async () => (await Bun.file(LABELS).exists()) ? (await Bun.file(LABELS).text()).trimEnd().split("\n").filter(Boolean).length : 0;
+const judgedBefore = await judged();
+
 await until((m) => m.type === "status", 30_000);
 check("off until it's turned on", got.some((m) => m.type === "watching" && !m.on), "");
 
@@ -19,7 +25,13 @@ check("turns on when asked", Boolean(on), "");
 
 const from = got.length;
 const note = await until((m) => m.type === "note", 90_000, from) as { text: string; sinceMs: number } | null;
-check("writes a line about the factory", Boolean(note), note ? note.text : "nothing in 90 s (a healthy factory says nothing, which is also correct)");
+// A healthy factory says nothing, and that is correct — so silence on its own can't be a failure, or the suite
+// fails on the game's mood (it did once, 7/8, on a save whose labs had just been given something to do). What has
+// to be true is that the pass *looked*: either it wrote a line, or it judged findings and decided against one.
+const judgedNow = await judged();
+const looked = note !== null || judgedNow > judgedBefore;
+check("looked at the factory, and wrote a line if there was one worth writing", looked,
+  note ? note.text : `no line; ${judgedNow - judgedBefore} findings judged and none worth saying`);
 if (note) {
   check("one sentence, not a paragraph", note.text.split(/\s+/).length <= 30, `${note.text.split(/\s+/).length} words`);
   check("says nothing about itself", !/\b(the ship|hauler|manifest|i flew|trimmed)\b/i.test(note.text), note.text);

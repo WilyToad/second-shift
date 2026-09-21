@@ -757,7 +757,10 @@ export class Agent {
           this.history.push(...working.map((m, i) => (i === 0 && m.role === "user" ? { ...m, content: compactUserContent(m.content) } : m)));
           const full = [...earlier, text].filter((t) => t.trim()).join("\n\n");
           this.shown.push({ kind: "agent", text: full });
-          this.deps.log?.(`Answer (${result.usage?.completion_tokens ?? "?"} tok, ${Math.round(performance.now() - started)} ms): ${full.replace(/\s*\n+\s*/g, " | ")}`);
+          // Every round's tokens, not just the last one's: a turn that called a tool first reported "14 tok" for a
+          // hundred-token answer, which is the log lying to whoever reads it (FC-243).
+          const answerTokens = record.rounds.reduce((n, r) => n + (r.completionTokens ?? 0), 0);
+          this.deps.log?.(`Answer (${answerTokens || "?"} tok, ${Math.round(performance.now() - started)} ms): ${full.replace(/\s*\n+\s*/g, " | ")}`);
           record.visibleTtftMs = ttftMs;
           record.totalMs = performance.now() - started;
           // Which path answered this turn's judgement calls, so a session says plainly whether Jev was up, how

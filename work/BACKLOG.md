@@ -104,6 +104,11 @@ Deferred by the player (2026-09-15): "file all except FC-144 as future items". T
 
 ## Tech debt and risks
 
+- [x] FC-252 Three loose ends from the live walkthrough
+  - Notes: things seen on 2026-09-20 and not filed at the time, cleared before the playtest.
+  - **A card that wasn't there.** Told "Confirmed.", he answered "the app needs the approval on the card" — lists have no card, and he'd invented the confirmation step in the answer before. `actionClaims` now corrects a turn that sends the player to a card when no tool raised one, the same way it corrects a claimed highlight (FC-229).
+  - **The answer log undercounted.** `Answer (14 tok, …)` for a hundred-token answer: the count was the last round's, so any turn that called a tool first lied to whoever read the log. It sums every round now (FC-243).
+  - **`e2e-watch` failed on the game's mood.** It asserted a line gets written, which needs a factory with something wrong; it went 7/8 once on a save whose labs had just been given work — by the FC-249 bug, as it happens. Silence is correct behaviour, so the check is now that the pass *looked*: a line, or findings judged and none worth saying, read from the label file.
 - [x] FC-251 "Set stone-brick to 250" was dropped, and he told the player to say it again
   - Notes: found live 2026-09-20. The player said it twice (`dropped=1` both turns): the model called `update_list` correctly and `ASKS_FOR.update_list` rejected it, because a count change says none of the guard's words — no "list", "add", "remove". Worse, the answer each time was *"say 'set stone-brick to 250' to change the count"*: the companion was recommending the exact phrasing the guard rejects, so the player could never win. (An earlier e2e passed only because "Make it 30 ovens **and drop the chests**" matched on "drop".)
   - Done: the guard also reads a count change — `set/change/bump/raise/lower/increase/decrease … to <number>`, and `make it/them/that <number>`. Recipe and rate questions with numbers in them still don't act. Pinned by a test naming both sides.
