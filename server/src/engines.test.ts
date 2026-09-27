@@ -147,3 +147,8 @@ test("FC-258: the OpenAI API gets no Qwen sampling settings or thinking switch, 
   const omlx = new OmlxClient({ baseUrl: "http://127.0.0.1:8888", apiKey: "k", model: "m" });
   expect(omlx.tuning(false, 100)).toMatchObject({ max_tokens: 100, chat_template_kwargs: { enable_thinking: false }, top_k: 20 });
 });
+
+test("FC-258: an assistant turn with nothing in it is left out rather than sent as an empty text block", () => {
+  const { messages } = toAnthropicMessages([{ role: "user", content: "a" }, { role: "assistant", content: "" }, { role: "user", content: "b" }]);
+  expect(messages).toEqual([{ role: "user", content: "a" }, { role: "user", content: "b" }]);
+});

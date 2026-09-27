@@ -28,8 +28,11 @@ export type Engine = {
 
 const OMLX_URL = "http://127.0.0.1:8888";
 export const DEFAULT_OMLX_MODEL = "Qwen3.8-Flash-Next-oQ4e-mtp";
-/** The Claude API reference's default, used unless the player names another (FC-258). */
-export const DEFAULT_ANTHROPIC_MODEL = "claude-opus-5";
+/**
+ * Sonnet, as for `claude -p`: speed first (CLAUDE.md), and through the CLI it reached first words in about half
+ * Opus's time (FC-258). `COMPANION_MODEL=claude-opus-5` for the stronger model.
+ */
+export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5";
 
 /** The engine asked for; an unknown name is an error, not a silent fall back to something that sends data out. */
 export function engineName(env: Record<string, string | undefined> = process.env): EngineName {

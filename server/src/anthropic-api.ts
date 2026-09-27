@@ -45,7 +45,8 @@ export function toAnthropicMessages(messages: ChatMessage[]): { system: string; 
         try { input = JSON.parse(c.function.arguments || "{}"); } catch { /* an unparseable call is sent back empty */ }
         blocks.push({ type: "tool_use", id: c.id, name: c.function.name, input });
       }
-      out.push({ role: "assistant", content: blocks.length ? blocks : [{ type: "text", text: "" }] });
+      // An empty text block is a 400; a turn with nothing in it is left out, and the API joins the user turns around it.
+      if (blocks.length) out.push({ role: "assistant", content: blocks });
     } else if (m.role === "tool") {
       const result: Anthropic.Beta.Messages.BetaToolResultBlockParam = { type: "tool_result", tool_use_id: m.tool_call_id, content: m.content };
       const last = out.at(-1);

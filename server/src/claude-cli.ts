@@ -96,6 +96,8 @@ export class ClaudeCliClient implements ChatModel {
     return this.opts.model || DEFAULT_CLAUDE_MODEL;
   }
 
+  // `thinking` and `maxTokens` are accepted and ignored: `claude -p` has no flag for either, so a capped call (the
+  // watcher's 60 tokens, a 1-token warm-up) runs to the model's own end.
   async stream(messages: ChatMessage[], { signal, onToken, tools }: StreamOptions = {}): Promise<StreamResult> {
     const started = performance.now();
     this.cwd ??= this.opts.cwd ?? emptyFolder();

@@ -226,12 +226,12 @@ at startup which one it's using and whether anything leaves your Mac.
 |---|---|---|
 | `omlx` (default) | oMLX on this Mac | oMLX running |
 | `claude-cli` | **Your Claude subscription**, through Claude Code's `claude -p` | Claude Code installed and logged in (`claude` works in a terminal). `COMPANION_MODEL=sonnet` (default), `opus` or `haiku` |
-| `anthropic` | The Anthropic API, billed per token | `ANTHROPIC_API_KEY`. `COMPANION_MODEL` defaults to `claude-opus-5` |
+| `anthropic` | The Anthropic API, billed per token | `ANTHROPIC_API_KEY`. `COMPANION_MODEL` defaults to `claude-sonnet-5`, the fastest in our tests; `claude-opus-5` for harder questions |
 | `openai` | The OpenAI API, billed per token | `OPENAI_API_KEY` and `COMPANION_MODEL` (an OpenAI model name) |
 | `openai-compatible` | Any other OpenAI-compatible server, such as Splash | `COMPANION_MODEL_URL` and `COMPANION_MODEL` (`COMPANION_MODEL_KEY` if it wants one) |
 
-**On your Claude subscription,** answers come as fast as they do from oMLX — measured with Sonnet, first words in
-1.1–2.3 s, 6–8 s for a turn that looks something up in the game — and the same checks pass: 10 of 10 on grounding
+**On your Claude subscription,** answers start close to oMLX's pace — measured with Sonnet, first words in about 2 s
+(oMLX: 1.0–1.5 s), 6–8 s for a turn that looks something up in the game — and the same checks pass: 10 of 10 on grounding
 and 18 of 18 on "only act when asked". It uses your plan's usage like Claude Code does. `claude -p` is an agent
 with its own shell and file tools, so the companion runs it with **none** of them — no tools, no MCP servers, none of
 your Claude Code settings, plugins or memory, nothing saved — from an empty folder. Asked to run a command, it can

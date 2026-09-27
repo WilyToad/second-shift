@@ -625,7 +625,7 @@ now `COMPANION_ENGINE` (`server/src/engines.ts`): `omlx` (default), `openai-comp
 recovered by FC-184's parser. Measured through the server on Sonnet: grounding 10/10 (first words median 1.95 s),
 ask-before-acting 18/18 with real tool rounds (6–8 s a tool turn — one process per round), ratios 7/8. **Codex is not
 an option**: `codex exec` ran `ls` and `cat` in its read-only sandbox and, with its shell features off, tried MCP
-calls through a bundled plugin; 17–44 s a turn. The Anthropic API adapter (official SDK; effort instead of a thinking
+calls through a bundled plugin; 17–44 s a turn. The Anthropic API adapter (official SDK, Sonnet 5 by default for speed; effort instead of a thinking
 switch, no sampling parameters, refusal fallbacks on, system prompt cached) and the OpenAI one (`max_completion_tokens`,
 nothing else) are unit-tested but unrun, for want of keys. Only a local engine gets the keep-awake pings and the
 2,048-token padding. Evidence: `work/spikes/FC-258-subscription-engines.md`. oMLX stays the default.
