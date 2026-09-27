@@ -47,6 +47,8 @@ def _short_data_path() -> str:
     is already short is used as it is, so a normal install changes nothing.
     """
     real = espeakng_loader.get_data_path()
+    # 120 is a safe margin, not the measured limit: 108 characters worked and 176 failed, so the real boundary is
+    # somewhere between (espeak-ng's buffer, less the filenames it appends).
     if len(real) <= 120:
         return real
     import shutil
