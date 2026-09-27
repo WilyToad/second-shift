@@ -51,9 +51,22 @@ export class OmlxClient implements ChatModel {
   /**
    * `thinkingSwitch`: how the engine is told to skip reasoning on quick lookups. oMLX reads Qwen's
    * `chat_template_kwargs.enable_thinking`; Splash ignores that and reads `reasoning_effort: "none"` (FC-237, measured:
-   * every other spelling left it reasoning through the whole token budget).
+   * every other spelling left it reasoning through the whole token budget). `openai` is the OpenAI API itself (FC-258):
+   * no switch and no sampling settings at all — its reasoning models reject `temperature`, none takes `top_k`, and it
+   * wants `max_completion_tokens`. Untested live until there's an OPENAI_API_KEY.
    */
-  constructor(private readonly opts: { baseUrl: string; apiKey: string; model: string; thinkingSwitch?: "chat_template_kwargs" | "reasoning_effort" }) {}
+  constructor(private readonly opts: { baseUrl: string; apiKey: string; model: string; thinkingSwitch?: "chat_template_kwargs" | "reasoning_effort" | "openai" }) {}
+
+  /** The engine-specific part of the request body. */
+  tuning(thinking: boolean, maxTokens: number): Record<string, unknown> {
+    if (this.opts.thinkingSwitch === "openai") return { max_completion_tokens: maxTokens };
+    return {
+      max_tokens: maxTokens,
+      ...(this.opts.thinkingSwitch === "reasoning_effort" ? (thinking ? {} : { reasoning_effort: "none" }) : { chat_template_kwargs: { enable_thinking: thinking } }),
+      // Qwen's recommended sampling; oMLX's default temperature (1.0) is too loose for factual answers.
+      ...(thinking ? { temperature: 0.6, top_p: 0.95, top_k: 20 } : { temperature: 0.7, top_p: 0.8, top_k: 20 }),
+    };
+  }
 
   async stream(
     messages: ChatMessage[],
@@ -69,11 +82,8 @@ export class OmlxClient implements ChatModel {
         messages,
         stream: true,
         stream_options: { include_usage: true },
-        max_tokens: maxTokens,
         ...(tools?.length ? { tools } : {}),
-        ...(this.opts.thinkingSwitch === "reasoning_effort" ? (thinking ? {} : { reasoning_effort: "none" }) : { chat_template_kwargs: { enable_thinking: thinking } }),
-        // Qwen's recommended sampling; oMLX's default temperature (1.0) is too loose for factual answers.
-        ...(thinking ? { temperature: 0.6, top_p: 0.95, top_k: 20 } : { temperature: 0.7, top_p: 0.8, top_k: 20 }),
+        ...this.tuning(thinking, maxTokens),
       }),
     });
     if (!res.ok || !res.body) throw new Error(`model server ${res.status}: ${await res.text()}`);

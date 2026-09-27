@@ -4,6 +4,7 @@
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "@companion/interfaces": "workspace:*",
     "zod": "4.6.5"
   }

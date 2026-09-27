@@ -4,7 +4,7 @@ import { DigestSchema } from "@companion/interfaces";
 import { Agent, fileSession, mapSession, SELECTED_PREFIX, TOOLS } from "./agent";
 import { GameLink, type Snapshot } from "./game";
 import type { ServerMessage } from "./messages";
-import { OmlxClient, readOmlxApiKey } from "./model";
+import { makeEngine } from "./engines";
 import { craftersByCategory, recognitionPhrases } from "./grounding";
 import { VoiceClips } from "./voice-clips";
 import { WhisperService } from "./stt";
@@ -29,19 +29,17 @@ export type { ClientMessage, ServerMessage } from "./messages";
 import { parseClientMessage } from "@companion/interfaces";
 
 const PORT = Number(process.env.COMPANION_PORT ?? 5170);
-const MODEL = process.env.COMPANION_MODEL ?? "Qwen3.8-Flash-Next-oQ4e-mtp";
-// The engine is a config value (FC-237): any OpenAI-compatible server. oMLX's key is read from its settings only
-// when the URL is oMLX's; another engine gets COMPANION_MODEL_KEY, or no key.
-const MODEL_URL = (process.env.COMPANION_MODEL_URL ?? "http://127.0.0.1:8888").replace(/\/$/, "");
-const isOmlx = MODEL_URL === "http://127.0.0.1:8888";
+// The engine is a config value (FC-237, FC-258): oMLX by default, or COMPANION_ENGINE (see engines.ts).
+const engine = await makeEngine();
 
 const game = new GameLink({ pollMs: 2000, historySize: 1800, cacheDir: new URL("../../data/cache", import.meta.url).pathname });
-const model = new OmlxClient({ baseUrl: MODEL_URL, apiKey: isOmlx ? await readOmlxApiKey() : (process.env.COMPANION_MODEL_KEY ?? ""), model: MODEL, thinkingSwitch: isOmlx ? "chat_template_kwargs" : "reasoning_effort" });
-console.log(`Model server: ${MODEL_URL} (${MODEL})`);
+const model = engine.model;
+console.log(`Model: ${engine.describe}`);
 let modelState: { state: "loading" | "ready" | "error"; error?: string } = { state: "loading" };
 let busy: Promise<void> = Promise.resolve();
 let asking = 0;
-const waker = new ModelWaker(() => model.stream([{ role: "user", content: "hi" }], { maxTokens: 1 }), () => asking > 0);
+// Keeping a resident model awake only means something for one on this Mac; a hosted engine would bill each ping.
+const waker = engine.local ? new ModelWaker(() => model.stream([{ role: "user", content: "hi" }], { maxTokens: 1 }), () => asking > 0) : null;
 let system = systemPrompt(null);
 let alignedBase: string | null = null; // the base prompt `system` was last aligned from
 let retriever: RecipeRetriever | null = null;
@@ -276,7 +274,7 @@ const server = Bun.serve({
         if (msg.on) watcher.start(Number(process.env.COMPANION_WATCH_MS) || undefined); else watcher.stop();
         broadcast({ type: "watching", on: watcher.on });
       }
-      if (msg.type === "wake") waker.wake();
+      if (msg.type === "wake") waker?.wake();
       if (msg.type === "reset") busy = busy.then(() => agent.reset());
       // Approvals don't wait for the model: the player is waiting on them.
       if (msg.type === "approve") void agent.approve(msg.id);
@@ -366,7 +364,10 @@ game.onPrototypes((p) => {
     // aligned prompt and the model's cache are still good, so skip re-measuring and re-warming.
     if (base === alignedBase) return;
     system = base;
-    try {
+    // Padding to a 2,048-token block is for oMLX's cache; a hosted engine caches its own way and would only pay for
+    // the extra tokens (FC-258).
+    if (!engine.local) alignedBase = base;
+    else try {
       const categories = [...craftersByCategory(p.data)].sort(([a], [b]) => a.localeCompare(b)).map(([c, crafters]) => `crafting category ${c}: ${crafters.join(", ")}`);
       // Static tech tree lines (no researched status, so they don't go stale) as further padding.
       const techTree = Object.entries(p.data.technologies).sort(([a], [b]) => a.localeCompare(b)).map(([name, t]) => `technology ${name}: needs ${t.prerequisites.join(", ") || "-"} | unlocks ${t.unlocks.join(", ") || "-"}`);

@@ -23,7 +23,8 @@ export type AskOptions = {
 };
 
 export async function openConsole(opts: ConsoleOptions = {}) {
-  const ws = new WebSocket(opts.url ?? "ws://127.0.0.1:5170/ws");
+  // COMPANION_CONSOLE_URL points any eval at a second server, say one on another engine (FC-258).
+  const ws = new WebSocket(opts.url ?? process.env.COMPANION_CONSOLE_URL ?? "ws://127.0.0.1:5170/ws");
   const got: Msg[] = [];
   ws.onmessage = (e) => got.push(JSON.parse(String(e.data)));
   await new Promise((r) => (ws.onopen = r));

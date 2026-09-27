@@ -211,11 +211,42 @@ nothing to switch on, and the server says which way it's running at startup.
 Deliberately **not** routed through it: working out what your question is about. Measured over 62 reviewed
 questions and 22 classifiers, the hand-written rules scored 1364/1364 and Jev 1311/1364 — so the rules kept the job.
 
-**With the local voice, this is the one part that leaves your Mac** (an ElevenLabs voice is the other), and it is a
+**With the local voice and oMLX, this is the one part that leaves your Mac** (an ElevenLabs voice or a hosted model is the other), and it is a
 narrow part: the words written on your list, and the
 companion's own findings about your factory ("iron-plate is down from 240 to 40 a minute"). Never your questions,
 never your microphone audio, never your save or your game state. To keep everything local, leave `JEV_KEY` out, or
 run the server with `COMPANION_DECISIONS=local`.
+
+### Another model, optional
+
+The model is a setting. Put `COMPANION_ENGINE` in your `.env` (or in front of `bun run start`), and the server says
+at startup which one it's using and whether anything leaves your Mac.
+
+| `COMPANION_ENGINE` | What answers | Needs |
+|---|---|---|
+| `omlx` (default) | oMLX on this Mac | oMLX running |
+| `claude-cli` | **Your Claude subscription**, through Claude Code's `claude -p` | Claude Code installed and logged in (`claude` works in a terminal). `COMPANION_MODEL=sonnet` (default), `opus` or `haiku` |
+| `anthropic` | The Anthropic API, billed per token | `ANTHROPIC_API_KEY`. `COMPANION_MODEL` defaults to `claude-opus-5` |
+| `openai` | The OpenAI API, billed per token | `OPENAI_API_KEY` and `COMPANION_MODEL` (an OpenAI model name) |
+| `openai-compatible` | Any other OpenAI-compatible server, such as Splash | `COMPANION_MODEL_URL` and `COMPANION_MODEL` (`COMPANION_MODEL_KEY` if it wants one) |
+
+**On your Claude subscription,** answers come as fast as they do from oMLX — measured with Sonnet, first words in
+1.1–2.3 s, 6–8 s for a turn that looks something up in the game — and the same checks pass: 10 of 10 on grounding
+and 18 of 18 on "only act when asked". It uses your plan's usage like Claude Code does. `claude -p` is an agent
+with its own shell and file tools, so the companion runs it with **none** of them — no tools, no MCP servers, none of
+your Claude Code settings, plugins or memory, nothing saved — from an empty folder. Asked to run a command, it can
+only write the command out. Any `ANTHROPIC_API_KEY` is kept from it, so it can't bill an API key by accident.
+
+**ChatGPT and Codex:** there's no Codex option. `codex exec` ran shell commands and read files even in its read-only
+sandbox, and with its shell turned off it went looking for another way in through a bundled plugin; it also took
+17–44 s a turn. A ChatGPT subscription doesn't cover the OpenAI API — `openai` above is billed per token.
+
+The two APIs are built but haven't been run against a real key yet. The Anthropic one has Claude's refusal fallback
+switched on (a declined answer is retried on a fallback model within the same call).
+
+**What leaves your Mac with anything but oMLX (or another engine on this Mac):** everything the model reads — your
+questions, the recent conversation, what the companion looked up in your save and game, and the list of mods you
+play with. The game itself, your saves and your microphone audio stay here.
 
 ## The helmet rule
 
@@ -247,9 +278,8 @@ Optional: the **local voice** (`.venv-tts`, see *Installing the local voice*) fo
 **ElevenLabs** (`ELEVENLABS_API_KEY`) for its voices, and **Jev** (`JEV_KEY`) for the two judgement calls described
 above. None of them is needed, and the companion works without them.
 
-Other model providers are part-built: the engine is a config value, so `COMPANION_MODEL_URL` and `COMPANION_MODEL`
-point the server at any OpenAI-compatible server. Splash + Qwen3.8-27B is measured and works (PLAN §5); oMLX stays
-the default.
+No 70 GB to spare? The companion can also run on your Claude subscription or on an API key instead; see
+*Another model, optional*. oMLX stays the default.
 
 ## Setup
 
@@ -351,6 +381,7 @@ The full design, measurements and decisions are in [`PLAN.md`](PLAN.md).
 | Steam asks to "launch with custom arguments" | Make sure Steam is running; always start the game through `bun run launch` |
 | `game: not connected` in the console | The game isn't hosted, or is still loading. A single-player game can't connect: use **Multiplayer → Host new game** or `bun run launch`. The server keeps retrying, so there's no need to restart it |
 | `model: error` | Check that oMLX is running on port 8888, the model name matches `COMPANION_MODEL`, and `~/.omlx/settings.json` has an API key |
+| `model: error` with `COMPANION_ENGINE=claude-cli` | Run `claude` once in a terminal and log in; the server's log shows Claude Code's own message |
 | Voice says the microphone is blocked | Allow the microphone for `127.0.0.1:5170` from the icon in Chrome's address bar |
 | Voice says the speech service couldn't be reached | Use Chrome with a network connection, or click **Recognize on this device instead** once |
 | Alt+V in the game doesn't start listening | Click **Talk** once in the console tab first so Chrome allows it; check the key under Controls → Mods |

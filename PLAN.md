@@ -616,6 +616,20 @@ list items) before it could be default, filed as FC-240. Switching is `COMPANION
 COMPANION_MODEL=incoai/Qwen3.8-27B-Splash` with `splash serve` up and oMLX stopped; the two won't fit together with
 the macOS reserve Splash insists on (17.4 + 13.7 GB against 25 GB free beside a 70 GB oMLX).
 
+**Other engines: the player's Claude subscription, and the APIs (FC-258, 2026-09-27).** The player asked for
+`claude -p`, "the chatgpt/codex equivalent" and the APIs, to run the companion on their subscription. The engine is
+now `COMPANION_ENGINE` (`server/src/engines.ts`): `omlx` (default), `openai-compatible` (FC-237), `claude-cli`,
+`anthropic`, `openai`. **`claude -p` works and stays inside the helmet rule**: run with `--tools ""`,
+`--strict-mcp-config`, `--setting-sources project` from an empty folder, `--no-session-persistence` and our own
+`--system-prompt`, it can't act (asked to `ls`, it wrote the command out); our tools travel as `<tool_call>` text,
+recovered by FC-184's parser. Measured through the server on Sonnet: grounding 10/10 (first words median 1.95 s),
+ask-before-acting 18/18 with real tool rounds (6–8 s a tool turn — one process per round), ratios 7/8. **Codex is not
+an option**: `codex exec` ran `ls` and `cat` in its read-only sandbox and, with its shell features off, tried MCP
+calls through a bundled plugin; 17–44 s a turn. The Anthropic API adapter (official SDK; effort instead of a thinking
+switch, no sampling parameters, refusal fallbacks on, system prompt cached) and the OpenAI one (`max_completion_tokens`,
+nothing else) are unit-tested but unrun, for want of keys. Only a local engine gets the keep-awake pings and the
+2,048-token padding. Evidence: `work/spikes/FC-258-subscription-engines.md`. oMLX stays the default.
+
 **A local voice, measured (FC-253, 2026-09-26):** read-aloud's only good voice was ElevenLabs, which is also the
 only one that sent the answer text off the Mac. Kokoro-82M (Apache-2.0 weights and code, training data provenance
 stated) runs on MLX here — the NaN/silence report against it is fixed in mlx-audio 0.5.6 — as a 535 MB localhost
