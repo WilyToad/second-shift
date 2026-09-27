@@ -6,7 +6,7 @@ import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 import { setSoundsOn, soundsOn } from "./sounds";
 import { capturing, captureError, clipCount, lastClip, lastLocal, localStt, probeStt, sayTruth, setCapturing, setLocalStt, sttStatus } from "./capture";
-import { markSpoken, spokenNow, takeInterrupted, phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
+import { markSpoken, spokenNow, takeInterrupted, phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, localVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
 
 const SILENCE_CHOICES = [1, 1.5, 2, 3, 4, 5];
 
@@ -201,14 +201,21 @@ export function Composer({ onAsk = (text: string, thinking: boolean, spoken = fa
             <label title="Your voice is transcribed on this Mac by whisper (FC-230). Off, the browser's speech engine does it as before."><input type="checkbox" id="local-stt" checked={localStt.value} onChange={(e) => setLocalStt(e.currentTarget.checked)} /> Transcribe on this Mac</label>
           )}
           <label title="Reads each answer aloud as it arrives"><input type="checkbox" id="read-aloud" checked={readAloud.value} onChange={(e) => { readAloud.value = e.currentTarget.checked; saveSetting("second-shift.readAloud", readAloud.value); if (!readAloud.value) stopSpeaking(); }} /> Read answers aloud</label>
-          {readAloud.value && elevenVoices.value.length > 0 && (
-            <label title="ElevenLabs voices send the answer text to ElevenLabs">
+          {readAloud.value && (localVoices.value.length > 0 || elevenVoices.value.length > 0) && (
+            <label title="The local voices run on this Mac (FC-254). ElevenLabs voices send the answer text to ElevenLabs.">
               <span class="visually-hidden">Voice</span>
               <select id="voice" value={voiceChoice.value} onChange={(e) => chooseVoice(e.currentTarget.value)}>
-                <option value="browser">This Mac's voice</option>
-                <optgroup label="ElevenLabs (online)">
-                  {elevenVoices.value.map((v) => <option key={v.id} value={`eleven:${v.id}`}>{v.name}</option>)}
-                </optgroup>
+                <option value="browser">The browser's voice</option>
+                {localVoices.value.length > 0 && (
+                  <optgroup label="On this Mac">
+                    {localVoices.value.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                  </optgroup>
+                )}
+                {elevenVoices.value.length > 0 && (
+                  <optgroup label="ElevenLabs (online)">
+                    {elevenVoices.value.map((v) => <option key={v.id} value={`eleven:${v.id}`}>{v.name}</option>)}
+                  </optgroup>
+                )}
               </select>
             </label>
           )}

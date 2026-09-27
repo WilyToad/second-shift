@@ -191,10 +191,12 @@ test("FC-062: without the API there's no mic button", async () => {
   render(null, root);
 });
 
-test("FC-062: answers are read aloud sentence by sentence as they stream, without charts or markdown, with a local voice", async () => {
+test("FC-062: answers are read aloud sentence by sentence as they stream, without charts or markdown, in the browser's voice", async () => {
   const synth = fakeSynthesis();
   const voice = await import("./voice");
   const { onMessage } = await import("./store");
+  // This is the browser's own speech path; the default is the local voice since FC-254, so choose it explicitly.
+  voice.chooseVoice("browser");
   voice.readAloud.value = true;
   onMessage({ type: "user", text: "How much jelly is Gleba making?" });
   onMessage({ type: "token", text: "Gleba makes **1,493/min** of " });
@@ -370,10 +372,10 @@ test("FC-148: the voice picker lists ElevenLabs voices only when the server has 
   await voice.loadElevenVoices((async () => Response.json({ available: true, voices: [{ id: "v1", name: "Aria" }, { id: "v2", name: "Roger" }] })) as unknown as typeof fetch);
   await new Promise((r) => setTimeout(r, 5));
   const select = root.querySelector("#voice") as HTMLSelectElement;
-  expect([...select.querySelectorAll("option")].map((o) => o.textContent)).toEqual(["This Mac's voice", "Aria", "Roger"]);
+  expect([...select.querySelectorAll("option")].map((o) => o.textContent)).toEqual(["The browser's voice", "Aria", "Roger"]);
   voice.chooseVoice("eleven:v2");
   expect(voice.voiceChoice.value).toBe("eleven:v2");
-  // A remembered voice the key no longer has falls back to the Mac voice.
+  // A remembered voice the key no longer has falls back to the browser's voice.
   await voice.loadElevenVoices((async () => Response.json({ available: true, voices: [{ id: "v1", name: "Aria" }] })) as unknown as typeof fetch);
   expect(voice.voiceChoice.value).toBe("browser");
   expect(voice.pickVoice([{ name: "Samantha", lang: "en-US", localService: true, default: true }, { name: "Ava (Premium)", lang: "en-US", localService: true, default: false }], "en-US")?.name).toBe("Ava (Premium)");
@@ -742,4 +744,53 @@ test("FC-241: an interim word over him doesn't swallow the final cut-in it becom
   } finally {
     voice.readAloud.value = false;
   }
+});
+
+test("FC-254: the local voice is offered when the server has it, is read by the server, and falls back when it's gone", async () => {
+  const { render } = await import("preact");
+  const { Composer } = await import("./chat");
+  const synth = fakeSynthesis();
+  const voice = await import("./voice");
+  const local = { available: true, voices: [{ id: "kokoro:am_michael", name: "Ballast (Michael)" }, { id: "kokoro:af_heart", name: "Heart (American)" }] };
+  voice.readAloud.value = true;
+  await voice.loadVoices((async () => Response.json({ available: false, voices: [], local })) as unknown as typeof fetch);
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  render(<Composer onAsk={() => {}} recognition={null} />, root);
+  await new Promise((r) => setTimeout(r, 5));
+  // No ElevenLabs key, but the picker is there, because the local voice is.
+  const select = root.querySelector("#voice") as HTMLSelectElement;
+  expect([...select.querySelectorAll("optgroup")].map((g) => g.getAttribute("label"))).toEqual(["On this Mac"]);
+  expect([...select.querySelectorAll("option")].map((o) => o.textContent)).toEqual(["The browser's voice", "Ballast (Michael)", "Heart (American)"]);
+
+  // Chosen, a sentence goes to the server as `kokoro:am_michael`, not to the browser's voice.
+  voice.chooseVoice(voice.LOCAL_DEFAULT);
+  const posted: { voice?: string; text?: string }[] = [];
+  const realFetch = globalThis.fetch;
+  const realAudio = (globalThis as { Audio?: unknown }).Audio;
+  globalThis.fetch = (async (_u: string, init?: RequestInit) => {
+    posted.push(JSON.parse(String(init?.body ?? "{}")));
+    return new Response(new Blob(["RIFF"], { type: "audio/wav" }));
+  }) as unknown as typeof fetch;
+  // The page's player plays what comes back with `new Audio(url)`; the test page has none.
+  (globalThis as { Audio?: unknown }).Audio = class { onended: (() => void) | null = null; onerror: (() => void) | null = null; constructor(public src: string) {} async play() {} pause() {} };
+  Object.assign(globalThis.URL, { createObjectURL: () => "blob:local", revokeObjectURL: () => {} });
+  try {
+    voice.speak("Your labs are idle.");
+    await new Promise((r) => setTimeout(r, 5));
+    expect(posted.map((p) => [p.voice, p.text])).toEqual([["kokoro:am_michael", "Your labs are idle."]]);
+    expect(synth.spoken).toEqual([]);
+  } finally {
+    globalThis.fetch = realFetch;
+    (globalThis as { Audio?: unknown }).Audio = realAudio;
+    voice.stopSpeaking();
+  }
+
+  // A remembered local voice is kept while it's there, and falls back to the browser's when the sidecar is gone.
+  await voice.loadVoices((async () => Response.json({ available: false, voices: [], local })) as unknown as typeof fetch);
+  expect(voice.voiceChoice.value).toBe("kokoro:am_michael");
+  await voice.loadVoices((async () => Response.json({ available: false, voices: [], local: { available: false, voices: [] } })) as unknown as typeof fetch);
+  expect(voice.voiceChoice.value).toBe("browser");
+  voice.readAloud.value = false;
+  render(null, root);
 });

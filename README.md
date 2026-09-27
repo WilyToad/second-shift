@@ -74,9 +74,11 @@ while the answer arrives and is read aloud, then listens again. Click **Talk** a
 goes out first), or press **Escape** to stop without sending. The in-game key is **Talk to Second Shift** under
 **Settings → Controls → Mods**.
 
-Tick **Read answers aloud** to hear each answer sentence by sentence as it streams. Pick the voice next to it: this
-Mac's own voice (download a Premium or Enhanced one in System Settings → Accessibility → Spoken Content for better
-sound), or an [ElevenLabs](https://elevenlabs.io) voice if you add a key.
+Tick **Read answers aloud** to hear each answer sentence by sentence as it streams. By default he speaks in
+**Ballast's own voice, generated on your Mac** by [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) — no key, no
+network, and each sentence ready in about 175 ms. Pick another next to it: 27 more local voices (American and British),
+the browser's own voice, or an [ElevenLabs](https://elevenlabs.io) voice if you add a key. In a blind test the local
+voice was preferred over ElevenLabs.
 
 To interrupt, just talk: speak while he's reading and he stops within a beat, and what you said is the next
 question — a bare "stop" or "nevermind" just stops him (every third time he may have a word to say about it). **A headset is
@@ -92,9 +94,23 @@ work in Brave). What stays on your machine:
 | Part | Where it runs |
 |---|---|
 | Turning your voice into text | Chrome's online speech service by default. Click **Recognize on this device instead** under the composer for a one-time download, and after that it stays on your Mac |
-| Reading answers aloud | On your Mac with a Mac voice. With an ElevenLabs voice, each answer's text goes to ElevenLabs |
+| Reading answers aloud | On your Mac, with the local voice (the default) or the browser's. With an ElevenLabs voice, each answer's text goes to ElevenLabs |
 | Sound effects | On your Mac |
 | Everything else | On your Mac, as always |
+
+**Installing the local voice.** It runs in its own Python environment beside the server, which starts it and stops
+it for you. Once, from the top of the repo:
+
+```sh
+python3 -m venv .venv-tts
+.venv-tts/bin/pip install mlx-audio misaki num2words phonemizer espeakng-loader soundfile
+.venv-tts/bin/pip install --only-binary=:all: spacy
+```
+
+The first start downloads the model (~330 MB); after that it starts offline in about two seconds. Without it, read-aloud
+offers the browser's voice and ElevenLabs exactly as before. One licence note: the model and its runtime are
+Apache-2.0 and MIT, but the fallback it uses for words outside its dictionary — espeak-ng, through phonemizer — is
+GPL-3.0. That's fine for a tool you install for yourself; it would matter only if you redistributed it.
 
 **Adding ElevenLabs (optional).** Put your key in a `.env` file at the top of the repo; git ignores it:
 
@@ -103,7 +119,7 @@ ELEVENLABS_API_KEY=your-key
 ```
 
 Restart `bun run start`. Your voices appear in the picker once **Read answers aloud** is on. The server holds the key
-and uses ElevenLabs' fastest model; if a sentence fails, the Mac voice reads it. `bun run sounds` generates proper
+and uses ElevenLabs' fastest model; if a sentence fails, the browser's voice reads it. `bun run sounds` generates proper
 sound effects with the same key into `data/sounds/` (they stay local, not in git); without them the console plays
 simple built-in tones. `ELEVEN_LABS_KEY` works as the variable name too, `ELEVENLABS_VOICE_ID` sets a default voice
 and `ELEVENLABS_MODEL` another model.
@@ -195,7 +211,8 @@ nothing to switch on, and the server says which way it's running at startup.
 Deliberately **not** routed through it: working out what your question is about. Measured over 62 reviewed
 questions and 22 classifiers, the hand-written rules scored 1364/1364 and Jev 1311/1364 — so the rules kept the job.
 
-**This is the one part that leaves your Mac**, and it is a narrow part: the words written on your list, and the
+**With the local voice, this is the one part that leaves your Mac** (an ElevenLabs voice is the other), and it is a
+narrow part: the words written on your list, and the
 companion's own findings about your factory ("iron-plate is down from 240 to 40 a minute"). Never your questions,
 never your microphone audio, never your save or your game state. To keep everything local, leave `JEV_KEY` out, or
 run the server with `COMPANION_DECISIONS=local`.
@@ -225,10 +242,10 @@ So it can't place real buildings, delete things, teleport, spawn items, finish r
 | **Browser** | Any modern browser for the console; Chrome for voice |
 | **Model** | oMLX (a local MLX model server) on `127.0.0.1:8888` serving a model with tool calling. Tested with Qwen3.8 Flash-Next (4-bit), which needs about 70 GB of memory. Smaller models haven't been tested |
 
-Optional, and off unless you add a key: **ElevenLabs** (`ELEVENLABS_API_KEY`) for a better read-aloud voice,
-**whisper.cpp** (`brew install whisper.cpp`) to transcribe your voice on this Mac instead of in the browser, and
-**Jev** (`JEV_KEY`) for the two judgement calls described above. None of them is needed, and the companion behaves
-the same without them.
+Optional: the **local voice** (`.venv-tts`, see *Installing the local voice*) for read-aloud on your Mac,
+**whisper.cpp** (`brew install whisper.cpp`) to transcribe your voice on this Mac instead of in the browser,
+**ElevenLabs** (`ELEVENLABS_API_KEY`) for its voices, and **Jev** (`JEV_KEY`) for the two judgement calls described
+above. None of them is needed, and the companion works without them.
 
 Other model providers are part-built: the engine is a config value, so `COMPANION_MODEL_URL` and `COMPANION_MODEL`
 point the server at any OpenAI-compatible server. Splash + Qwen3.8-27B is measured and works (PLAN §5); oMLX stays

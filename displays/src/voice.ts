@@ -664,11 +664,18 @@ export function pickVoice<V extends { name?: string; lang: string; localService:
 
 let queue: SentenceQueue | null = null;
 
-// ElevenLabs voices (FC-148): the choice is "browser" or "eleven:<voice id>", remembered per browser.
+// Voices for read-aloud: "browser", "eleven:<voice id>" (FC-148), or "kokoro:<name>" — the local voice (FC-254),
+// which the player preferred blind over ElevenLabs. Remembered per browser. A browser that has never chosen gets
+// Ballast's own voice; one that chose something keeps it, since changing a stored choice under someone is a
+// surprise, and the picker is one click.
 export type ElevenVoice = { id: string; name: string; category?: string };
-export const voiceChoice = signal(loadText("second-shift.voice", "browser"));
+export const LOCAL_DEFAULT = "kokoro:am_michael";
+export const voiceChoice = signal(loadText("second-shift.voice", LOCAL_DEFAULT));
 export const elevenVoices = signal<ElevenVoice[]>([]);
+export const localVoices = signal<ElevenVoice[]>([]);
 export const elevenError = signal<string | null>(null);
+/** A voice the server speaks, rather than the browser: the local one or ElevenLabs. */
+const spokenByServer = (choice: string) => choice.startsWith("eleven:") || choice.startsWith("kokoro:");
 
 function loadText(key: string, fallback: string): string {
   try {
@@ -688,17 +695,29 @@ export function chooseVoice(choice: string): void {
   }
 }
 
-/** Asks the server which ElevenLabs voices the player's key can use (none without a key). */
-export async function loadElevenVoices(get: typeof fetch = fetch): Promise<void> {
+/**
+ * Asks the server which voices it can read with: the local ones when the sidecar is up (FC-254), and whichever
+ * ElevenLabs voices the player's key can use. A remembered choice the server can't serve any more falls back to the
+ * browser's voice — for either kind, so a saved local voice isn't wiped while it's still there.
+ */
+export async function loadVoices(get: typeof fetch = fetch): Promise<void> {
   try {
-    const body = (await (await get("/tts/voices")).json()) as { available: boolean; voices: ElevenVoice[]; error?: string };
+    const body = (await (await get("/tts/voices")).json()) as { available: boolean; voices: ElevenVoice[]; error?: string; local?: { available: boolean; voices: ElevenVoice[] } };
     elevenVoices.value = body.available ? body.voices : [];
+    localVoices.value = body.local?.available ? body.local.voices : [];
     elevenError.value = body.error ?? null;
   } catch {
     elevenVoices.value = [];
+    localVoices.value = [];
   }
-  if (voiceChoice.value.startsWith("eleven:") && !elevenVoices.value.some((v) => `eleven:${v.id}` === voiceChoice.value)) voiceChoice.value = "browser";
+  const choice = voiceChoice.value;
+  const served =
+    (choice.startsWith("eleven:") && elevenVoices.value.some((v) => `eleven:${v.id}` === choice)) ||
+    (choice.startsWith("kokoro:") && localVoices.value.some((v) => v.id === choice));
+  if (spokenByServer(choice) && !served) voiceChoice.value = "browser";
 }
+/** The old name, for anything still calling it. */
+export const loadElevenVoices = loadVoices;
 
 type AudioLike = { play(): Promise<void>; pause(): void; onended: (() => void) | null; onerror: (() => void) | null; src: string };
 
@@ -787,8 +806,13 @@ export class ElevenPlayer {
 
 const eleven = new ElevenPlayer({
   fallback: (text) => speakWithBrowser(text),
+  // ElevenLabs is sent its bare voice id, as it always was; a local voice keeps its `kokoro:` prefix, which is how
+  // the server tells the two apart (FC-254).
   voice: () => voiceChoice.value.replace(/^eleven:/, ""),
-  onError: (message) => { voiceError.value = `ElevenLabs couldn't speak (${message}); using this Mac's voice instead.`; },
+  onError: (message) => {
+    const who = voiceChoice.value.startsWith("kokoro:") ? "The local voice" : "ElevenLabs";
+    voiceError.value = `${who} couldn't speak (${message}); using the browser's voice instead.`;
+  },
   // ElevenLabs plays per sentence with no word timing exposed here: the mark is the sentence, moved as each one
   // starts and cleared when the queue runs dry (FC-216, FC-231).
   onPlay: (sentence) => { spokenNow.value = { sentence, char: -1 }; },
@@ -798,7 +822,9 @@ const eleven = new ElevenPlayer({
 export function speak(sentence: string): void {
   recentlySpoken.push({ text: sentence, at: Date.now() });
   while (recentlySpoken.length > 12) recentlySpoken.shift();
-  if (voiceChoice.value.startsWith("eleven:")) eleven.enqueue(sentence);
+  // Both server voices go through the same player; only the browser's own voice is spoken in the page. Before
+  // FC-254 this read `startsWith("eleven:")`, so a local voice would have fallen through to the browser's.
+  if (spokenByServer(voiceChoice.value)) eleven.enqueue(sentence);
   else speakWithBrowser(sentence);
 }
 

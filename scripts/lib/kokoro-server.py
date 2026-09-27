@@ -3,6 +3,7 @@
 # One resident model, one endpoint in the same shape as the OpenAI speech API the rest of the stack already speaks:
 #   POST /v1/audio/speech  {"input": "...", "voice": "af_heart", "speed": 1.0}  ->  audio/wav
 #   GET  /health                                                                  ->  {"ready": true}
+#   GET  /voices                                                                  ->  {"default": "...", "voices": [...]}
 #
 # Deliberately small and standard-library only: mlx-audio's own server pulls in speech-to-text dependencies
 # (webrtcvad) that don't build on Python 3.14 and that text-to-speech never touches.
@@ -26,8 +27,57 @@ import espeakng_loader
 
 logging.getLogger("phonemizer").setLevel(logging.ERROR)
 
+# Point phonemizer at the espeak-ng that espeakng-loader bundles — both the library and its data. The data path
+# matters as much as the library: without it, espeak-ng falls back to the path baked in on the package's own build
+# machine (/Users/runner/work/…) and exits on start. The first version set `ESPEAK_DATA_PATH`, which phonemizer
+# doesn't read; it only worked in the venv it was written in, and failed from a clean install (FC-254). The
+# explicit setters don't depend on getting a variable name right.
+from phonemizer.backend.espeak.wrapper import EspeakWrapper  # noqa: E402
+
+
+def _short_data_path() -> str:
+    """
+    espeak-ng keeps its data path in a fixed-size buffer and silently drops one that's too long, falling back to the
+    path baked in on the package's own build machine (/Users/runner/work/…) — then exits on start, naming a directory
+    nobody has. Measured: data paths of 103 and 108 characters worked, 176 failed. A repo cloned somewhere deep would
+    hit it.
+
+    A symlink doesn't help — phonemizer resolves the path, following the link straight back to the long one — so a
+    long path gets a real copy (19 MB, once, keyed by the package version so an upgrade isn't left stale). A path that
+    is already short is used as it is, so a normal install changes nothing.
+    """
+    real = espeakng_loader.get_data_path()
+    if len(real) <= 120:
+        return real
+    import shutil
+    from importlib.metadata import version
+
+    short = os.path.join(os.path.expanduser("~/.cache/second-shift"), f"espeak-ng-data-{version('espeakng-loader')}")
+    try:
+        if not os.path.isfile(os.path.join(short, "phontab")):
+            shutil.copytree(real, short, dirs_exist_ok=True)
+        return short
+    except OSError:
+        return real  # can't copy: the real path, which fails loudly rather than quietly
+
+
+DATA_PATH = _short_data_path()
+EspeakWrapper.set_library(espeakng_loader.get_library_path())
+EspeakWrapper.set_data_path(DATA_PATH)
 os.environ.setdefault("PHONEMIZER_ESPEAK_LIBRARY", espeakng_loader.get_library_path())
-os.environ.setdefault("ESPEAK_DATA_PATH", espeakng_loader.get_data_path())
+os.environ.setdefault("PHONEMIZER_ESPEAK_DATA_PATH", DATA_PATH)
+
+# Offline-first. The model and voices are downloaded once; after that nothing here should touch the network at
+# startup — the player tests the whole stack with the wifi off, and Hugging Face's update check alone added 6 s to
+# startup when it could reach the network. HF_HUB_OFFLINE only once the snapshot is on disk, so a first run still
+# downloads.
+from huggingface_hub import scan_cache_dir  # noqa: E402
+
+try:
+    if any(r.repo_id == "prince-canuma/Kokoro-82M" for r in scan_cache_dir().repos):
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+except Exception:
+    pass
 
 import numpy as np  # noqa: E402
 import soundfile as sf  # noqa: E402
@@ -43,6 +93,18 @@ MODEL = load_model("prince-canuma/Kokoro-82M")
 # The first generation compiles the graph (~0.8-4.9 s measured); pay it here, not on the player's first sentence.
 for _ in MODEL.generate(text="Ready.", voice=DEFAULT_VOICE, speed=1.0, lang_code="a"):
     pass
+# The English voices this install has — American and British, both sexes (a_ and b_ prefixes; f_ and m_). Read
+# from the model's own voices folder, so the list is what's on disk rather than what a README says.
+def _voices() -> list:
+    from huggingface_hub import snapshot_download
+
+    folder = os.path.join(snapshot_download("prince-canuma/Kokoro-82M", allow_patterns=["voices/*"]), "voices")
+    # Each voice is on disk in two formats (.pt and .safetensors): one name, once.
+    names = sorted({os.path.splitext(f)[0] for f in os.listdir(folder)}) if os.path.isdir(folder) else []
+    return [n for n in names if n[:3] in ("af_", "am_", "bf_", "bm_")]
+
+
+VOICES = _voices()
 print(f"kokoro-server: ready on :{PORT} in {time.time() - started:.1f} s (voice {DEFAULT_VOICE})", flush=True)
 
 
@@ -79,6 +141,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self._send(200, b'{"ready": true}', "application/json")
+        elif self.path == "/voices":
+            self._send(200, json.dumps({"default": DEFAULT_VOICE, "voices": VOICES}).encode(), "application/json")
         else:
             self._send(404, b"not found", "text/plain")
 

@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { USER_DIR } from "./factorio";
 import { SHOT_NAME } from "./screenshots";
 import { ElevenLabs, elevenLabsKey } from "./tts";
+import { LocalVoice, PREFIX as LOCAL_VOICE, voiceLabel } from "./local-voice";
 import { SOUND_NAMES, type SoundName } from "./sfx";
 import { ModelWaker } from "./wake";
 import { LABELS, Watcher, howLongAgo } from "./watch";
@@ -124,7 +125,10 @@ const stt = new WhisperService(console.log);
 void stt.start();
 // whisper-server is our child: it goes when we go (FC-238: three of them, 1.8 GB each, were found running after a
 // day of restarts).
-for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { stt.stop(); process.exit(0); });
+// Read-aloud in a local voice (FC-254): Kokoro beside whisper, looked after the same way.
+const localVoice = new LocalVoice(console.log);
+void localVoice.start();
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { stt.stop(); localVoice.stop(); process.exit(0); });
 
 const clips = new VoiceClips(join(import.meta.dir, "..", "..", "data", "captures", "voice"));
 
@@ -191,18 +195,26 @@ const server = Bun.serve({
         return Response.json({ ok, ...(await clips.count()) });
       },
     },
+    // Both kinds of voice the console can read with: the local one (FC-254) and ElevenLabs (FC-148). `available` and
+    // `voices` stay ElevenLabs', as they always were, so a page loaded before this change still works.
     "/tts/voices": async () => {
-      if (!tts) return Response.json({ available: false, voices: [] });
+      const local = await localVoice.voices();
+      // Ballast's own voice first — alphabetically it would sit seventeenth — then the rest as they come.
+      const names = [...(local?.voices ?? [])].sort((a, b) => Number(b === local?.default) - Number(a === local?.default));
+      const localPart = { available: Boolean(local), default: local?.default, voices: names.map((v) => ({ id: `${LOCAL_VOICE}${v}`, name: voiceLabel(v) })) };
+      if (!tts) return Response.json({ available: false, voices: [], local: localPart });
       try {
-        return Response.json({ available: true, voices: await tts.listVoices() });
+        return Response.json({ available: true, voices: await tts.listVoices(), local: localPart });
       } catch (e) {
-        return Response.json({ available: false, error: (e as Error).message, voices: [] });
+        return Response.json({ available: false, error: (e as Error).message, voices: [], local: localPart });
       }
     },
     "/tts": {
       POST: async (req) => {
-        if (!tts) return new Response("ElevenLabs isn't set up: add ELEVENLABS_API_KEY to .env and restart the server", { status: 404 });
         const body = (await req.json().catch(() => ({}))) as { text?: string; voice?: string; previous?: string };
+        // A `kokoro:` voice is the local one; anything else is an ElevenLabs voice id, as before.
+        if ((body.voice ?? "").startsWith(LOCAL_VOICE)) return localVoice.speak(String(body.text ?? ""), body.voice, req.signal);
+        if (!tts) return new Response("ElevenLabs isn't set up: add ELEVENLABS_API_KEY to .env and restart the server", { status: 404 });
         try {
           return await tts.speak(String(body.text ?? ""), body.voice, body.previous, req.signal);
         } catch (e) {

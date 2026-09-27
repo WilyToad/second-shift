@@ -2,7 +2,7 @@ import { render } from "preact";
 import { Composer, Thread } from "./chat";
 import { AlertFeed, ListPanel, LivePanel } from "./console";
 import { connect, connected, send, status } from "./store";
-import { loadElevenVoices, probeRecognition } from "./voice";
+import { loadVoices, probeRecognition } from "./voice";
 import { loadSounds } from "./sounds";
 import { composing, keepWarm, lastTypedAt } from "./warm";
 import { heard, listenState } from "./voice";
@@ -59,7 +59,7 @@ function App() {
 
 connect();
 void probeRecognition();
-void loadElevenVoices();
+void loadVoices();
 void loadSounds();
 // The model idles within ~3 s; keep it awake while a question is being spoken or typed (FC-158).
 keepWarm((now) => composing({ listening: listenState.peek() === "listening", heard: heard.peek(), lastTypedAt: lastTypedAt.peek() }, now), () => send({ type: "wake" }));

@@ -632,6 +632,15 @@ vocabulary needs, are GPL-3.0** — fine for a sidecar the player installs into 
 whisper.cpp, and a concern only if the project ever bundled them. **Verdict: adopt** (FC-254). Notes:
 `work/spikes/FC-253-local-voice.md`.
 
+**The local voice, shipped (FC-254, 2026-09-26):** Kokoro is read-aloud's default, started and stopped with the
+server like whisper-server, `am_michael` for Ballast. Through the real `/tts` route: 175 ms p50 against 178 ms direct,
+so the route costs nothing. The build found what the spike couldn't, because the spike ran in one hand-built venv:
+the console routed anything not `eleven:` to the browser's voice; the sidecar set an environment variable phonemizer
+doesn't read; and **espeak-ng silently drops a data path longer than its fixed buffer** (103 and 108 characters
+worked, 176 failed), falling back to a directory on its package's build machine and exiting. A deep install now gets
+the data copied to a short path; a normal one is untouched. Lesson worth keeping: install instructions aren't done
+until they've been run from clean, at the depth a real user gets.
+
 **whisper-server's cold call (FC-232, 2026-09-19):** the first `/stt` call after the model has sat idle was 356 ms
 after startup, 526 ms after 17 idle minutes and 666 ms after 30 — 34 ms from the 700 ms wait after which the
 browser's text is sent instead — against ~130 ms warm. A short clip of the Mac's own `say` voice through

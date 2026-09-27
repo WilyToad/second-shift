@@ -35,8 +35,18 @@ const engines: Engine[] = [
   {
     name: "kokoro",
     speak: (text, file) => timed(async () => {
-      const res = await fetch("http://127.0.0.1:8891/v1/audio/speech", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: text }) });
+      const res = await fetch("http://127.0.0.1:8891/v1/audio/speech", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: text, voice: "am_michael" }) });
       if (!res.ok) throw new Error(`kokoro ${res.status}: ${await res.text()}`);
+      await Bun.write(file, await res.arrayBuffer());
+    }),
+  },
+  {
+    // The same voice through the product's own route (FC-254): Bun server → sidecar. The difference from the row
+    // above is what the route costs.
+    name: "kokoro/tts",
+    speak: (text, file) => timed(async () => {
+      const res = await fetch("http://127.0.0.1:5170/tts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, voice: "kokoro:am_michael" }) });
+      if (!res.ok) throw new Error(`kokoro/tts ${res.status}: ${await res.text()}`);
       await Bun.write(file, await res.arrayBuffer());
     }),
   },
@@ -68,7 +78,7 @@ for (const engine of engines) {
     const ms: number[] = [];
     for (let r = 0; r < runs; r++) {
       const ext = engine.name === "eleven" ? "mp3" : "wav";
-      ms.push(await engine.speak(s.text, `${out}/${engine.name}-${String(i + 1).padStart(2, "0")}.${ext}`));
+      ms.push(await engine.speak(s.text, `${out}/${engine.name.replace("/", "-")}-${String(i + 1).padStart(2, "0")}.${ext}`));
     }
     results[engine.name]!.push({ band: s.band, words: s.words, ms });
   }
