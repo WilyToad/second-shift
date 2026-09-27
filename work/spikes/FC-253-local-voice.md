@@ -75,8 +75,38 @@ Bun server talks to the sidecar over HTTP in a separate process, the same footin
 attach to redistributing the GPL code, which we don't do. It would matter only if the project ever bundled a
 ready-made voice package, and then the espeak-ng fallback is the one piece to replace or ship under its own licence.
 
-## Still to decide
+## Quality — the player's ear, blind
 
-- **Quality.** The player listens and picks; this isn't a number.
-- **ElevenLabs latency**, for the table. It spends the player's credits (one call per sentence per run), so it runs
-  only on their word.
+The player heard one hard sentence ("…cerys electromagnetic tooling… holmium plates") in six Kokoro voices and macOS
+`say`: both `af_heart` and `am_michael` "sound amazing — waaaaay better than" `say`. Then a blind A/B on the same
+sentence — A was ElevenLabs "Adam" (American male, `eleven_flash_v2_5`, through the product's own client), B was
+Kokoro `am_michael` — without being told which was which: **"Honestly, they were both great quality. I'd say I
+preferred B."** The local voice won, blind.
+
+**Ballast's voice is `am_michael`** (the player's choice).
+
+On that sentence, whole-sentence latency was **Kokoro ~178 ms warm, ElevenLabs 573 ms** — one ElevenLabs sample,
+network included, so a data point rather than a p50. The full ElevenLabs column wasn't run: it spends the player's
+credits, and with the local voice preferred blind and faster, it no longer decides anything.
+
+The first `am_michael` request took 422 ms: loading a voice the sidecar hadn't used yet. It warms whichever voice is
+its default at startup, so making `am_michael` the default removes that.
+
+## How fast it generates
+
+Median **41× realtime** across the 12 sentences — a typical 15-word sentence, about 7 s of speech, in 150–200 ms. A
+whole 93-word answer, 47.8 s of speech, took 2.7 s (18×). One 21-word sentence took 1.6 s once in the in-process run;
+it didn't happen in the 36-run sidecar benchmark (worst 281 ms), so it's noted, not chased.
+
+**A correction to this spike's own assumption:** streaming is *not* a latent upside for long text. On that 93-word
+answer the first audio wasn't ready until 2.3 s — Kokoro hands back big chunks, not an early first word. What makes
+it feel instant is what the console already does: `SentenceQueue` sends one sentence at a time, each ready in
+~150 ms, so the first words start almost at once and the rest stay ahead of the voice. Nothing to build there.
+
+## Verdict: adopt
+
+Local, free, faster than ElevenLabs on the sentence compared, preferred blind, 535 MB, and no cost to the model's
+first token — and the answer text stops leaving the Mac. The build is FC-254: the sidecar started and watched by the
+server the way whisper-server is (FC-230), `am_michael` the default and warmed at startup, a choice in the voice
+picker beside the others, no key needed, and the README's "the one part that leaves your Mac" narrowed to Jev alone.
+ElevenLabs stays selectable for anyone with a key.

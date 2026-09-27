@@ -616,6 +616,22 @@ list items) before it could be default, filed as FC-240. Switching is `COMPANION
 COMPANION_MODEL=incoai/Qwen3.8-27B-Splash` with `splash serve` up and oMLX stopped; the two won't fit together with
 the macOS reserve Splash insists on (17.4 + 13.7 GB against 25 GB free beside a 70 GB oMLX).
 
+**A local voice, measured (FC-253, 2026-09-26):** read-aloud's only good voice was ElevenLabs, which is also the
+only one that sent the answer text off the Mac. Kokoro-82M (Apache-2.0 weights and code, training data provenance
+stated) runs on MLX here — the NaN/silence report against it is fixed in mlx-audio 0.5.6 — as a 535 MB localhost
+sidecar (`scripts/lib/kokoro-server.py`), ready in 1.2 s with its first compile paid at startup. Request → playable
+audio on 12 real answer sentences (`scripts/bench-voices.ts`, 3 runs): **152 ms p50, 277 ms p95**, scaling from 77 ms
+for a short sentence to 219 ms for a long one, against macOS `say` at 674 ms p50 (~620 ms of fixed overhead). oMLX's
+first token didn't move with it reading aloud (254 ms idle, 220 ms busy). Median 41× realtime. On the one sentence
+compared, Kokoro ~178 ms against ElevenLabs 573 ms (one sample). **Quality was the player's call, blind:** they
+preferred Kokoro `am_michael` over ElevenLabs "Adam" without knowing which was which, and chose `am_michael` as
+Ballast's voice. Streaming turned out *not* to help long text — the first audio of a 93-word paragraph took 2.3 s,
+because Kokoro yields big chunks — so the existing one-sentence-at-a-time queue is what makes it quick. Licences:
+the model, misaki, mlx-audio and spaCy are permissive; **phonemizer and espeak-ng, the fallback this game's
+vocabulary needs, are GPL-3.0** — fine for a sidecar the player installs into their own venv, the same footing as
+whisper.cpp, and a concern only if the project ever bundled them. **Verdict: adopt** (FC-254). Notes:
+`work/spikes/FC-253-local-voice.md`.
+
 **whisper-server's cold call (FC-232, 2026-09-19):** the first `/stt` call after the model has sat idle was 356 ms
 after startup, 526 ms after 17 idle minutes and 666 ms after 30 — 34 ms from the 700 ms wait after which the
 browser's text is sent instead — against ~130 ms warm. A short clip of the Mac's own `say` voice through
