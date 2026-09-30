@@ -4,6 +4,9 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 2 — Acting on request
 
+- [ ] FC-261 The packing list ticks itself off when the player picks things up, not only when they ask
+  - Notes: player, playtest 2026-09-30: a packing list said "20 wood (0 of 20 in reach)" after they'd chopped trees and carried 46 wood. Root cause: `checkPacking` (server/src/agent.ts) runs only when the list is edited or a turn's question is about stock, readiness or the list (`askedStock`); nothing in the digest or the mod says the inventory changed. FC-166's acceptance ("items tick themselves off as the player picks things up") was met in `e2e-packing` only because it asked between pickups.
+  - Acceptance: the mod bumps an inventory-change counter in the digest from `on_player_main_inventory_changed` (the player's own inventory only; no timer, no sweep); with a packing list active, the server re-checks the list when the counter moves, at most once per digest poll, and the console list and in-game panel update without a question; benchmarked (under 0.1 ms/tick, no tick over 1 ms); `test-player`/`e2e-packing` extended with a pickup and no question in between; items arriving in nearby chests without touching the inventory still wait for a question, and the README says so.
 
 ## Phase 3 — Pleasant console and more actions
 
