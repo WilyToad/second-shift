@@ -616,6 +616,15 @@ list items) before it could be default, filed as FC-240. Switching is `COMPANION
 COMPANION_MODEL=incoai/Qwen3.8-27B-Splash` with `splash serve` up and oMLX stopped; the two won't fit together with
 the macOS reserve Splash insists on (17.4 + 13.7 GB against 25 GB free beside a 70 GB oMLX).
 
+**Eleven v4 with audio cues (FC-259, 2026-09-29).** ElevenLabs shipped v4 (`eleven_v4`, `eleven_v4_turbo`) with
+audio tags — `[sighs]`, `[chuckles]`, `[whispers]` — performed rather than read (checked by transcribing the clips).
+Both work through our existing HTTP streaming route. Whole clip, 12 real sentences: Flash v2.5 380 ms p50, **v4 Turbo
+1,528 ms** (first byte 291 ms — it's generated at about speaking pace), v4 2,538 ms, Kokoro 206 ms. The player heard four
+Ballast lines in Kokoro, v4 Turbo plain, v4 Turbo with cues and v4 with cues: "MUCH more immersive than Kokoro. Let's
+land it, but keep kokoro as an option", with no audible difference between Turbo and full. **Verdict: v4 Turbo with
+cues becomes the ElevenLabs default; Kokoro stays selectable and is the key-less default.** Streaming playback is what
+brings v4 Turbo's wait down toward its first byte (FC-260). Evidence: `work/spikes/FC-259-eleven-v4.md`.
+
 **Other engines: the player's Claude subscription, and the APIs (FC-258, 2026-09-27).** The player asked for
 `claude -p`, "the chatgpt/codex equivalent" and the APIs, to run the companion on their subscription. The engine is
 now `COMPANION_ENGINE` (`server/src/engines.ts`): `omlx` (default), `openai-compatible` (FC-237), `claude-cli`,
