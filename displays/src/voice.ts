@@ -3,6 +3,7 @@
 // the speech service. Recognition runs on the device when the browser offers that (`processLocally`), otherwise the
 // audio goes to the browser's speech service, and the console says which.
 import { signal } from "@preact/signals";
+import { withoutCues } from "@companion/interfaces/src/cues";
 import { playSound } from "./sounds";
 import { ensureCapture, keepClip, markUtterance, transcribeLocally } from "./capture";
 
@@ -371,7 +372,7 @@ function listen(): void {
       const text = run.pending();
       awaitingAnswer = false;
       // What he was saying when cut off goes with the words, so he can take it as an interruption (FC-241).
-      interrupted = { during: spokenNow.value?.sentence ?? recentlySpoken.at(-1)?.text ?? "", stopOnly: isStopOnly(text) };
+      interrupted = { during: withoutCues(spokenNow.value?.sentence ?? "") || (recentlySpoken.at(-1)?.text ?? ""), stopOnly: isStopOnly(text) };
       stopSpeaking();
       listenState.value = "listening";
     }
@@ -574,6 +575,9 @@ export const POINTER = { chart: "The chart's in the app.", numbers: "The numbers
  * and the working behind it is left on screen, with one short pointer at the end. The written answer is untouched.
  */
 export class SentenceQueue {
+  /** `keepCues`: the voice acts delivery cues (Eleven v4, FC-260). Every other voice would read "[sighs]" out. */
+  constructor(private readonly keepCues = false) {}
+
   private buffer = "";
   private said = false;
   private skipped = false;
@@ -613,6 +617,11 @@ export class SentenceQueue {
     return { text: kept.join(" "), pointer };
   }
 
+  /** A sentence as the voice gets it; a cue on its own is only worth sending to a voice that acts it. */
+  private say(text: string): string {
+    return speakable(this.keepCues ? text : withoutCues(text));
+  }
+
   push(delta: string): string[] {
     this.buffer += delta;
     const out: string[] = [];
@@ -622,7 +631,7 @@ export class SentenceQueue {
       const m = /[\s\S]*?(?:[.!?](?=\s)|\n\n)/.exec(safe);
       if (!m) break;
       const heard = this.worthHearing(m[0]);
-      const sentence = speakable(heard.text);
+      const sentence = this.say(heard.text);
       this.buffer = this.buffer.slice(m[0].length);
       if (sentence) out.push(sentence);
       if (heard.pointer) out.push(heard.pointer);
@@ -632,7 +641,7 @@ export class SentenceQueue {
 
   end(): string[] {
     const heard = this.worthHearing(this.buffer);
-    const rest = speakable(heard.text);
+    const rest = this.say(heard.text);
     this.buffer = "";
     const out = rest ? [rest] : [];
     if (heard.pointer) out.push(heard.pointer);
@@ -674,6 +683,8 @@ export const voiceChoice = signal(loadText("second-shift.voice", LOCAL_DEFAULT))
 export const elevenVoices = signal<ElevenVoice[]>([]);
 export const localVoices = signal<ElevenVoice[]>([]);
 export const elevenError = signal<string | null>(null);
+/** Read aloud by an ElevenLabs voice, which acts delivery cues (FC-260): the question asks for them, and they're kept. */
+export const cuesWanted = () => readAloud.value && voiceChoice.value.startsWith("eleven:");
 /** A voice the server speaks, rather than the browser: the local one or ElevenLabs. */
 const spokenByServer = (choice: string) => choice.startsWith("eleven:") || choice.startsWith("kokoro:");
 
@@ -700,16 +711,22 @@ export function chooseVoice(choice: string): void {
  * ElevenLabs voices the player's key can use. A remembered choice the server can't serve any more falls back to the
  * browser's voice — for either kind, so a saved local voice isn't wiped while it's still there.
  */
+let elevenDefault: string | undefined;
+
 export async function loadVoices(get: typeof fetch = fetch): Promise<void> {
   try {
-    const body = (await (await get("/tts/voices")).json()) as { available: boolean; voices: ElevenVoice[]; error?: string; local?: { available: boolean; voices: ElevenVoice[] } };
+    const body = (await (await get("/tts/voices")).json()) as { available: boolean; voices: ElevenVoice[]; default?: string; error?: string; local?: { available: boolean; voices: ElevenVoice[] } };
     elevenVoices.value = body.available ? body.voices : [];
+    elevenDefault = body.available && body.voices.some((v) => v.id === body.default) ? body.default! : body.voices[0]?.id;
     localVoices.value = body.local?.available ? body.local.voices : [];
     elevenError.value = body.error ?? null;
   } catch {
     elevenVoices.value = [];
     localVoices.value = [];
   }
+  // A browser that never chose gets Ballast's acted voice when there's an ElevenLabs key — the player's pick over
+  // Kokoro once cues came in (FC-259) — and the local voice otherwise.
+  if (!loadText("second-shift.voice", "") && elevenVoices.value.length && elevenDefault) voiceChoice.value = `eleven:${elevenDefault}`;
   const choice = voiceChoice.value;
   const served =
     (choice.startsWith("eleven:") && elevenVoices.value.some((v) => `eleven:${v.id}` === choice)) ||
@@ -820,7 +837,8 @@ const eleven = new ElevenPlayer({
 });
 
 export function speak(sentence: string): void {
-  recentlySpoken.push({ text: sentence, at: Date.now() });
+  // What was said, as heard: an echo of "[sighs] Idle." through the mic is "Idle." (FC-260).
+  recentlySpoken.push({ text: withoutCues(sentence), at: Date.now() });
   while (recentlySpoken.length > 12) recentlySpoken.shift();
   // Both server voices go through the same player; only the browser's own voice is spoken in the page. Before
   // FC-254 this read `startsWith("eleven:")`, so a local voice would have fallen through to the browser's.
@@ -873,7 +891,7 @@ export const answerSpeech = {
     // Any question (spoken or typed) pauses a talk session's mic until its answer is done (FC-149).
     if (session) pauseForAnswer();
     stopSpeaking();
-    if (readAloud.value) queue = new SentenceQueue();
+    if (readAloud.value) queue = new SentenceQueue(cuesWanted());
   },
   onToken(text: string): void {
     if (!queue) return;
@@ -896,7 +914,8 @@ export type Marked = { text: string; mark: "sentence" | "word" | null };
  */
 export function markSpoken(text: string, spoken: { sentence: string; char: number } | null): Marked[] {
   if (!spoken) return [{ text, mark: null }];
-  const lead = spoken.sentence.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean).slice(0, 3);
+  // A sentence read by ElevenLabs may lead with a cue the screen doesn't show (FC-260): match on its words.
+  const lead = withoutCues(spoken.sentence).toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean).slice(0, 3);
   if (!lead.length) return [{ text, mark: null }];
   const esc = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const start = new RegExp(lead.map(esc).join("[\\s\\-*_`]+"), "i").exec(text);

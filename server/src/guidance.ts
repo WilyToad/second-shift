@@ -4,6 +4,7 @@
 //
 // A pure function of what the turn found: nothing in here looks anything up, which is what makes it testable
 // against a corpus of real questions (FC-199).
+import { cueNote } from "@companion/interfaces";
 
 /** He may remark on being cut off once in this many interruptions; the rest pass without comment (FC-241). */
 export const REMARK_EVERY = 3;
@@ -37,6 +38,8 @@ export type TurnFacts = {
   /** The player is describing a build they're about to go and make, and there's no packing list yet (FC-166). */
   describingBuild: boolean;
   spoken: boolean;
+  /** An ElevenLabs voice will read this answer, so it may carry delivery cues (FC-260). */
+  cues: boolean;
   askedBuild: boolean;
   stage: { id: string; register: string };
   throwbackSpent: boolean;
@@ -101,6 +104,9 @@ export function turnNotes(f: TurnFacts): string[] {
     // The arc (FC-182): the register follows the factory, not the clock, and the past surfaces at most once a
     // session — rate-limited in the agent because the model can't count sessions, and never on a turn like this one.
     f.plain ? "" : `your register here: ${f.stage.register}`,
+    // Only when the voice will act them, and never on a plain answer (FC-260). Here in the turn, not the system
+    // prompt: the cached prefix stays the same whichever voice is chosen.
+    f.cues && !f.plain ? cueNote() : "",
     f.plain || f.throwbackSpent ? "" : "you may let one clause of your own past show in this answer, if it fits the sentence you were already writing; don't add a sentence for it, and don't explain yourself",
     f.askedReady ? "answer with what's still missing and whether the load fits the player's free slots, both from the lines" : "",
     f.packing && f.aboutList ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",

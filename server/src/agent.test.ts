@@ -1069,3 +1069,21 @@ test("FC-248: the list is pushed to the game again when it reconnects, because t
   expect(sent()).toBe(afterFirst + 1);
   expect(calls.at(-1)!.args).toMatchObject({ name: "packing" });
 });
+
+test("FC-260: cues are asked for only when an ElevenLabs voice reads the answer, reach the voice, and are kept nowhere", async () => {
+  const { agent, events, model } = setup([{ text: "[sighs] Your labs are idle, [short pause] nothing queued." }, { text: "Nothing queued." }]);
+  await agent.ask("why is research stuck?", false, true, undefined, true);
+  // The turn's guidance allows them — in the tail, so the cached system prompt is the same whichever voice is chosen.
+  expect(model.seen[0]![0]!.content).toBe("rules");
+  expect(String(model.seen[0]!.at(-1)!.content)).toContain("[chuckles]");
+  // The stream carries them for the voice…
+  expect(events.filter((e) => e.type === "token").map((e) => (e as { text: string }).text).join("")).toContain("[sighs]");
+  // …and nothing kept does: not the transcript a reloaded page gets, not the history the next turn reads.
+  expect(JSON.stringify(agent.transcript())).not.toContain("[sighs]");
+  await agent.ask("and now?");
+  const history = JSON.stringify(model.seen[1]);
+  expect(history).toContain("Your labs are idle, nothing queued.");
+  expect(history).not.toContain("[sighs]");
+  // A turn not read by ElevenLabs isn't told about cues at all.
+  expect(String(model.seen[1]!.at(-1)!.content)).not.toContain("[chuckles]");
+});

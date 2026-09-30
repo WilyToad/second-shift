@@ -794,3 +794,40 @@ test("FC-254: the local voice is offered when the server has it, is read by the 
   voice.readAloud.value = false;
   render(null, root);
 });
+
+test("FC-260: cues reach an ElevenLabs voice, never Kokoro or the browser's, and the highlight still finds its sentence", async () => {
+  const { SentenceQueue, markSpoken } = await import("./voice");
+  const answer = "[sighs] Your labs are idle, [short pause] nothing queued. [chuckles] Back in orbit I'd have called that a light hold.";
+  const eleven = new SentenceQueue(true);
+  expect([...eleven.push(answer + " "), ...eleven.end()]).toEqual(["[sighs] Your labs are idle, [short pause] nothing queued.", "[chuckles] Back in orbit I'd have called that a light hold."]);
+  const local = new SentenceQueue(false);
+  expect([...local.push(answer + " "), ...local.end()]).toEqual(["Your labs are idle, nothing queued.", "Back in orbit I'd have called that a light hold."]);
+  // A cue on its own at the end is a chuckle to ElevenLabs and nothing at all to the others.
+  const tail = new SentenceQueue(false);
+  expect([...tail.push("Done. "), ...tail.end(), ...tail.push("[chuckles]"), ...tail.end()]).toEqual(["Done."]);
+  // The screen shows the answer without cues; the sentence being read starts with one.
+  const marked = markSpoken("Your labs are idle, nothing queued. Back in orbit.", { sentence: "[sighs] Your labs are idle, [short pause] nothing queued.", char: -1 });
+  expect(marked.find((m) => m.mark)?.text).toContain("Your labs are idle");
+});
+
+test("FC-260: a browser that never chose starts on the ElevenLabs voice when there's a key, and asks for cues only then", async () => {
+  const voice = await import("./voice");
+  globalThis.localStorage?.removeItem("second-shift.voice");
+  voice.voiceChoice.value = voice.LOCAL_DEFAULT;
+  const local = { available: true, voices: [{ id: "kokoro:am_michael", name: "Ballast (Michael)" }] };
+  const eleven = [{ id: "v1", name: "Aria" }, { id: "pNInz6obpgDQGcFmaJgB", name: "Adam" }];
+  await voice.loadVoices((async () => Response.json({ available: true, voices: eleven, default: "pNInz6obpgDQGcFmaJgB", local })) as unknown as typeof fetch);
+  expect(voice.voiceChoice.value).toBe("eleven:pNInz6obpgDQGcFmaJgB");
+  voice.readAloud.value = true;
+  expect(voice.cuesWanted()).toBe(true);
+  voice.readAloud.value = false;
+  expect(voice.cuesWanted()).toBe(false);
+  // A choice the player made is kept, and Kokoro asks for no cues.
+  voice.chooseVoice(voice.LOCAL_DEFAULT);
+  await voice.loadVoices((async () => Response.json({ available: true, voices: eleven, default: "pNInz6obpgDQGcFmaJgB", local })) as unknown as typeof fetch);
+  expect(voice.voiceChoice.value).toBe("kokoro:am_michael");
+  voice.readAloud.value = true;
+  expect(voice.cuesWanted()).toBe(false);
+  voice.readAloud.value = false;
+  globalThis.localStorage?.removeItem("second-shift.voice");
+});

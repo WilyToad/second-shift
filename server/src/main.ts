@@ -202,7 +202,7 @@ const server = Bun.serve({
       const localPart = { available: Boolean(local), default: local?.default, voices: names.map((v) => ({ id: `${LOCAL_VOICE}${v}`, name: voiceLabel(v) })) };
       if (!tts) return Response.json({ available: false, voices: [], local: localPart });
       try {
-        return Response.json({ available: true, voices: await tts.listVoices(), local: localPart });
+        return Response.json({ available: true, voices: await tts.listVoices(), default: tts.defaultVoice, local: localPart });
       } catch (e) {
         return Response.json({ available: false, error: (e as Error).message, voices: [], local: localPart });
       }
@@ -264,7 +264,7 @@ const server = Bun.serve({
         }
         try {
           if (msg.interrupted) console.log(`Cut in${msg.interrupted.stopOnly ? " (stop only)" : ""} while reading: "${msg.interrupted.during}"`);
-          await agent.ask(msg.text.trim(), msg.thinking ?? false, msg.spoken === true, msg.interrupted);
+          await agent.ask(msg.text.trim(), msg.thinking ?? false, msg.spoken === true, msg.interrupted, msg.cues === true);
         } finally {
           asking--;
         }

@@ -4,8 +4,14 @@
 // API: POST /v1/text-to-speech/{voice_id}/stream (xi-api-key), GET /v2/voices.
 
 const API = "https://api.elevenlabs.io";
-/** Their lowest-latency model (~75 ms, 32 languages). */
-const DEFAULT_MODEL = "eleven_flash_v2_5";
+/**
+ * Eleven v4 Turbo: it acts delivery cues like `[sighs]` (FC-259, FC-260). The player heard it against Kokoro and
+ * full v4 — "MUCH more immersive than Kokoro", no audible difference from full v4 — and it's a second faster than v4 to
+ * a whole clip. `ELEVENLABS_MODEL=eleven_flash_v2_5` is the old, faster (380 ms) and cue-less choice.
+ */
+export const DEFAULT_MODEL = "eleven_v4_turbo";
+/** Adam: the ElevenLabs voice the player heard in both listening tests (FC-253, FC-259). */
+export const DEFAULT_VOICE = "pNInz6obpgDQGcFmaJgB";
 const MAX_CHARS = 600;
 
 export type TtsVoice = { id: string; name: string; category?: string };
@@ -38,6 +44,11 @@ export class ElevenLabs {
 
   constructor(private readonly opts: { key: string; model?: string; defaultVoice?: string; fetch?: Fetch }) {}
 
+  /** The voice used when the console doesn't name one, and the one a browser that never chose starts on. */
+  get defaultVoice(): string {
+    return this.opts.defaultVoice || DEFAULT_VOICE;
+  }
+
   private get fetch(): Fetch {
     return this.opts.fetch ?? fetch;
   }
@@ -61,8 +72,7 @@ export class ElevenLabs {
   async speak(text: string, voiceId: string | undefined, previous?: string, signal?: AbortSignal): Promise<Response> {
     const clean = text.trim().slice(0, MAX_CHARS);
     if (!clean) return new Response("Nothing to say", { status: 400 });
-    const voice = voiceId || this.opts.defaultVoice || (await this.listVoices())[0]?.id;
-    if (!voice) return new Response("No ElevenLabs voices on this account", { status: 404 });
+    const voice = voiceId || this.defaultVoice;
     const res = await this.fetch(`${API}/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=mp3_44100_128`, {
       method: "POST",
       headers: { "xi-api-key": this.opts.key, "content-type": "application/json", accept: "audio/mpeg" },

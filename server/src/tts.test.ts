@@ -14,20 +14,21 @@ test("FC-148: the key comes from the environment only; blank means off", () => {
   expect(elevenLabsKey({ ELEVEN_LABS_KEY: "sk_alt" })).toBe("sk_alt");
 });
 
-test("FC-148: speech streams from ElevenLabs' flash model with the key in a header, never in the URL", async () => {
+test("FC-148, FC-260: speech streams from Eleven v4 Turbo, cues and all, with the key in a header, never in the URL", async () => {
   const { fn, calls } = fakeFetch((url) => url.includes("/v2/voices")
     ? Response.json({ voices: [{ voice_id: "v1", name: "Aria", category: "premade" }] })
     : new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "audio/mpeg" } }));
   const tts = new ElevenLabs({ key: "sk_secret", fetch: fn });
   expect(await tts.listVoices()).toEqual([{ id: "v1", name: "Aria", category: "premade" }]);
-  const res = await tts.speak("  Gleba makes 1,493 per minute of jelly.  ", undefined, "Earlier sentence.");
+  const res = await tts.speak("  [dryly] Gleba makes 1,493 per minute of jelly.  ", undefined, "Earlier sentence.");
   expect(res.headers.get("content-type")).toBe("audio/mpeg");
   expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
   const speech = calls.at(-1)!;
-  expect(speech.url).toBe("https://api.elevenlabs.io/v1/text-to-speech/v1/stream?output_format=mp3_44100_128");
+  // No voice named: Adam, the one the player heard (FC-259), not whichever the account lists first.
+  expect(speech.url).toBe("https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB/stream?output_format=mp3_44100_128");
   expect(speech.url).not.toContain("sk_secret");
   expect((speech.init!.headers as Record<string, string>)["xi-api-key"]).toBe("sk_secret");
-  expect(JSON.parse(String(speech.init!.body))).toEqual({ text: "Gleba makes 1,493 per minute of jelly.", model_id: "eleven_flash_v2_5", previous_text: "Earlier sentence." });
+  expect(JSON.parse(String(speech.init!.body))).toEqual({ text: "[dryly] Gleba makes 1,493 per minute of jelly.", model_id: "eleven_v4_turbo", previous_text: "Earlier sentence." });
 });
 
 test("FC-148: a key limited to speech still gets the standard voices", async () => {

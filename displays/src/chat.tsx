@@ -6,7 +6,8 @@ import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 import { setSoundsOn, soundsOn } from "./sounds";
 import { capturing, captureError, clipCount, lastClip, lastLocal, localStt, probeStt, sayTruth, setCapturing, setLocalStt, sttStatus } from "./capture";
-import { markSpoken, spokenNow, takeInterrupted, phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, localVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
+import { withoutCuesStreaming } from "@companion/interfaces/src/cues";
+import { cuesWanted, markSpoken, spokenNow, takeInterrupted, phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, localVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
 
 const SILENCE_CHOICES = [1, 1.5, 2, 3, 4, 5];
 
@@ -27,7 +28,9 @@ function SpokenText({ text }: { text: string }) {
   return <>{marked.map((m, i) => (m.mark ? <mark key={i} class={`spoken ${m.mark}`}>{m.text}</mark> : <Emphasis key={i} text={m.text} />))}</>;
 }
 
-function AgentText({ text }: { text: string }) {
+function AgentText({ text: raw }: { text: string }) {
+  // Delivery cues are for the voice (FC-260); the screen never shows them, not even half-arrived.
+  const text = withoutCuesStreaming(raw);
   return (
     <div class="msg agent">
       {segments(text).map((seg, i) =>
@@ -147,7 +150,7 @@ export function TruthRow({ heard }: { heard: string }) {
   );
 }
 
-export function Composer({ onAsk = (text: string, thinking: boolean, spoken = false) => send({ type: "ask", text, thinking, ...(spoken ? { spoken: true, ...(heardDetail() ? { heard: heardDetail()! } : {}), ...interruptedField() } : {}) }), recognition = recognitionCtor() }: { onAsk?: (text: string, thinking: boolean, spoken?: boolean) => void; recognition?: ReturnType<typeof recognitionCtor> } = {}) {
+export function Composer({ onAsk = (text: string, thinking: boolean, spoken = false) => send({ type: "ask", text, thinking, ...(cuesWanted() ? { cues: true } : {}), ...(spoken ? { spoken: true, ...(heardDetail() ? { heard: heardDetail()! } : {}), ...interruptedField() } : {}) }), recognition = recognitionCtor() }: { onAsk?: (text: string, thinking: boolean, spoken?: boolean) => void; recognition?: ReturnType<typeof recognitionCtor> } = {}) {
   const text = useSignal("");
   const thinking = useSignal(false);
   const submit = () => {

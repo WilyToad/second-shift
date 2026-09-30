@@ -1,4 +1,4 @@
-import type { Interrupted } from "@companion/interfaces";
+import { type Interrupted, withoutCues } from "@companion/interfaces";
 // The agent loop: retrieval + snapshot → model → tools → answer, with approvals for map changes.
 // Looks run immediately; map changes wait for the player to confirm a card in the web page.
 import { join } from "node:path";
@@ -474,7 +474,7 @@ export class Agent {
     this.deps.emit({ type: "reset" });
   }
 
-  async ask(rawQuestion: string, thinking = false, spoken = false, interrupted?: Interrupted): Promise<void> {
+  async ask(rawQuestion: string, thinking = false, spoken = false, interrupted?: Interrupted, cues = false): Promise<void> {
     const started = performance.now();
     const decisionsBefore = { ...(this.deps.decisions?.counts ?? { jev: 0, local: 0 }) };
     // Spoken over the answer (FC-241): he may remark on it once in a few; a bare "stop" with no remark due is just
@@ -602,7 +602,7 @@ export class Agent {
       question, plain, measured: Boolean(measuredLine), world, answeredFromData, around: Boolean(around), searchAgain, loot: lootNote(status, around), chart,
       carryOver: carryOver ? { label: carryOver.label, where: carryOver.where } : null, bare, start,
       playerLines: playerLines.length > 0, character: Boolean(status?.character), recipeLines: Boolean(found?.lines.length),
-      craftable: craftableRecipes(status).length > 0, describingBuild: wantsPackingList(question) && !packing, spoken, askedBuild,
+      craftable: craftableRecipes(status).length > 0, describingBuild: wantsPackingList(question) && !packing, spoken, cues, askedBuild,
       stage: { id: stage.row.id, register: stage.row.register }, throwbackSpent: this.throwbacks > 0, askedReady,
       packing: Boolean(packing), listActive: this.lists.all().length > 0,
       aboutList,
@@ -723,6 +723,9 @@ export class Agent {
           ms: result.totalMs, toolCalls: result.toolCalls.length,
           ...(result.toolCalls.length ? { tools: result.toolCalls.map((c) => c.function.name) } : {}),
         });
+        // Delivery cues were for the voice reading the stream (FC-260). Everything kept from here on — history, the
+        // transcript a reloaded page gets, what the correction checks read — is the answer without them.
+        result = { ...result, text: withoutCues(result.text) };
         // Actions and pictures nobody asked for are dropped (FC-126, FC-127): the round's answer stands without them.
         const calls = result.toolCalls.filter((c) => askedFor(c.function.name, intent));
         const dropped = result.toolCalls.length - calls.length;
