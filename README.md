@@ -118,8 +118,13 @@ GPL-3.0. That's fine for a tool you install for yourself; it would matter only i
 ELEVENLABS_API_KEY=your-key
 ```
 
-Restart `bun run start`. Your voices appear in the picker once **Read answers aloud** is on. The server holds the key
-and uses ElevenLabs' fastest model; if a sentence fails, the browser's voice reads it. `bun run sounds` generates proper
+Restart `bun run start`. Your voices appear in the picker once **Read answers aloud** is on, and a browser that
+hasn't picked a voice starts on Adam. The server holds the key and uses **Eleven v4 Turbo**, which acts: with an
+ElevenLabs voice chosen, Ballast writes a few delivery cues into his answers — `[sighs]`, `[dryly]`, `[chuckles]`,
+`[whispers]`, a `[short pause]`, now and then an `[explosion]` — and you hear them performed, not read. You never see
+them on screen, and the local voice and the browser's never get them. Audio starts playing as it arrives (about 0.3 s
+in), and if a sentence fails, the browser's voice reads it. `ELEVENLABS_MODEL=eleven_flash_v2_5` is the older model:
+faster to a whole sentence, but it has no cues. `bun run sounds` generates proper
 sound effects with the same key into `data/sounds/` (they stay local, not in git); without them the console plays
 simple built-in tones. `ELEVEN_LABS_KEY` works as the variable name too, `ELEVENLABS_VOICE_ID` sets a default voice
 and `ELEVENLABS_MODEL` another model.

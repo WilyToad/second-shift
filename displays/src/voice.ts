@@ -738,9 +738,64 @@ export const loadElevenVoices = loadVoices;
 
 type AudioLike = { play(): Promise<void>; pause(): void; onended: (() => void) | null; onerror: (() => void) | null; src: string };
 
+type SourceBufferLike = { mode: string; updating: boolean; appendBuffer(data: Uint8Array): void; addEventListener(type: "updateend", f: () => void): void };
+export type MediaSourceLike = { readyState: string; addSourceBuffer(type: string): SourceBufferLike; endOfStream(): void; addEventListener(type: "sourceopen", f: () => void, opts?: { once: boolean }): void };
+/** One sentence's audio, ready to hand to an audio element, and how to let it go. */
+type Clip = { url: string; release(): void };
+
+/** The browser's MediaSource, where it can play MP3 as it arrives (Chrome can); null where it can't. */
+function browserMediaSource(): (() => MediaSourceLike) | null {
+  const MS = (globalThis as { MediaSource?: { new (): MediaSourceLike; isTypeSupported?(type: string): boolean } }).MediaSource;
+  return MS?.isTypeSupported?.("audio/mpeg") ? () => new MS() : null;
+}
+
+/**
+ * A sentence's MP3 played while it's still arriving (FC-260). Eleven v4 Turbo sends its first audio in ~0.3 s but takes
+ * ~1.5 s to finish a sentence, because it's made at about speaking pace (FC-259); waiting for the whole clip threw that
+ * second away. Reading starts at once, so audio that arrives before the sentence's turn is kept and appended when the
+ * element opens the source.
+ */
+function streamedClip(body: ReadableStream<Uint8Array>, make: () => MediaSourceLike, signal: AbortSignal): Clip {
+  const chunks: Uint8Array[] = [];
+  let finished = false;
+  let wake = null as (() => void) | null; // set by the pump once it has caught up
+  const reader = body.getReader();
+  void (async () => {
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        wake?.();
+      }
+    } catch {
+      // cancelled or cut off: play what came
+    }
+    finished = true;
+    wake?.();
+  })();
+  signal.addEventListener("abort", () => void reader.cancel().catch(() => {}), { once: true });
+  const source = make();
+  const url = URL.createObjectURL(source as unknown as MediaSource);
+  source.addEventListener("sourceopen", () => {
+    const buffer = source.addSourceBuffer("audio/mpeg");
+    buffer.mode = "sequence"; // MP3 frames carry no timestamps: play them in the order they come
+    let next = 0;
+    const pump = () => {
+      if (buffer.updating || source.readyState !== "open") return;
+      if (next < chunks.length) buffer.appendBuffer(chunks[next++]!);
+      else if (finished) source.endOfStream();
+      else wake = pump;
+    };
+    buffer.addEventListener("updateend", pump);
+    pump();
+  }, { once: true });
+  return { url, release: () => URL.revokeObjectURL(url) };
+}
+
 /** Plays ElevenLabs audio for each sentence in order; each is fetched as soon as it's queued, so playback flows. */
 export class ElevenPlayer {
-  private items: { text: string; audio: Promise<string | null> }[] = [];
+  private items: { text: string; audio: Promise<Clip | null> }[] = [];
   private playing: AudioLike | null = null;
   private busyFlag = false;
   private stop = new AbortController();
@@ -750,6 +805,8 @@ export class ElevenPlayer {
     private readonly deps: {
       post?: typeof fetch;
       makeAudio?: (src: string) => AudioLike;
+      /** Plays MP3 as it streams in; null plays each clip once it's whole. Defaults to the browser's, where it has one. */
+      mediaSource?: (() => MediaSourceLike) | null;
       fallback: (text: string) => void;
       voice: () => string;
       onError: (message: string) => void;
@@ -775,7 +832,11 @@ export class ElevenPlayer {
     const audio = post("/tts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, voice: this.deps.voice(), previous }), signal })
       .then(async (res) => {
         if (!res.ok) { this.deps.onError(await res.text()); return null; }
-        return URL.createObjectURL(await res.blob());
+        // ElevenLabs' MP3 plays as it arrives; the local voice's WAV is whole in ~0.2 s and plays as before.
+        const stream = this.deps.mediaSource === undefined ? browserMediaSource() : this.deps.mediaSource;
+        if (stream && res.body && res.headers?.get("content-type")?.startsWith("audio/mpeg")) return streamedClip(res.body, stream, signal);
+        const url = URL.createObjectURL(await res.blob());
+        return { url, release: () => URL.revokeObjectURL(url) };
       })
       .catch((e) => { if (!signal.aborted) this.deps.onError((e as Error).message); return null; });
     this.items.push({ text, audio });
@@ -788,17 +849,17 @@ export class ElevenPlayer {
     if (!item) { this.deps.onIdle?.(); return; }
     this.busyFlag = true;
     const signal = this.stop.signal;
-    const url = await item.audio;
+    const clip = await item.audio;
     if (signal.aborted) return;
-    if (!url) {
+    if (!clip) {
       this.deps.fallback(item.text);
       this.busyFlag = false;
       return this.next();
     }
-    const audio = (this.deps.makeAudio ?? ((src) => new Audio(src) as unknown as AudioLike))(url);
+    const audio = (this.deps.makeAudio ?? ((src) => new Audio(src) as unknown as AudioLike))(clip.url);
     this.playing = audio;
     const done = () => {
-      URL.revokeObjectURL(url);
+      clip.release();
       if (this.playing !== audio) return;
       this.playing = null;
       this.busyFlag = false;

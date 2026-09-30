@@ -185,6 +185,11 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
   like whisper-server. `/tts` serves it for any `kokoro:<name>` voice; `am_michael` is Ballast's and the default. Absent without
   complaint if the venv isn't there. The sidecar is Python, so `bun run check` doesn't cover it — `server/src/local-voice.ts` is
   the tested part.
+- **Delivery cues (FC-260):** with an ElevenLabs voice chosen, the console flags each question `cues`, and the turn's guidance
+  (never the system prompt) offers the list in `interfaces/src/cues.ts`. That one list is also what gets stripped from the
+  screen, history, transcript, correction checks, Kokoro and the browser voice. `eleven_v4_turbo` is the default model; its MP3
+  plays through MediaSource as it streams. `bun scripts/e2e-cues.ts [--listen]` (server running; `--listen` spends ElevenLabs
+  credits, only on the player's word) checks it end to end.
 - `bun scripts/bench-voices.ts --sentences <file> --out <dir> [--eleven]` times request → playable audio for the local voice
   (direct and through `/tts`) and macOS `say` on real answer sentences (FC-253). `--eleven` spends the player's credits: only on their word.
 - `bun scripts/test-stt.ts` (server running, whisper.cpp installed) checks local transcription on the player's own clips: the three FC-189 misses fixed, the noise clip refused, and the round trip under 300 ms (FC-230).

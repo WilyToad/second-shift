@@ -20,6 +20,8 @@ export type AskOptions = {
   /** What to do with approval cards the answer puts up. Default: leave them. */
   cards?: "leave" | "decline" | "approve";
   timeoutMs?: number;
+  /** More fields for the ask message, as the console would send them (say `{ cues: true }`, FC-260). */
+  extra?: Record<string, unknown>;
 };
 
 export async function openConsole(opts: ConsoleOptions = {}) {
@@ -53,7 +55,7 @@ export async function openConsole(opts: ConsoleOptions = {}) {
   /** Asks and waits for the answer to finish; returns the text, the messages it produced and the done/error. */
   const askFull = async (text: string, o: AskOptions = {}): Promise<Asked> => {
     const from = got.length;
-    send({ type: "ask", text });
+    send({ type: "ask", text, ...o.extra });
     const done = await until<Asked["done"] & object>((m) => m.type === "done" || m.type === "error", o.timeoutMs ?? 120_000, from);
     const slice = got.slice(from);
     if (o.cards && o.cards !== "leave") {

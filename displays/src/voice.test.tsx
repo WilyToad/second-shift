@@ -831,3 +831,43 @@ test("FC-260: a browser that never chose starts on the ElevenLabs voice when the
   voice.readAloud.value = false;
   globalThis.localStorage?.removeItem("second-shift.voice");
 });
+
+test("FC-260: ElevenLabs audio starts playing while the sentence is still arriving, in order, and the stream is closed", async () => {
+  const { ElevenPlayer } = await import("./voice");
+  Object.assign(globalThis.URL, { createObjectURL: () => "blob:source", revokeObjectURL: () => {} });
+  const appended: number[][] = [];
+  let ended = false;
+  let open: (() => void) | null = null;
+  const buffer = { mode: "", updating: false, onUpdateEnd: null as (() => void) | null,
+    appendBuffer(d: Uint8Array) { appended.push([...d]); this.updating = true; setTimeout(() => { this.updating = false; this.onUpdateEnd?.(); }, 1); },
+    addEventListener(_t: string, f: () => void) { this.onUpdateEnd = f; } };
+  const source = { readyState: "closed", addSourceBuffer: () => buffer, endOfStream() { ended = true; this.readyState = "ended"; },
+    addEventListener(_t: string, f: () => void) { open = () => { source.readyState = "open"; f(); }; } };
+  let push!: (chunk: number[] | null) => void;
+  const body = new ReadableStream<Uint8Array>({ start(c) { push = (chunk) => (chunk ? c.enqueue(new Uint8Array(chunk)) : c.close()); } });
+  const played: string[] = [];
+  const player = new ElevenPlayer({
+    post: (async () => new Response(body, { headers: { "content-type": "audio/mpeg" } })) as unknown as typeof fetch,
+    // The element opens the source when it's given it, as a browser's does.
+    makeAudio: (src) => { setTimeout(() => open?.(), 0); return { src, onended: null, onerror: null, play: async () => { played.push(src); }, pause() {} }; },
+    mediaSource: () => source,
+    fallback: () => { throw new Error("no fallback expected"); },
+    voice: () => "v1",
+    onError: (m) => { throw new Error(m); },
+  });
+  push([1, 2]);
+  player.enqueue("[sighs] Your labs are idle.");
+  await new Promise((r) => setTimeout(r, 10));
+  // Playing on the first chunk, with the rest still to come.
+  expect(played).toEqual(["blob:source"]);
+  expect(buffer.mode).toBe("sequence");
+  expect(appended).toEqual([[1, 2]]);
+  expect(ended).toBe(false);
+  push([3]);
+  push([4, 5]);
+  push(null);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(appended).toEqual([[1, 2], [3], [4, 5]]);
+  expect(ended).toBe(true);
+  player.cancel();
+});
