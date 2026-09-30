@@ -199,6 +199,14 @@ const buildNames = ((await call("player_status")).recent_builds as { name: strin
 const justBuilt = await ask("I just built something");
 check("I just built something: names the stone furnace", mentions(justBuilt.text, ["stone furnace"]).length > 0);
 
+// FC-256: the player's own words (playtest 2026-09-30). "drill" named no item, so the turn had no recipe and the answer
+// said "I don't have the drill's recipe in this message". Checked against the game's own recipe for the burner drill.
+const drillRecipe = JSON.parse(await game.sc(`local out = {} for _, i in pairs(prototypes.recipe["burner-mining-drill"].ingredients) do out[#out + 1] = { name = i.name, amount = i.amount } end rcon.print(helpers.table_to_json(out))`)) as { name: string; amount: number }[];
+const drill = await ask("I don't have a second drill. What does a drill need?");
+const statesIngredient = (i: { name: string; amount: number }) => new RegExp(`\\b${i.amount}\\b[^.;\\n]{0,24}${i.name.replace(/-/g, "[- ]")}`, "i").test(drill.text);
+check("a drill: gives the burner mining drill's recipe from the save", drillRecipe.length > 0 && drillRecipe.every(statesIngredient), drillRecipe.map((i) => `${i.amount} ${i.name}${statesIngredient(i) ? "" : " (missing)"}`).join(", "));
+check("a drill: doesn't say it lacks the recipe", !/don'?t have (the|a|its)\b[^.]*recipe|can'?t give (you )?exact/i.test(drill.text), drill.text.slice(0, 120));
+
 await ask("what should I build next?");
 // No offer came up on its own: ask for one, so the "yeah" path is always exercised through the real model.
 if (!offerChecked) await ask("Before you scan for ore, ask me whether I want you to look around.");

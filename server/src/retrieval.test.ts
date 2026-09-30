@@ -53,3 +53,63 @@ test("recipe questions naming something that isn't in the save are recognised", 
   expect(r.unknownName("How many assemblers do I have?")).toBeNull();
 });
 
+
+/** A new map's worth of drills, chests, furnaces and arms (FC-256): the basics unlocked, the rest behind research. */
+function newMap(unlockAll = false) {
+  const r = (ingredients: [string, number][], enabled: boolean) => ({ category: "crafting", energy: 1, enabled: enabled || unlockAll, maximum_productivity: 3, ingredients: ingredients.map(([name, amount]) => ({ type: "item", name, amount })), products: [] as { type: string; name: string; amount: number }[] });
+  const recipes: Record<string, ReturnType<typeof r>> = {
+    "burner-mining-drill": r([["iron-gear-wheel", 3], ["stone-furnace", 1], ["iron-plate", 3]], true),
+    "electric-mining-drill": r([["electronic-circuit", 3], ["iron-gear-wheel", 5], ["iron-plate", 10]], true),
+    "big-mining-drill": r([["tungsten-carbide", 20], ["electric-engine-unit", 10]], false),
+    "wooden-chest": r([["wood", 2]], true),
+    "iron-chest": r([["iron-plate", 8]], true),
+    "steel-chest": r([["steel-plate", 8]], false),
+    "stone-furnace": r([["stone", 5]], true),
+    "burner-inserter": r([["iron-plate", 1], ["iron-gear-wheel", 1]], true),
+    "inserter": r([["electronic-circuit", 1], ["iron-gear-wheel", 1], ["iron-plate", 1]], true),
+    "bulk-inserter": r([["fast-inserter", 1], ["iron-gear-wheel", 15]], false),
+  };
+  for (const [name, recipe] of Object.entries(recipes)) recipe.products = [{ type: "item", name, amount: 1 }];
+  const items = Object.fromEntries([...Object.keys(recipes), "iron-ore", "copper-ore", "iron-plate", "stone-wall"].map((n) => [n, { type: "item", stack_size: 50 }]));
+  return PrototypesSchema.parse({
+    recipes, items, fluids: {}, raw_resources: ["iron-ore", "copper-ore"],
+    technologies: {
+      "steel-processing": { prerequisites: [], unlocks: ["steel-chest"], researched: unlockAll, count: 50, ingredients: [], seconds_per_unit: 10 },
+      "big-mining-drill": { prerequisites: ["steel-processing"], unlocks: ["big-mining-drill"], researched: unlockAll, count: 50, ingredients: [], seconds_per_unit: 10 },
+      "bulk-inserter": { prerequisites: ["steel-processing"], unlocks: ["bulk-inserter"], researched: unlockAll, count: 50, ingredients: [], seconds_per_unit: 10 },
+    },
+    machines: { "assembling-machine-1": { type: "assembling-machine", size: [3, 3], crafting_categories: ["crafting"], crafting_speed: 0.5 } },
+  });
+}
+
+test("FC-256: the player's own words find the item — 'a second drill' is the drills they can make, and the answer is told so", () => {
+  const retriever = new RecipeRetriever(newMap());
+  for (const q of ["I don't have a second drill.", "I need another drill", "what does a drill need?", "is this miner thing working?"]) {
+    const r = retriever.retrieve(q);
+    expect(r.items).toEqual(["burner-mining-drill", "electric-mining-drill"]);
+    expect(r.lines.some((l) => l.startsWith("burner-mining-drill: 3 iron-gear-wheel, 1 stone-furnace, 3 iron-plate"))).toBe(true);
+    // Said once, so the answer can name what it took the word to mean.
+    expect(r.lines[0]).toContain("read as burner-mining-drill, electric-mining-drill");
+  }
+  expect(retriever.retrieve("I think I need a chest").items).toEqual(["iron-chest", "wooden-chest"]);
+  expect(retriever.retrieve("arms to feed the ovens").items).toEqual(["burner-inserter", "inserter", "stone-furnace"]);
+  expect(retriever.retrieve("point me to the nearest ore").items).toEqual(["iron-ore", "copper-ore"]);
+  // The whole name still wins over a guess, and "mining drill" isn't read as any drill.
+  expect(retriever.retrieve("burner mining drill").items).toEqual(["burner-mining-drill"]);
+  expect(retriever.retrieve("burner mining drill").lines[0]).not.toContain("read as");
+  // "what does a drill need?" is no longer an unknown name.
+  expect(retriever.unknownName("what does a drill need?")).toBeNull();
+});
+
+test("FC-256: on a late save, where everything is unlocked, an everyday word still means the basic ones first", () => {
+  const retriever = new RecipeRetriever(newMap(true));
+  expect(retriever.retrieve("I think I need a chest").items).toEqual(["iron-chest", "wooden-chest", "steel-chest"]);
+  expect(retriever.retrieve("arms").items).toEqual(["burner-inserter", "inserter", "bulk-inserter"]);
+});
+
+test("FC-256: ordinary talk doesn't pick up items", () => {
+  const retriever = new RecipeRetriever(newMap());
+  for (const q of ["k, I found it", "start the gathering list", "This here is running", "I'm just starting, so I need some guidance.", "what should I do next?", "the second one is on coal"]) {
+    expect(retriever.retrieve(q).items).toEqual([]);
+  }
+});

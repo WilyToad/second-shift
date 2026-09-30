@@ -52,7 +52,9 @@ const replayDigest = process.env.COMPANION_REPLAY_DIGEST
 
 // One conversation per map (FC-137). Until the game reports its map id, the last conversation without one is shown.
 const SESSIONS_DIR = process.env.COMPANION_SESSIONS ?? new URL("../../data/sessions", import.meta.url).pathname;
-const LEGACY_SESSION = new URL("../../data/session.json", import.meta.url).pathname;
+// The conversation before any map is known. With COMPANION_SESSIONS (a test server) it sits beside that folder, not in
+// the player's data/: a test server's grounding run once landed there and was then adopted as a fresh map's history.
+const LEGACY_SESSION = process.env.COMPANION_SESSIONS ? `${SESSIONS_DIR.replace(/\/$/, "")}.session.json` : new URL("../../data/session.json", import.meta.url).pathname;
 let mapId: string | undefined;
 
 // Typed decisions (FC-244): Jev when a key is in .env, the same code paths as before when it isn't.
