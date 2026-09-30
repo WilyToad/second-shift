@@ -39,10 +39,60 @@ export function elevenLabsKey(env: Record<string, string | undefined> = process.
   return key ? key : null;
 }
 
+/**
+ * ElevenLabs requests in flight at once. The player's plan allows 5 and answered a sixth with a 429 ("Too many
+ * concurrent requests") in their first session on v4 (FC-260): the console asks for every sentence as it arrives, and
+ * a streamed sentence holds its request open while it plays. One spare for anything else using the key.
+ */
+export const MAX_CONCURRENT = 4;
+/** Waits before retrying a 429 — the limit is transient, so a short wait beats dropping to the browser's voice. */
+const RETRY_MS = [400, 1200];
+
+/** Hands the body on unchanged, and calls `done` once when it ends, fails or is cancelled. */
+function releasing(body: ReadableStream<Uint8Array>, done: () => void): ReadableStream<Uint8Array> {
+  let released = false;
+  const once = () => { if (!released) { released = true; done(); } };
+  const reader = body.getReader();
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { done: finished, value } = await reader.read();
+        if (finished) { once(); controller.close(); } else controller.enqueue(value);
+      } catch (e) {
+        once();
+        controller.error(e);
+      }
+    },
+    cancel(reason) {
+      once();
+      return reader.cancel(reason);
+    },
+  });
+}
+
 export class ElevenLabs {
   private voices: TtsVoice[] | null = null;
+  private active = 0;
+  private waiting: (() => void)[] = [];
 
-  constructor(private readonly opts: { key: string; model?: string; defaultVoice?: string; fetch?: Fetch }) {}
+  constructor(private readonly opts: { key: string; model?: string; defaultVoice?: string; fetch?: Fetch; concurrency?: number; retryMs?: number[] }) {}
+
+  /** A place among the requests in flight, first come first served, so sentences still start in order. */
+  private async slot(signal?: AbortSignal): Promise<(() => void) | null> {
+    if (this.active < (this.opts.concurrency ?? MAX_CONCURRENT)) {
+      this.active++;
+    } else {
+      const got = await new Promise<boolean>((resolve) => {
+        const turn = () => { signal?.removeEventListener("abort", gone); resolve(true); };
+        const gone = () => { this.waiting = this.waiting.filter((w) => w !== turn); resolve(false); };
+        this.waiting.push(turn);
+        signal?.addEventListener("abort", gone, { once: true });
+      });
+      if (!got) return null;
+    }
+    // A place is handed straight to the next in line, so `active` only drops when nobody is waiting.
+    return () => { const next = this.waiting.shift(); if (next) next(); else this.active--; };
+  }
 
   /** The voice used when the console doesn't name one, and the one a browser that never chose starts on. */
   get defaultVoice(): string {
@@ -73,14 +123,29 @@ export class ElevenLabs {
     const clean = text.trim().slice(0, MAX_CHARS);
     if (!clean) return new Response("Nothing to say", { status: 400 });
     const voice = voiceId || this.defaultVoice;
-    const res = await this.fetch(`${API}/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=mp3_44100_128`, {
-      method: "POST",
-      headers: { "xi-api-key": this.opts.key, "content-type": "application/json", accept: "audio/mpeg" },
-      body: JSON.stringify({ text: clean, model_id: this.opts.model ?? DEFAULT_MODEL, ...(previous ? { previous_text: previous.slice(-MAX_CHARS) } : {}) }),
-      signal,
-    });
-    if (!res.ok || !res.body) return new Response(await failure(res), { status: res.status === 401 ? 401 : 502 });
-    return new Response(res.body, { headers: { "content-type": "audio/mpeg", "cache-control": "no-store" } });
+    const release = await this.slot(signal);
+    if (!release) return new Response("Cancelled", { status: 499 });
+    let res: Response;
+    try {
+      for (let attempt = 0; ; attempt++) {
+        res = await this.fetch(`${API}/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=mp3_44100_128`, {
+          method: "POST",
+          headers: { "xi-api-key": this.opts.key, "content-type": "application/json", accept: "audio/mpeg" },
+          body: JSON.stringify({ text: clean, model_id: this.opts.model ?? DEFAULT_MODEL, ...(previous ? { previous_text: previous.slice(-MAX_CHARS) } : {}) }),
+          signal,
+        });
+        const wait = (this.opts.retryMs ?? RETRY_MS)[attempt];
+        if (res.status !== 429 || wait === undefined || signal?.aborted) break;
+        await res.body?.cancel();
+        await Bun.sleep(wait);
+      }
+    } catch (e) {
+      release();
+      throw e;
+    }
+    if (!res.ok || !res.body) { release(); return new Response(await failure(res), { status: res.status === 401 ? 401 : 502 }); }
+    // The place is held until the audio has all come through — that's when ElevenLabs counts the request as done.
+    return new Response(releasing(res.body, release), { headers: { "content-type": "audio/mpeg", "cache-control": "no-store" } });
   }
 }
 

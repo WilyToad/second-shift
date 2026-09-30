@@ -47,3 +47,44 @@ test("FC-148: a refused key or a failure comes back with ElevenLabs' reason", as
   expect(await res.text()).toBe("ElevenLabs 401: Invalid API key");
   await expect(tts.listVoices()).rejects.toThrow("ElevenLabs 401: Invalid API key");
 });
+
+test("FC-260: never more than four sentences in flight — the plan's limit is five — and they still start in order", async () => {
+  let inFlight = 0;
+  let most = 0;
+  const started: string[] = [];
+  const finish: (() => void)[] = [];
+  const fn = async (_url: string, init?: RequestInit) => {
+    started.push(JSON.parse(String(init!.body)).text);
+    inFlight++;
+    most = Math.max(most, inFlight);
+    // A streamed sentence holds its request open until its audio is all through.
+    const body = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new Uint8Array([1])); finish.push(() => { inFlight--; c.close(); }); } });
+    return new Response(body, { headers: { "content-type": "audio/mpeg" } });
+  };
+  const tts = new ElevenLabs({ key: "k", fetch: fn });
+  const answers = Array.from({ length: 8 }, (_, i) => tts.speak(`Sentence ${i + 1}.`, "v"));
+  await Bun.sleep(5);
+  expect(started).toEqual(["Sentence 1.", "Sentence 2.", "Sentence 3.", "Sentence 4."]);
+  // Each sentence's audio read to the end frees its place for the next in line.
+  const read = answers.map(async (r) => new Uint8Array(await (await r).arrayBuffer()));
+  while (finish.length) { finish.shift()!(); await Bun.sleep(2); }
+  expect((await Promise.all(read)).every((b) => b.length === 1)).toBe(true);
+  expect(started).toEqual(Array.from({ length: 8 }, (_, i) => `Sentence ${i + 1}.`));
+  expect(most).toBe(4);
+});
+
+test("FC-260: a 429 is waited out and retried, not handed to the browser's voice", async () => {
+  let calls = 0;
+  const fn = async () => ++calls < 3
+    ? Response.json({ detail: { status: "too_many_concurrent_requests", message: "Too many concurrent requests." } }, { status: 429 })
+    : new Response(new Uint8Array([7]), { headers: { "content-type": "audio/mpeg" } });
+  const tts = new ElevenLabs({ key: "k", fetch: fn, retryMs: [1, 1] });
+  const res = await tts.speak("Idle.", "v");
+  expect(res.status).toBe(200);
+  expect(calls).toBe(3);
+  // Past the retries it's still an error the console can show.
+  calls = -10;
+  const refused = await new ElevenLabs({ key: "k", fetch: fn, retryMs: [1] }).speak("Idle.", "v");
+  expect(refused.status).toBe(502);
+  expect(await refused.text()).toContain("Too many concurrent requests");
+});
