@@ -1105,3 +1105,17 @@ test("FC-255: an answer that will be listened to stops at its first paragraph; t
   await heard.agent.ask("walk me through the steps for a drill", false, false, undefined, false, true);
   expect(String(heard.model.seen[2]!.at(-1)!.content)).toContain("give the steps they asked for");
 });
+
+test("FC-257: a wrong recipe in an answer gets the save's own recipe as a correction line", async () => {
+  const r = (ingredients: [string, number][], product: string) => ({ category: "crafting", energy: 1, enabled: true, maximum_productivity: 3, ingredients: ingredients.map(([name, amount]) => ({ type: "item", name, amount })), products: [{ type: "item", name: product, amount: 1 }] });
+  const protos = PrototypesSchema.parse({
+    recipes: { "burner-mining-drill": r([["iron-plate", 3], ["iron-gear-wheel", 3], ["stone-furnace", 1]], "burner-mining-drill") },
+    items: Object.fromEntries(["burner-mining-drill", "iron-plate", "iron-gear-wheel", "stone-furnace"].map((n) => [n, { type: "item", stack_size: 50 }])),
+    fluids: {}, technologies: {}, machines: {},
+  });
+  const events: ServerMessage[] = [];
+  const agent = new Agent({ model: fakeModel([{ text: "A burner drill takes 2 iron gear wheels, 5 iron plate, 1 stone furnace." }]), game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: (m) => events.push(m) });
+  await agent.ask("I need another drill.");
+  const shown = events.filter((e) => e.type === "token").map((e) => (e as { text: string }).text).join("");
+  expect(shown).toContain("Correction: in this save a burner-mining-drill takes 3 iron-plate, 3 iron-gear-wheel, 1 stone-furnace.");
+});

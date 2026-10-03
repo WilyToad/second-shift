@@ -18,6 +18,7 @@ import { remarkDue, STEPS, turnNotes } from "./guidance";
 import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, ASKS_FOR, askedFor, parseTarget, anchorFor, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 export { bareFollowUp, needsWorldTools, PICTURE, ASKS_FOR, askedFor, parseTarget, targetRate, anchorFor, SELECTED_PREFIX, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 import type { BlueprintCard } from "./messages";
+import { powerCorrections, recipeCorrections } from "./recipe-claims";
 import { FirstParagraphFilter, HiddenBlockFilter, LIST_REPORT, RepeatFilter, TailCutFilter, stripChartBlocks } from "./stream-filter";
 import { pruneShots, waitForShot } from "./screenshots";
 import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
@@ -763,7 +764,7 @@ export class Agent {
           // A name this save doesn't have, said with confidence (FC-171), and sums the answer did in its head (FC-153).
           // "The 6 are highlighted in-game" on a turn with no tool call (FC-229): an action it says it took.
           const toolsRun = record.rounds.flatMap((r) => r.tools ?? []);
-          const corrections = [...(await this.checkClaims(text, status)), ...arithmeticCorrections(text), ...nameCorrections(text, protos), ...materialCorrections(text, protos), ...actionClaims(text, toolsRun)];
+          const corrections = [...(await this.checkClaims(text, status)), ...arithmeticCorrections(text), ...nameCorrections(text, protos), ...materialCorrections(text, protos), ...actionClaims(text, toolsRun), ...recipeCorrections(text, protos), ...powerCorrections(text, protos)];
           if (corrections.length) {
             const add = `\n\n${corrections.join(" ")}`;
             text += add;
