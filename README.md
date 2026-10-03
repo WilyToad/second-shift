@@ -41,8 +41,10 @@ leaves it; without it, the browser's own speech service does the transcribing (s
 ### Answers from your game, not from the wiki
 
 Ask how much of something you make, what's holding production back, or how many machines a target needs. Recipes,
-machine speeds and research are read from the game you're playing, mods and all, so modded recipes are right. Charts are drawn from
-the game's production statistics, never by the model.
+machine speeds and research are read from the game you're playing, mods and all, so modded recipes are right. Everyday
+names work — "a drill", "another chest", "arms for the ovens" — and it says which items it took them to mean. If an
+answer still states a recipe or a power draw your game disagrees with, a correction with your save's own figures is added
+under it. Charts are drawn from the game's production statistics, never by the model.
 
 <img src="docs/media/production-plan.png" alt="A production plan for 60 advanced circuits a minute, with a recipe graph from raw inputs to 4.8 assembling machines" width="880">
 
@@ -74,11 +76,15 @@ while the answer arrives and is read aloud, then listens again. Click **Talk** a
 goes out first), or press **Escape** to stop without sending. The in-game key is **Talk to Second Shift** under
 **Settings → Controls → Mods**.
 
-Tick **Read answers aloud** to hear each answer sentence by sentence as it streams. By default he speaks in
-**Ballast's own voice, generated on your Mac** by [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) — no key, no
-network, and each sentence ready in about 175 ms. Pick another next to it: 27 more local voices (American and British),
-the browser's own voice, or an [ElevenLabs](https://elevenlabs.io) voice if you add a key. In a blind test the local
-voice was preferred over ElevenLabs.
+Tick **Read answers aloud** to hear each answer sentence by sentence as it streams. With an
+[ElevenLabs](https://elevenlabs.io) key he speaks in an ElevenLabs voice and **acts his lines** — a sigh, a dry aside, a
+sharp breath when something's attacking (see *Adding ElevenLabs*). Without one, he speaks in **Ballast's own voice,
+generated on your Mac** by [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) — no key, no network, each sentence ready
+in about 175 ms. Either way the picker next to it has the rest: 27 more local voices (American and British), the
+browser's own voice, and your ElevenLabs voices.
+
+An answer that's being read to you is kept to the point: one short paragraph, no sign-off, nothing offered that you
+can't use yet. Ask for steps and you get them, four at most. Typed and read on screen, answers keep their full length.
 
 To interrupt, just talk: speak while he's reading and he stops within a beat, and what you said is the next
 question — a bare "stop" or "nevermind" just stops him (every third time he may have a word to say about it). The console
@@ -240,7 +246,7 @@ at startup which one it's using and whether anything leaves your Mac.
 | `openai-compatible` | Any other OpenAI-compatible server, such as Splash | `COMPANION_MODEL_URL` and `COMPANION_MODEL` (`COMPANION_MODEL_KEY` if it wants one) |
 
 **On your Claude subscription,** answers start close to oMLX's pace — measured with Sonnet, first words in about 2 s
-(oMLX: 1.0–1.5 s), 6–8 s for a turn that looks something up in the game — and the same checks pass: 10 of 10 on grounding
+(oMLX: about 0.7 s), 6–8 s for a turn that looks something up in the game — and the same checks pass: 10 of 10 on grounding
 and 18 of 18 on "only act when asked". It uses your plan's usage like Claude Code does. `claude -p` is an agent
 with its own shell and file tools, so the companion runs it with **none** of them — no tools, no MCP servers, none of
 your Claude Code settings, plugins or memory, nothing saved — from an empty folder. Asked to run a command, it can
@@ -340,8 +346,8 @@ No 70 GB to spare? The companion can also run on your Claude subscription or on 
    bun run start        # http://127.0.0.1:5170
    ```
 
-   The first answer takes longer while the model warms up; after that, the first words usually arrive in 2–3
-   seconds.
+   The first answer takes longer while the model warms up; after that, the first words usually arrive in under a
+   second.
 
 ### First questions to try
 

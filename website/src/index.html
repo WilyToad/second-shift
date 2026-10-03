@@ -125,7 +125,7 @@
             <li><span class="step-n mono">2</span>Pause for 2 seconds and it sends (pick 1–5 s)</li>
             <li><span class="step-n mono">3</span>The answer is read aloud as it arrives, then the mic opens again</li>
           </ol>
-          <p>Answers are read with your Mac’s voice or an ElevenLabs voice if you add a key, and short sounds mark alerts, research and cards. Voice input uses Chrome’s speech recognition, on your Mac after a one-time download.</p>
+          <p>Answers are read in a voice generated on your Mac, or in an ElevenLabs voice if you add a key — and then he acts his lines: a sigh, a dry aside, a sharp breath when the wall’s under attack. Read aloud, answers stay short. Talk over him and he stops; his own voice is cancelled out of the mic, the way voice chat does it. Voice input uses Chrome’s speech recognition, on your Mac after a one-time download.</p>
         </div>
         <figure class="capture">
           <img src="./media/talk.png" alt="The console with an answer about automation science packs, and the composer’s voice controls: Sounds, Read answers aloud with an ElevenLabs voice picked, send after 2 s, and the Talk button" width="879" height="411" loading="lazy">
@@ -202,13 +202,13 @@
         <div class="link"><span class="mono">RCON · named actions</span></div>
         <div class="node core"><span class="label">Server</span><strong>Bun</strong><span>agent · planner · blueprints</span></div>
         <div class="link"><span class="mono">OpenAI-style API</span></div>
-        <div class="node"><span class="label">Model</span><strong>Local model</strong><span>oMLX for now</span></div>
+        <div class="node"><span class="label">Model</span><strong>Local model</strong><span>oMLX, or your Claude plan</span></div>
         <div class="link down"><span class="mono">WebSocket</span></div>
         <div class="node console"><span class="label">Console</span><strong>Your browser</strong><span>second monitor</span></div>
       </div>
       <dl class="stats">
         <div><dt class="mono">&lt;&thinsp;0.1 ms</dt><dd>added per game tick on a large Space Age base (0.05 ms of script time in the latest profile). No map scans on a timer, only a one-time scan when a save first loads.</dd></div>
-        <div><dt class="mono">~1.5 s</dt><dd>to the first words of an answer, with the model's prompt cache kept warm and the model kept awake while you talk.</dd></div>
+        <div><dt class="mono">0.7 s</dt><dd>to the first words of an answer (median, measured), with the model's prompt cache kept warm and the model kept awake while you talk.</dd></div>
         <div><dt class="mono">0</dt><dd>calls to the cloud needed. The game, the mod, the server and the model all run locally; voice, and the optional judgement layer below, use online services only if you turn them on.</dd></div>
       </dl>
       <p class="note"><strong>One optional exception.</strong> Two judgement calls are ones code is bad at: which item in your save you meant when you wrote “ovens” on a list, and whether a hiccup in your factory is worth interrupting you for. Add a <a href="https://typesafe.ai">Jev</a> key and those two are asked of it — typed questions, calibrated answers, about 150&thinsp;ms — with the code that did the job before still sitting behind it, so no key or no network changes nothing. What leaves your Mac is narrow and stated: the words on your list, and the companion’s own findings. Never your questions, your microphone, your save or your game state.</p>
@@ -225,7 +225,7 @@
             <li><strong>Factorio 2.0 from Steam.</strong> Tested with Space Age and extra mods.</li>
             <li><strong>Bun 1.3</strong> or newer.</li>
             <li><strong>Chrome</strong> to talk to it (the console itself works in any modern browser).</li>
-            <li><strong>oMLX</strong> serving a model with tool calling. Tested with Qwen3.8 Flash-Next, which needs about 70 GB of memory. Other providers are planned.</li>
+            <li><strong>oMLX</strong> serving a model with tool calling. Tested with Qwen3.8 Flash-Next, which needs about 70 GB of memory. Short on memory? It can run on your Claude subscription or an API key instead — see the <a href="https://github.com/WilyToad/second-shift#another-model-optional">README</a>.</li>
           </ul>
           <p class="note"><strong>Host the game.</strong> The companion connects to multiplayer-hosted games only: start a new one from <em>Multiplayer → Host new game</em>, or host a save with the launcher. Back up existing saves first; hosted games autosave.</p>
         </div>
