@@ -113,3 +113,21 @@ test("FC-219: a later paragraph that reports the list is cut with everything aft
   expect(run(["The list is 3 of 11 done."]).cut).toBe(false);
   expect(run(["Your list is 3 of 11 done.\n\nThe belts are what's left."]).cut).toBe(false);
 });
+
+test("FC-255: a heard answer stops at its first paragraph, at any token split, and lists inside it stream", async () => {
+  const { FirstParagraphFilter } = await import("./stream-filter");
+  const answer = "Burner drill: 3 iron plate, 3 gears, 1 stone furnace.\n- gears are 2 plate each\n\nAnd back in orbit I'd have called that light.";
+  for (let size = 1; size <= answer.length; size += 3) {
+    const f = new FirstParagraphFilter();
+    let out = "";
+    for (let i = 0; i < answer.length; i += size) out += f.push(answer.slice(i, i + size));
+    out += f.end();
+    expect(out).toBe("Burner drill: 3 iron plate, 3 gears, 1 stone furnace.\n- gears are 2 plate each");
+    expect(f.cut).toBe(true);
+  }
+  const lead = new FirstParagraphFilter();
+  expect(lead.push("\n\nAnswer here.\n\nMore.") + lead.end()).toBe("\n\nAnswer here.");
+  const one = new FirstParagraphFilter();
+  expect(one.push("Just this.") + one.end()).toBe("Just this.");
+  expect(one.cut).toBe(false);
+});

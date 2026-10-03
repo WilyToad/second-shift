@@ -197,6 +197,9 @@ Binary: `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.
 - `bun scripts/test-stt.ts` (server running, whisper.cpp installed) checks local transcription on the player's own clips: the three FC-189 misses fixed, the noise clip refused, and the round trip under 300 ms (FC-230).
 - `bun scripts/compare-transcribers.ts [--vocab]` scores the browser's transcript and any installed local engine against the player's corrected clips in `data/captures/voice/` (FC-189). Run it on each new session's clips.
 - `bun scripts/probe-concurrency.ts` (oMLX running) measures what a concurrent request does to the cached prefix, the decode rate and oMLX's memory (FC-192). Run it after an oMLX upgrade, and before anything that would add a second client.
+- `bun scripts/eval-spoken.ts` (server running; game can be closed) replays the first local-voice playtest's spoken lines
+  and checks heard answers stay one short paragraph while typed ones keep their length (FC-255). Run it after changes to
+  turn guidance or the stream filters.
 - `bun scripts/eval-grounding.ts` (server running) runs the 10-question grounding check. Run it
   after any change to retrieval, prompt wording or sampling; results land in `data/eval/`.
 

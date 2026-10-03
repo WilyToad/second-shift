@@ -150,7 +150,7 @@ export function TruthRow({ heard }: { heard: string }) {
   );
 }
 
-export function Composer({ onAsk = (text: string, thinking: boolean, spoken = false) => send({ type: "ask", text, thinking, ...(cuesWanted() ? { cues: true } : {}), ...(spoken ? { spoken: true, ...(heardDetail() ? { heard: heardDetail()! } : {}), ...interruptedField() } : {}) }), recognition = recognitionCtor() }: { onAsk?: (text: string, thinking: boolean, spoken?: boolean) => void; recognition?: ReturnType<typeof recognitionCtor> } = {}) {
+export function Composer({ onAsk = (text: string, thinking: boolean, spoken = false) => send({ type: "ask", text, thinking, ...(readAloud.value ? { aloud: true } : {}), ...(cuesWanted() ? { cues: true } : {}), ...(spoken ? { spoken: true, ...(heardDetail() ? { heard: heardDetail()! } : {}), ...interruptedField() } : {}) }), recognition = recognitionCtor() }: { onAsk?: (text: string, thinking: boolean, spoken?: boolean) => void; recognition?: ReturnType<typeof recognitionCtor> } = {}) {
   const text = useSignal("");
   const thinking = useSignal(false);
   const submit = () => {

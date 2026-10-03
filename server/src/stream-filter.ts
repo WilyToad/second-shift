@@ -242,3 +242,42 @@ export const LIST_REPORT = [
   /\b(in reach|nearby stock|still 0)\b/i,
   /\bback to the (outpost|list|build)\b/i,
 ];
+
+/**
+ * Lets the first paragraph through and stops at the second (FC-255). For answers that will be listened to: the player
+ * cut in on the second paragraph of nearly every answer in the first local-voice playtest ("He seems very verbal and
+ * chatty"), and the turn's guidance alone still let one in thirteen through. A paragraph break before any words is
+ * not the end of the first paragraph; lists inside the first paragraph (single line breaks) stream untouched.
+ */
+export class FirstParagraphFilter {
+  private seen = "";
+  private pending = "";
+  cut = false;
+
+  push(text: string): string {
+    if (this.cut || !text) return "";
+    this.pending += text;
+    let out = "";
+    for (;;) {
+      const brk = /\n[ \t]*\n/.exec(this.pending);
+      if (!brk) break;
+      const before = this.pending.slice(0, brk.index);
+      if ((this.seen + before).trim()) { out += before; this.seen += before; this.pending = ""; this.cut = true; return out.trimEnd(); }
+      // A break before the answer has started: pass it on and keep looking.
+      const blank = this.pending.slice(0, brk.index + brk[0].length);
+      out += blank; this.seen += blank; this.pending = this.pending.slice(blank.length);
+    }
+    // Hold a trailing newline (it may be the first half of a break); release the rest.
+    const hold = /\n[ \t]*$/.exec(this.pending)?.[0] ?? "";
+    const release = this.pending.slice(0, this.pending.length - hold.length);
+    out += release; this.seen += release; this.pending = hold;
+    return out;
+  }
+
+  end(): string {
+    if (this.cut) return "";
+    const rest = this.pending;
+    this.pending = "";
+    return rest;
+  }
+}

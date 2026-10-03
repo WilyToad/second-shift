@@ -266,7 +266,7 @@ const server = Bun.serve({
         }
         try {
           if (msg.interrupted) console.log(`Cut in${msg.interrupted.stopOnly ? " (stop only)" : ""} while reading: "${msg.interrupted.during}"`);
-          await agent.ask(msg.text.trim(), msg.thinking ?? false, msg.spoken === true, msg.interrupted, msg.cues === true);
+          await agent.ask(msg.text.trim(), msg.thinking ?? false, msg.spoken === true, msg.interrupted, msg.cues === true, msg.aloud === true || msg.cues === true);
         } finally {
           asking--;
         }

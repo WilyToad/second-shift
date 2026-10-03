@@ -1087,3 +1087,21 @@ test("FC-260: cues are asked for only when an ElevenLabs voice reads the answer,
   // A turn not read by ElevenLabs isn't told about cues at all.
   expect(String(model.seen[1]!.at(-1)!.content)).not.toContain("[chuckles]");
 });
+
+test("FC-255: an answer that will be listened to stops at its first paragraph; typed, it's whole; steps run on", async () => {
+  const twoParagraphs = "Burner drill: 3 iron plate, 3 gears, 1 stone furnace.\n\nBack in orbit I'd have called that a light hold.";
+  const heard = setup([{ text: twoParagraphs }, { text: twoParagraphs }, { text: twoParagraphs }]);
+  await heard.agent.ask("I need another drill.", false, true);
+  // The turn was told it's heard, and the second paragraph never reached the page or the history.
+  expect(String(heard.model.seen[0]!.at(-1)!.content)).toContain("this answer will be heard, not read");
+  const shown = heard.events.filter((e) => e.type === "token").map((e) => (e as { text: string }).text).join("");
+  expect(shown).toBe("Burner drill: 3 iron plate, 3 gears, 1 stone furnace.");
+  expect(JSON.stringify(heard.agent.transcript())).not.toContain("orbit");
+  // Typed with read-aloud off: untouched.
+  await heard.agent.ask("I need another drill.");
+  expect(String(heard.model.seen[1]!.at(-1)!.content)).not.toContain("heard, not read");
+  expect(JSON.stringify(heard.agent.transcript())).toContain("orbit");
+  // Asked for steps, read aloud: the steps note, and no cut.
+  await heard.agent.ask("walk me through the steps for a drill", false, false, undefined, false, true);
+  expect(String(heard.model.seen[2]!.at(-1)!.content)).toContain("give the steps they asked for");
+});

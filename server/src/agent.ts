@@ -14,11 +14,11 @@ import { materialCorrections, nameCorrections } from "./names";
 import { actionClaims } from "./claims";
 import { renamedNote, resolveListItems } from "./list-items";
 import type { Decisions } from "./decisions";
-import { remarkDue, turnNotes } from "./guidance";
+import { remarkDue, STEPS, turnNotes } from "./guidance";
 import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, ASKS_FOR, askedFor, parseTarget, anchorFor, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 export { bareFollowUp, needsWorldTools, PICTURE, ASKS_FOR, askedFor, parseTarget, targetRate, anchorFor, SELECTED_PREFIX, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 import type { BlueprintCard } from "./messages";
-import { HiddenBlockFilter, LIST_REPORT, RepeatFilter, TailCutFilter, stripChartBlocks } from "./stream-filter";
+import { FirstParagraphFilter, HiddenBlockFilter, LIST_REPORT, RepeatFilter, TailCutFilter, stripChartBlocks } from "./stream-filter";
 import { pruneShots, waitForShot } from "./screenshots";
 import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
 import type { Snapshot } from "./game";
@@ -57,6 +57,8 @@ export type TurnRecord = {
   repeated?: boolean;
   /** A list report was cut off the end (FC-219). */
   listCut?: boolean;
+  /** A heard answer was stopped at its first paragraph (FC-255). */
+  paragraphCut?: boolean;
   /** How many of the turn's judgement calls Jev answered, and how many fell to the code (FC-244). */
   decisions?: { jev: number; local: number };
   /** Tool calls dropped because the player didn't ask for them (FC-126). */
@@ -474,7 +476,9 @@ export class Agent {
     this.deps.emit({ type: "reset" });
   }
 
-  async ask(rawQuestion: string, thinking = false, spoken = false, interrupted?: Interrupted, cues = false): Promise<void> {
+  async ask(rawQuestion: string, thinking = false, spoken = false, interrupted?: Interrupted, cues = false, aloud = false): Promise<void> {
+    // Listened to rather than read: spoken, or read aloud by the console (FC-255).
+    const heard = spoken || aloud || cues;
     const started = performance.now();
     const decisionsBefore = { ...(this.deps.decisions?.counts ?? { jev: 0, local: 0 }) };
     // Spoken over the answer (FC-241): he may remark on it once in a few; a bare "stop" with no remark due is just
@@ -602,7 +606,7 @@ export class Agent {
       question, plain, measured: Boolean(measuredLine), world, answeredFromData, around: Boolean(around), searchAgain, loot: lootNote(status, around), chart,
       carryOver: carryOver ? { label: carryOver.label, where: carryOver.where } : null, bare, start,
       playerLines: playerLines.length > 0, character: Boolean(status?.character), recipeLines: Boolean(found?.lines.length),
-      craftable: craftableRecipes(status).length > 0, describingBuild: wantsPackingList(question) && !packing, spoken, cues, askedBuild,
+      craftable: craftableRecipes(status).length > 0, describingBuild: wantsPackingList(question) && !packing, spoken, cues, heard, askedBuild,
       stage: { id: stage.row.id, register: stage.row.register }, throwbackSpent: this.throwbacks > 0, askedReady,
       packing: Boolean(packing), listActive: this.lists.all().length > 0,
       aboutList,
@@ -692,7 +696,13 @@ export class Agent {
         // that isn't about it, a paragraph reporting the list is cut the same way (FC-219).
         const repeat = new RepeatFilter();
         const tailCut = this.lists.all().length > 0 && !aboutList ? new TailCutFilter(LIST_REPORT) : null;
-        const pass = (text: string) => (tailCut ? tailCut.push(text) : text);
+        // An answer that will be listened to stops at its first paragraph, unless they asked for steps or a chart (FC-255).
+        const oneParagraph = heard && !chart && !STEPS.test(question) ? new FirstParagraphFilter() : null;
+        const pass = (text: string) => {
+          const listed = tailCut ? tailCut.push(text) : text;
+          return oneParagraph ? oneParagraph.push(listed) : listed;
+        };
+        const stopped = () => repeat.repeated || tailCut?.cut || oneParagraph?.cut;
         const stop = new AbortController();
         const roundStarted = performance.now();
         let result: StreamResult;
@@ -703,17 +713,23 @@ export class Agent {
             signal: stop.signal,
             onToken: (text) => {
               show(repeat.push(pass(filter.push(text))));
-              if ((repeat.repeated || tailCut?.cut) && !stop.signal.aborted) stop.abort();
+              if (stopped() && !stop.signal.aborted) stop.abort();
             },
           });
         } catch (e) {
-          if (!repeat.repeated && !tailCut?.cut) throw e;
+          if (!stopped()) throw e;
           result = { text: repeat.text(), toolCalls: [], totalMs: performance.now() - roundStarted };
         }
-        if (!repeat.repeated && !tailCut?.cut) show(repeat.push(pass(filter.end()) + (tailCut?.end() ?? "")));
+        if (!stopped()) {
+          const held = pass(filter.end());
+          const listTail = tailCut?.end() ?? "";
+          const rest = oneParagraph ? oneParagraph.push(listTail) : listTail;
+          show(repeat.push(held + rest + (oneParagraph && !oneParagraph.cut ? oneParagraph.end() : "")));
+        }
         show(repeat.end());
-        if (repeat.repeated || tailCut?.cut) {
+        if (stopped()) {
           if (repeat.repeated) record.repeated = true;
+          if (oneParagraph?.cut) record.paragraphCut = true;
           if (tailCut?.cut) { record.listCut = true; this.deps.log?.("Cut a list report off the end of an answer that wasn't about the list (FC-219)."); }
           result = { ...result, text: repeat.text(), toolCalls: [] };
         }

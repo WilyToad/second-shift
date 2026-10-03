@@ -38,6 +38,8 @@ export type TurnFacts = {
   /** The player is describing a build they're about to go and make, and there's no packing list yet (FC-166). */
   describingBuild: boolean;
   spoken: boolean;
+  /** The answer will be listened to — the question was spoken, or the console reads answers aloud (FC-255). */
+  heard: boolean;
   /** An ElevenLabs voice will read this answer, so it may carry delivery cues (FC-260). */
   cues: boolean;
   askedBuild: boolean;
@@ -65,6 +67,9 @@ function interruptionNote(f: TurnFacts): string {
   if (it.stopOnly) return `the player cut you off${on} with just "${f.question}": one short line about being stopped, in character, then wait; nothing about what you were saying`;
   return `the player cut in${on} and said this instead: answer it, and don't resume or restate what you were saying${it.remark ? "; you were mid-thought, so one dry line about being cut off first is yours to take, or not" : ""}`;
 }
+
+/** The player asked for steps, which may run past one idea even when heard. */
+export const STEPS = /\b(steps?|walk me through|step by step|in order|what order|how do i (set up|start|get started))\b/i;
 
 export function turnNotes(f: TurnFacts): string[] {
   return [
@@ -96,11 +101,17 @@ export function turnNotes(f: TurnFacts): string[] {
     f.describingBuild ? "the player is describing a build they're about to go and make: start a packing list with every single thing they named, one line each, count first (\"20 stone furnace\"), rounding vague amounts up generously and saying the assumption; add nothing else yourself" : "",
     // Speech recognition mis-hears words ("wire" as "wine", "dots" as "darts"): read the odd one as a mis-hear
     // rather than a fact, and ask if it changes the answer (FC-175).
+    // "I cut a lot because I didn't feel like listening to his whole conversation. He seems very verbal and chatty."
+    // (playtest 2026-09-27): answers of 58–129 tokens, cut in on at the second paragraph or the closing line, and
+    // ghosts-and-robots pitched to a player with no power (FC-255). Reading tolerates length; listening doesn't.
+    f.heard && !f.plain ? (STEPS.test(f.question)
+      ? "this answer will be heard, not read: give the steps they asked for, at most four, a few words each, and nothing after them"
+      : "this answer will be heard, not read: answer what they said in one idea — two short sentences, one paragraph — then stop; no closing remark, no second paragraph, and offer nothing unless they could use it right now with what they have") : "",
     f.spoken ? "this question was spoken and turned into text, so a word that makes no sense in Factorio is probably a mis-hear: answer what they plainly meant, and only ask if the wrong word changes the answer" : "",
     // "I can't build belts or place entities for you" for a belt run, then a plan in words anyway (FC-172).
     f.askedBuild ? "the player is asking for something to be built: say what you can actually do — build a blueprint in code for one production row (machines for a single item, with inserters, an input belt, an output belt and poles) and offer to paste it as ghosts where they stand, on a card they confirm — rather than saying you can't place anything" : "",
     f.askedBuild ? "and the real limits: there's no template for a belt run between two points or a mixed layout, and ghosts are built by construction robots, so before robots a paste would sit unbuilt and a plan in words is the honest offer" : "",
-    f.start ? `say which stage you think they're in ("${f.stage.id}") so they can tell you if you've got it wrong, then give the stage's own next steps in your words, shortest first — the whole row won't fit, so drop the last goal before you drop the first` : "",
+    f.start ? `say which stage you think they're in ("${f.stage.id}") so they can tell you if you've got it wrong, then ${f.heard ? "give only the stage's first next step or two, in one sentence: it's being listened to" : "give the stage's own next steps in your words, shortest first — the whole row won't fit, so drop the last goal before you drop the first"}` : "",
     // The arc (FC-182): the register follows the factory, not the clock, and the past surfaces at most once a
     // session — rate-limited in the agent because the model can't count sessions, and never on a turn like this one.
     f.plain ? "" : `your register here: ${f.stage.register}`,

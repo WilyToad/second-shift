@@ -23,9 +23,10 @@ const HeardSchema = z.object({
 export const ClientMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("watch"), on: z.boolean() }),
   // `spoken` marks a question that came through speech recognition (FC-175); `heard` is its diagnostic record
-  // (FC-185): logged, never put in the prompt. `cues`: an ElevenLabs voice will read the answer aloud, so it may carry
+  // (FC-185): logged, never put in the prompt. `aloud`: the answer will be read aloud, so it's heard, not read
+  // (FC-255). `cues`: an ElevenLabs voice will read the answer aloud, so it may carry
   // delivery cues (FC-260).
-  z.object({ type: z.literal("ask"), text: z.string().max(8000), thinking: z.boolean().optional(), spoken: z.boolean().optional(), cues: z.boolean().optional(), heard: HeardSchema.optional(), interrupted: InterruptedSchema.optional() }),
+  z.object({ type: z.literal("ask"), text: z.string().max(8000), thinking: z.boolean().optional(), spoken: z.boolean().optional(), aloud: z.boolean().optional(), cues: z.boolean().optional(), heard: HeardSchema.optional(), interrupted: InterruptedSchema.optional() }),
   z.object({ type: z.literal("approve"), id: z.string().min(1).max(64) }),
   z.object({ type: z.literal("decline"), id: z.string().min(1).max(64) }),
   z.object({ type: z.literal("reset") }),
