@@ -903,8 +903,8 @@ test("FC-267: the recognizer listens on the shared echo-cancelled track, and fal
   }
 });
 
-test("FC-267: the echo check says how much of him was removed and what the recognizer heard", async () => {
+test("FC-267: the echo check says how far above the room he was on each stream, and what the recognizer heard", async () => {
   const { describeEcho } = await import("./echo-check");
-  expect(describeEcho({ raw: -42, cancelled: -71, heard: "", trackAccepted: true })).toBe("Raw mic heard him at -42 dB; after echo cancellation -71 dB (29 dB removed), and the recognizer heard nothing.");
-  expect(describeEcho({ raw: -42, cancelled: -44, heard: "walled off the", trackAccepted: false })).toContain("wouldn't take the cancelled stream");
+  expect(describeEcho({ raw: 18, cancelled: 1, heard: "", trackAccepted: true })).toBe("On the raw mic his voice was 18 dB above the room; after echo cancellation, no louder than the room, and the recognizer heard nothing.");
+  expect(describeEcho({ raw: 18, cancelled: 15, heard: "walled off the", trackAccepted: false })).toContain("wouldn't take the cancelled stream");
 });

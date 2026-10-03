@@ -6,6 +6,11 @@ import { signal } from "@preact/signals";
 import { micStream } from "./capture";
 import { isSpeaking, recognitionCtor, speak, usesDeviceRecognition } from "./voice";
 
+/**
+ * Each stream is measured against its own room noise, just before he speaks: the cancelled stream has Chrome's
+ * automatic gain control on (as a voice call does), which turns everything up, so comparing its level with the raw
+ * stream's said "-9 dB removed" on the player's first run while the recognizer heard nothing (2026-10-03).
+ */
 export type EchoResult = { raw: number; cancelled: number; heard: string; trackAccepted: boolean };
 export const echoCheck = signal<{ state: "idle" | "running" | "done" | "error"; result?: EchoResult; message?: string }>({ state: "idle" });
 
@@ -56,6 +61,10 @@ export async function runEchoCheck(): Promise<void> {
       try { rec.start(cancelled.getAudioTracks()[0]); trackAccepted = true; } catch { /* reported below */ }
     }
 
+    // The room, before he says anything.
+    const rawRoom: number[] = [];
+    const cancelledRoom: number[] = [];
+    for (let i = 0; i < 12; i++) { rawRoom.push(rawLevel()); cancelledRoom.push(cancelledLevel()); await new Promise((r) => setTimeout(r, 50)); }
     const raws: number[] = [];
     const cancels: number[] = [];
     speak(LINE);
@@ -71,7 +80,8 @@ export async function runEchoCheck(): Promise<void> {
     try { rec?.stop(); } catch { /* already stopped */ }
     await new Promise((r) => setTimeout(r, 400));
     if (!raws.length) { echoCheck.value = { state: "error", message: "He didn't speak — is Read answers aloud on, with a voice that works?" }; return; }
-    echoCheck.value = { state: "done", result: { raw: dbfs(raws), cancelled: dbfs(cancels), heard: heard.trim(), trackAccepted } };
+    // How far he stood above the room on each: the raw mic is the echo, the cancelled stream what's left of it.
+    echoCheck.value = { state: "done", result: { raw: dbfs(raws) - dbfs(rawRoom), cancelled: dbfs(cancels) - dbfs(cancelledRoom), heard: heard.trim(), trackAccepted } };
   } catch (e) {
     echoCheck.value = { state: "error", message: `The check couldn't run: ${(e as Error).message}` };
   } finally {
@@ -82,8 +92,8 @@ export async function runEchoCheck(): Promise<void> {
 
 /** The result in words: how much of him the cancelled stream removed, and what the recognizer heard. */
 export function describeEcho(r: EchoResult): string {
-  const removed = r.raw - r.cancelled;
+  const level = (db: number) => (db <= 2 ? "no louder than the room" : `${db} dB above the room`);
   const heard = r.heard ? `the recognizer heard "${r.heard}"` : "the recognizer heard nothing";
   const track = r.trackAccepted ? "" : " — this browser wouldn't take the cancelled stream, so the recognizer still opens the mic itself";
-  return `Raw mic heard him at ${r.raw} dB; after echo cancellation ${r.cancelled} dB (${removed} dB removed), and ${heard}${track}.`;
+  return `On the raw mic his voice was ${level(r.raw)}; after echo cancellation, ${level(r.cancelled)}, and ${heard}${track}.`;
 }
