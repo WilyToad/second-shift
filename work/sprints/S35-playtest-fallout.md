@@ -1,6 +1,7 @@
 # S35 — Playtest fallout
 
-- **Status:** planned
+- **Status:** active
+- **Started:** 2026-10-03
 - **Goal:** Everything the first local-voice and Eleven v4 playtests turned up: the cache that makes every answer fast works again, Ballast acts his lines in the console as heard in the spike, the packing list keeps up with what the player picks up, spoken answers are short, and a wrong recipe or power figure is caught.
 - **Acceptance:** cached tokens on the grounding eval back near the system prompt's size with first words back under a second (FC-262); `eval-requests` green on v4 Turbo with cues and the player hearing Adam with cues in the console (FC-260); a picked-up item ticks off the list with no question asked (FC-261); spoken answers at least a third shorter on the playtest's questions (FC-255); a recipe or power claim that contradicts the save gets a correction (FC-257); every eval and the corpus test still green.
 

@@ -1,6 +1,9 @@
 // FC-126 through the real server: the companion runs or cards an action only when the player asked for it.
 // Needs bun run start + the dev save hosted. Every card shown is declined, so nothing in the game changes.
-// Usage: bun scripts/eval-requests.ts [--runs N]
+// Usage: bun scripts/eval-requests.ts [--runs N] [--cues]
+//   --cues: every question as the console sends it with an ElevenLabs voice chosen (FC-260), so the guards are checked
+//           on turns that carry delivery cues; answers are checked with the cues taken out, as the player reads them.
+import { withoutCues } from "../interfaces/src/cues";
 import { openConsole } from "./lib/console";
 import type { ServerMessage } from "../server/src/messages";
 import { connectDevGame } from "./lib/devgame";
@@ -8,6 +11,7 @@ import { asChecks, saveEvalRun } from "./lib/eval-log";
 
 const args = Bun.argv.slice(2);
 const runs = args.includes("--runs") ? Number(args[args.indexOf("--runs") + 1]) : 1;
+const cues = args.includes("--cues");
 
 // Each case is one conversation. `card`: whether an approval card should appear on the last question.
 type Case = { name: string; questions: string[]; card: boolean; ran?: RegExp };
@@ -36,12 +40,12 @@ console.log(`setup: ${placed.length} test rails east of the player`);
 const { ws, got, until, results, answers } = await openConsole();
 const ask = async (text: string) => {
   const from = got.length;
-  ws.send(JSON.stringify({ type: "ask", text }));
+  ws.send(JSON.stringify({ type: "ask", text, ...(cues ? { cues: true } : {}) }));
   await until((m) => m.type === "done" || m.type === "error", 180_000, from);
   const slice = got.slice(from);
   // Decline every card at once: the eval never changes the game.
   for (const m of slice) if (m.type === "approval") ws.send(JSON.stringify({ type: "decline", id: m.id }));
-  return { slice, answer: slice.filter((m) => m.type === "token").map((m: any) => m.text).join("").trim() };
+  return { slice, answer: withoutCues(slice.filter((m) => m.type === "token").map((m: any) => m.text).join("")).trim() };
 };
 
 const check = (name: string, ok: boolean, detail = "") => { results.push([name, ok, detail]); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`); };
@@ -73,5 +77,5 @@ await game.sc(`local p = game.connected_players[1] for _, r in pairs(helpers.jso
 game.rcon.close();
 const failed = results.filter((r) => !r[1]);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);
-console.log(`Saved to ${await saveEvalRun("eval-requests", asChecks(results), answers)}`);
+console.log(`Saved to ${await saveEvalRun(cues ? "eval-requests-cues" : "eval-requests", asChecks(results), answers)}`);
 process.exit(failed.length ? 1 : 0);
