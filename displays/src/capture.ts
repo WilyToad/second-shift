@@ -101,6 +101,40 @@ class Tap extends AudioWorkletProcessor {
 registerProcessor("second-shift-tap", Tap);
 `;
 
+/**
+ * The one microphone stream every listener uses (FC-267): the browser's recognizer, local Whisper and kept clips.
+ * Echo cancellation is on, so Chrome subtracts what it is itself playing — Ballast's ElevenLabs or local voice, played
+ * through an <audio> element — before anything listens. This is how voice chat, games and smart speakers keep their
+ * own output out of the mic (FC-266); a headset alone didn't (the mic still heard "Wall's off the list", faintly, and
+ * the recognizer turned it into a question). Opened once, on the first talk (a user gesture), and kept.
+ */
+let shared: MediaStream | null = null;
+let opening: Promise<MediaStream | null> | null = null;
+
+type MediaDevicesLike = { getUserMedia(c: unknown): Promise<MediaStream> };
+const mediaDevices = () => (globalThis as { navigator?: { mediaDevices?: MediaDevicesLike } }).navigator?.mediaDevices;
+
+/** Echo-cancelled microphone settings; the rest are Chrome's defaults, as a voice call gets. */
+export const MIC_CONSTRAINTS = { audio: { channelCount: 1, echoCancellation: true } };
+
+export async function micStream(): Promise<MediaStream | null> {
+  if (shared && shared.getAudioTracks().some((t) => t.readyState === "live")) return shared;
+  const media = mediaDevices();
+  if (!media) return null;
+  opening ??= media.getUserMedia(MIC_CONSTRAINTS).then((s) => { shared = s; return s; }).catch(() => null).finally(() => { opening = null; });
+  return opening;
+}
+
+/** The live echo-cancelled track, if the stream is open. */
+export function micTrack(): MediaStreamTrack | null {
+  return shared?.getAudioTracks().find((t) => t.readyState === "live") ?? null;
+}
+
+/** Nothing to wait for: the stream is open, or this browser can't open one. */
+export function micSettled(): boolean {
+  return Boolean(micTrack()) || !mediaDevices();
+}
+
 type Mic = { ctx: { close(): Promise<void>; sampleRate: number }; stop: () => void };
 let mic: Mic | null = null;
 let ring: Float32Array | null = null;
@@ -126,11 +160,13 @@ function since(mark: number): Float32Array {
 /** Opens the microphone tap. Returns an error message if this browser won't allow a second consumer. */
 export async function startCapture(): Promise<string | null> {
   if (mic) return null;
-  const media = (globalThis as { navigator?: { mediaDevices?: { getUserMedia(c: unknown): Promise<MediaStream> } } }).navigator?.mediaDevices;
   const Ctx = (globalThis as { AudioContext?: new () => AudioContext }).AudioContext;
-  if (!media || !Ctx) return "This browser can't record audio, so clips can't be kept.";
+  if (!mediaDevices() || !Ctx) return "This browser can't record audio, so clips can't be kept.";
   try {
-    const stream = await media.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    // The shared, echo-cancelled stream (FC-267): local Whisper hears what the recognizer hears, without Ballast in it.
+    // It was opened raw (FC-188) to keep the player's voice untouched for FC-189's comparisons, which are done.
+    const stream = await micStream();
+    if (!stream) return "Couldn't open the microphone.";
     const ctx = new Ctx();
     // A context made outside a user gesture starts suspended and delivers zeros; resume is cheap and idempotent.
     await ctx.resume().catch(() => {});
@@ -146,7 +182,8 @@ export async function startCapture(): Promise<string | null> {
     const silence = ctx.createGain();
     silence.gain.value = 0;
     ctx.createMediaStreamSource(stream).connect(tap).connect(silence).connect(ctx.destination);
-    mic = { ctx, stop: () => stream.getTracks().forEach((t) => t.stop()) };
+    // The stream is shared with the recognizer, so closing the tap leaves it open.
+    mic = { ctx, stop: () => {} };
     return null;
   } catch (e) {
     return `Couldn't keep audio: ${(e as Error).message}`;

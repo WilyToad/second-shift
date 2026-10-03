@@ -5,7 +5,7 @@
 import { signal } from "@preact/signals";
 import { withoutCues } from "@companion/interfaces/src/cues";
 import { playSound } from "./sounds";
-import { ensureCapture, keepClip, markUtterance, transcribeLocally } from "./capture";
+import { ensureCapture, keepClip, markUtterance, micSettled, micStream, micTrack, transcribeLocally } from "./capture";
 
 type Alternative = { transcript: string };
 type Result = { isFinal: boolean; 0: Alternative; length: number; [index: number]: Alternative };
@@ -20,7 +20,8 @@ export interface Recognition {
   onerror: ((e: { error: string }) => void) | null;
   onend: (() => void) | null;
   onstart: (() => void) | null;
-  start(): void;
+  /** Chrome 135+ takes a microphone track (FC-267); older engines ignore it or throw. */
+  start(track?: MediaStreamTrack): void;
   stop(): void;
   abort(): void;
 }
@@ -196,6 +197,8 @@ let carried = "";
 /** Extra pauses already granted to an unfinished sentence (FC-173). */
 let holds = 0;
 let onDevice: boolean | null = null;
+/** Whether recognition runs on this device (for the echo check, FC-267). */
+export const usesDeviceRecognition = () => onDevice === true;
 
 /**
  * Asks the browser once, at page load, whether recognition can run on this device, so a click can start listening
@@ -297,6 +300,12 @@ export function setSilenceSeconds(seconds: number): void {
 }
 
 type Session = { ctor: RecognitionCtor; lang: string; onUtterance: (text: string) => void; fromGame: boolean };
+/**
+ * Which microphone the recognizer is listening through (FC-267): the shared echo-cancelled stream, or — when this
+ * browser won't take a track — the one it opens itself, which hears Ballast's voice through headphones.
+ */
+export const micPath = signal<"echo-cancelled" | "browser" | null>(null);
+
 let session: Session | null = null;
 /** A question was sent (or typed) and its answer is still arriving or being read aloud: the mic waits. */
 let awaitingAnswer = false;
@@ -320,7 +329,12 @@ export function startTalking(onUtterance: (text: string) => void, ctor = recogni
   answerDone = true;
   voiceError.value = null;
   playSound("listen");
-  listen();
+  // The echo-cancelled stream first, so the recognizer never hears him (FC-267). Opened once; after that, at once.
+  if (micSettled()) listen();
+  else {
+    const s = session;
+    void micStream().then(() => { if (session === s) listen(); });
+  }
 }
 
 function listen(): void {
@@ -413,7 +427,20 @@ function listen(): void {
   heard.value = carried; // a restart mid-sentence keeps what the player already said on screen
   listenState.value = "listening";
   try {
-    rec.start();
+    const track = micTrack();
+    if (track) {
+      try {
+        rec.start(track);
+        micPath.value = "echo-cancelled";
+      } catch {
+        // This engine won't take a track: it opens the microphone itself, without cancelling his voice.
+        rec.start();
+        micPath.value = "browser";
+      }
+    } else {
+      rec.start();
+      micPath.value = "browser";
+    }
   } catch (e) {
     active = null;
     voiceError.value = `Voice input couldn't start: ${(e as Error).message}`;
@@ -909,7 +936,7 @@ export function speak(sentence: string): void {
 
 let browserSpeaking = 0;
 
-function isSpeaking(): boolean {
+export function isSpeaking(): boolean {
   return browserSpeaking > 0 || eleven.busy();
 }
 

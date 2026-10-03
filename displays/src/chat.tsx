@@ -6,6 +6,7 @@ import { plainName } from "./rich-text";
 import { send, thread, type ThreadItem } from "./store";
 import { setSoundsOn, soundsOn } from "./sounds";
 import { capturing, captureError, clipCount, lastClip, lastLocal, localStt, probeStt, sayTruth, setCapturing, setLocalStt, sttStatus } from "./capture";
+import { describeEcho, echoCheck, runEchoCheck } from "./echo-check";
 import { withoutCuesStreaming } from "@companion/interfaces/src/cues";
 import { cuesWanted, markSpoken, spokenNow, takeInterrupted, phrasesRejected, chooseVoice, deviceStatus, preferOnDevice, setPreferOnDevice, elevenVoices, localVoices, voiceChoice, heard, heardDetail, installOnDevice, listenState, talkRequests, readAloud, recognitionCtor, recognizedWhere, saveSetting, setSilenceSeconds, silenceSeconds, startTalking, stopSpeaking, stopTalking, talking, voiceError } from "./voice";
 
@@ -222,6 +223,13 @@ export function Composer({ onAsk = (text: string, thinking: boolean, spoken = fa
               </select>
             </label>
           )}
+          {readAloud.value && recognition && (
+            <button type="button" class="cancel" id="echo-check" disabled={echoCheck.value.state === "running"} title="Plays one line in the chosen voice and checks the microphone doesn't hear it (FC-267)" onClick={() => void runEchoCheck()}>
+              {echoCheck.value.state === "running" ? "Checking echo…" : "Check echo"}
+            </button>
+          )}
+          {echoCheck.value.state === "done" && echoCheck.value.result && <span class="echo-result">{describeEcho(echoCheck.value.result)}</span>}
+          {echoCheck.value.state === "error" && <span class="echo-result">{echoCheck.value.message}</span>}
         </span>
         <span>
           <button type="button" class="cancel" onClick={() => send({ type: "reset" })}>New conversation</button>{" "}

@@ -871,3 +871,40 @@ test("FC-260: ElevenLabs audio starts playing while the sentence is still arrivi
   expect(ended).toBe(true);
   player.cancel();
 });
+
+test("FC-267: the recognizer listens on the shared echo-cancelled track, and falls back to its own mic if refused", async () => {
+  const voice = await import("./voice");
+  const track = { kind: "audio", readyState: "live", stop() {} };
+  const stream = { getAudioTracks: () => [track], getTracks: () => [track] };
+  const asked: unknown[] = [];
+  const nav = globalThis.navigator as unknown as { mediaDevices?: unknown };
+  const realDevices = nav.mediaDevices;
+  Object.defineProperty(globalThis.navigator, "mediaDevices", { configurable: true, value: { getUserMedia: async (c: unknown) => { asked.push(c); return stream; } } });
+  try {
+    for (const refuses of [false, true]) {
+      const starts: unknown[][] = [];
+      class Rec {
+        lang = ""; continuous = false; interimResults = false; maxAlternatives = 1; phrases: unknown[] = [];
+        onresult: unknown = null; onerror: unknown = null; onend: unknown = null; onstart: unknown = null;
+        start(...args: unknown[]) { starts.push(args); if (refuses && args.length) throw new Error("no tracks here"); }
+        stop() {} abort() {}
+      }
+      voice.startTalking(() => {}, Rec as never);
+      await new Promise((r) => setTimeout(r, 5));
+      // The microphone was opened with echo cancellation on.
+      expect(asked[0]).toMatchObject({ audio: { echoCancellation: true } });
+      expect(starts[0]).toEqual([track]);
+      expect(voice.micPath.value).toBe(refuses ? "browser" : "echo-cancelled");
+      if (refuses) expect(starts[1]).toEqual([]);
+      voice.stopTalking({ send: false });
+    }
+  } finally {
+    Object.defineProperty(globalThis.navigator, "mediaDevices", { configurable: true, value: realDevices });
+  }
+});
+
+test("FC-267: the echo check says how much of him was removed and what the recognizer heard", async () => {
+  const { describeEcho } = await import("./echo-check");
+  expect(describeEcho({ raw: -42, cancelled: -71, heard: "", trackAccepted: true })).toBe("Raw mic heard him at -42 dB; after echo cancellation -71 dB (29 dB removed), and the recognizer heard nothing.");
+  expect(describeEcho({ raw: -42, cancelled: -44, heard: "walled off the", trackAccepted: false })).toContain("wouldn't take the cancelled stream");
+});
