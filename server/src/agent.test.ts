@@ -1172,3 +1172,36 @@ test("FC-255: a heard answer cut at its first paragraph still makes the tool cal
   await agent.ask("how many rails are near me?", false, true);
   expect(game.calls.map((c) => c.action)).toContain("find_entities");
 });
+
+test("FC-265: a to-do list keeps the player's words; a packing list still gets the save's item names", async () => {
+  const protos = PrototypesSchema.parse({
+    recipes: {}, fluids: {}, technologies: {}, machines: {},
+    items: Object.fromEntries(["boiler", "stone-furnace", "maraxsis-automation-science-pack-research-vessel", "stone-wall"].map((n) => [n, { type: "item", stack_size: 50 }])),
+  });
+  const todo = ["Hand-mine coal", "Build boiler + steam engine", "Build stone furnaces", "Research automation-science-pack", "Research stone-wall"];
+  const model = fakeModel([
+    { tool: "update_list", args: { list: "getting started", add: todo } }, { text: "List's started." },
+    { tool: "update_list", args: { list: "outpost", kind: "packing", add: ["20 stone furnaces"] } }, { text: "Packed." },
+  ]);
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: () => {} });
+  await agent.ask("Okay, can you create me a list of things I need to do so I can keep track?");
+  expect(agent.lists.get("getting started")!.items.map((i) => i.text)).toEqual(todo);
+  await agent.ask("start a packing list for the outpost: 20 stone furnaces");
+  expect(agent.lists.get("outpost")!.items.map((i) => i.text)).toEqual(["20 stone-furnace"]);
+});
+
+test("FC-265: asked to remove a line, the turn is told to make the edit, and 'off the list' with no edit is corrected", async () => {
+  const model = fakeModel([
+    { tool: "update_list", args: { list: "getting started", add: ["Hand-mine coal", "Research stone-wall"] } }, { text: "Started." },
+    { text: "Wall's off the list — eight items left, starting with coal and ore." },
+  ]);
+  const events: ServerMessage[] = [];
+  const agent = new Agent({ model, game: fakeGame().game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: (m) => events.push(m) });
+  await agent.ask("create me a list of things to do: mine coal, research stone wall");
+  const from = events.length;
+  await agent.ask("I don't care about the wall.\n You can remove that from the list.");
+  expect(String(model.seen.at(-1)!.at(-1)!.content)).toContain("make the change with update_list in this turn");
+  const shown = events.slice(from).filter((e) => e.type === "token").map((e) => (e as { text: string }).text).join("");
+  expect(shown).toContain("Correction: the list wasn't changed this turn");
+  expect(agent.lists.active()!.items).toHaveLength(2);
+});

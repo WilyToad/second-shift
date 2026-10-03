@@ -38,6 +38,8 @@ export type TurnFacts = {
   /** The player is describing a build they're about to go and make, and there's no packing list yet (FC-166). */
   describingBuild: boolean;
   spoken: boolean;
+  /** The player asked to change the list: add, remove, cross off (FC-265). */
+  listChange: boolean;
   /** The answer will be listened to — the question was spoken, or the console reads answers aloud (FC-255). */
   heard: boolean;
   /** An ElevenLabs voice will read this answer, so it may carry delivery cues (FC-260). */
@@ -121,6 +123,7 @@ export function turnNotes(f: TurnFacts): string[] {
     // Heard, the clause of his past landed as the closing line the player cut in on (FC-255): it waits for a typed turn.
     f.plain || f.throwbackSpent || f.heard ? "" : "you may let one clause of your own past show in this answer, if it fits the sentence you were already writing; don't add a sentence for it, and don't explain yourself",
     f.askedReady ? "answer with what's still missing and whether the load fits the player's free slots, both from the lines" : "",
+    f.listChange ? "they asked to change the list: make the change with update_list in this turn (remove a line by its text as it's written on the list), and don't say the list changed unless you called it" : "",
     f.packing && f.aboutList ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",
     // Asked "do you ever miss flying?", it answered and then added "The list is 0 of 4 done: 1 of 20 furnace…" — the
     // list rides in every turn so it can answer list questions, not so it can report on it unasked (FC-219).

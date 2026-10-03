@@ -9,6 +9,8 @@ const CLAIMS: { says: RegExp; needs: string[]; correction: string }[] = [
   { says: /\b(marked|tagged|pinned|dropped a (marker|pin|flag)) on (the|your|my) map\b|\bmap (tag|marker|pin) (is|was) (placed|dropped|added)\b/i, needs: ["map_action"], correction: "Correction: nothing was marked on the map this turn." },
   // "Nothing is queued" is a report, not a claim: the claim needs an agent ("I've queued", "queued it for you").
   { says: /\b(I'?ve|I have|I just|just) queued\b|\bqueued (it|that|them|the research|[\w-]+ for you)\b|\bresearch (has been|was) queued\b/i, needs: ["queue_research"], correction: "Correction: nothing was queued this turn — say the word and I'll queue it." },
+  // "Wall's off the list — eight items left" with no list edit made (FC-265, live 2026-10-03).
+  { says: /\boff (the|your|my) list\b|\b(removed|dropped|deleted|taken|took) (it |that |them |[\w-]+ )?from (the|your|my) list\b|\b(added|put) (it |that |them )?(on|to) (the|your|my) list\b|\b(crossed|struck|scratched) (it |that |them |[\w-]+ )?off\b/i, needs: ["update_list"], correction: "Correction: the list wasn't changed this turn — say it again and I'll change it." },
   { says: /\b(pasted|placed) (it|them|the ghosts|the blueprint|ghosts)\b/i, needs: ["place_blueprint"], correction: "Correction: nothing was pasted this turn; a paste puts up a card to confirm first." },
   // Sending the player to a card that isn't there (FC-252). Live 2026-09-20, on being told "Confirmed.": "I can't
   // write it in on a spoken 'confirmed' — the app needs the approval on the card." Lists have no card, so the

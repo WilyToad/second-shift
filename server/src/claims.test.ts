@@ -36,3 +36,10 @@ test("FC-252: sending the player to a card that isn't there is corrected", async
   // Ordinary uses of the word are not a claim about the app.
   expect(actionClaims("A card reader isn't a thing in this save.", [])).toEqual([]);
 });
+
+test("FC-265: 'off the list' with no list edit is corrected; a readiness report saying 'missing from the list' isn't", async () => {
+  const { actionClaims } = await import("./claims");
+  expect(actionClaims("Wall's off the list — eight items left.", [])).toEqual(["Correction: the list wasn't changed this turn — say it again and I'll change it."]);
+  expect(actionClaims("Wall's off the list — eight items left.", ["update_list"])).toEqual([]);
+  expect(actionClaims("Not yet. Still missing from the list: 200 transport belts.", [])).toEqual([]);
+});

@@ -32,7 +32,7 @@ import { entityFacts } from "./grounding";
 import { Lists, type Checklist, type ListsData } from "./lists";
 import { arithmeticCorrections } from "./numbers";
 import { check, essentials, parseNeed, readiness, slots, type Need } from "./packing";
-import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, formatStock, formatNetwork, wantsStock, wantsReady, wantsListTalk, wantsPackingList, wantsBotsToFill, wantsRequestsCleared, wantsContents, wantsMeasuredOutput, wantsPointedAt, wantsSpidertronSent, wantsStop, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
+import { acceptedOffer, contentsTarget, correctedRequest, bearing, formatContents, formatMachineOutput, formatPointedAt, formatSpidertrons, formatStock, formatNetwork, wantsStock, wantsReady, wantsListTalk, wantsListChange, wantsPackingList, wantsBotsToFill, wantsRequestsCleared, wantsContents, wantsMeasuredOutput, wantsPointedAt, wantsSpidertronSent, wantsStop, claimCorrections, craftableRecipes, formatPlayerStatus, lootNote, formatSurroundings, wantsPlayerStatus, wantsStartAdvice, wantsSurroundings } from "./player";
 
 export interface GameActions {
   call<A extends ActionName>(action: A, args?: ActionArgs<A>): Promise<ActionData<A>>;
@@ -609,7 +609,7 @@ export class Agent {
       playerLines: playerLines.length > 0, character: Boolean(status?.character), recipeLines: Boolean(found?.lines.length),
       craftable: craftableRecipes(status).length > 0, describingBuild: wantsPackingList(question) && !packing, spoken, cues, heard, askedBuild,
       stage: { id: stage.row.id, register: stage.row.register }, throwbackSpent: this.throwbacks > 0, askedReady,
-      packing: Boolean(packing), listActive: this.lists.all().length > 0,
+      packing: Boolean(packing), listActive: this.lists.all().length > 0, listChange: this.lists.all().length > 0 && wantsListChange(question),
       aboutList,
       stock: stockLines.length > 0, cardUp: Boolean(sendLine?.startsWith("An approval card")),
       stopped: Boolean(stopLine), pointed: Boolean(pointed), referred, referenceWord: referred.length ? REFERENCE.exec(question)![0] : "",
@@ -1146,7 +1146,12 @@ export class Agent {
           const protos = this.deps.prototypes();
           const adds = Array.isArray(args.add) ? args.add.map(String) : [];
           const sets = Array.isArray(args.set) ? args.set.map(String) : [];
-          const resolved = await resolveListItems([...adds, ...sets], protos, this.deps.decisions);
+          // Lines are turned into this save's item names only on a packing list, which counts them against what the
+          // player carries. A to-do list keeps the player's words: "Research automation-science-pack" became
+          // maraxsis-automation-science-pack-research-vessel, and "Build boiler + steam engine" lost its engine (FC-265).
+          const target = typeof args.list === "string" ? this.lists.get(args.list) : this.lists.active();
+          const packingList = args.kind === "packing" || (args.kind !== "plain" && (wantsPackingList(this.currentQuestion) || target?.kind === "packing"));
+          const resolved = packingList ? await resolveListItems([...adds, ...sets], protos, this.deps.decisions) : [];
           const renamed = renamedNote(resolved);
           const listText = (text: string) => resolved.find((r) => r.text === text)?.listText ?? text;
           const message = this.lists.apply({

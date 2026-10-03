@@ -326,6 +326,14 @@ export function wantsListTalk(text: string): boolean {
   return LIST_TALK.test(text);
 }
 
+// "You can remove that from the list", "drop the wall", "add 20 belts", "cross off the furnaces": asked to change it
+// (FC-265, live 2026-10-03: the answer said "Wall's off the list" and no edit was made).
+const LIST_CHANGE = /\b(remove|drop|delete|add|put|cross|tick|check|take|scratch|strike)\b[^.?!]{0,40}\b(list|off|on)\b|\b(remove|drop|delete)\s+(it|that|them|the\s+\w+)\b/i;
+
+export function wantsListChange(text: string): boolean {
+  return LIST_CHANGE.test(text);
+}
+
 // "I'm building a new smelting outpost. I need about 20 ovens, a couple hundred belt…" — the shape of a build
 // the player is about to walk out and make (FC-166).
 const BUILD_PLAN = /\b(building|build|set(ting)? up|putting up|outpost|new base|expansion)\b/i;
