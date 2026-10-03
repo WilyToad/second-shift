@@ -19,7 +19,7 @@ import { REFERENCE, SELECTED, SPATIAL, bareFollowUp, needsWorldTools, ASKS_FOR, 
 export { bareFollowUp, needsWorldTools, PICTURE, ASKS_FOR, askedFor, parseTarget, targetRate, anchorFor, SELECTED_PREFIX, wantsBlueprint, plainAnswer, wantsBuild, wantsChart } from "./intent";
 import type { BlueprintCard } from "./messages";
 import { powerCorrections, recipeCorrections } from "./recipe-claims";
-import { FirstParagraphFilter, HiddenBlockFilter, LIST_REPORT, RepeatFilter, TailCutFilter, stripChartBlocks } from "./stream-filter";
+import { FirstParagraphFilter, HiddenBlockFilter, LIST_REPORT, namesListItems, RepeatFilter, TailCutFilter, stripChartBlocks } from "./stream-filter";
 import { pruneShots, waitForShot } from "./screenshots";
 import { resolveEntityFilter, resolveEntityFilterInText } from "./entities";
 import type { Snapshot } from "./game";
@@ -696,14 +696,17 @@ export class Agent {
         // An answer that starts over is cut to one copy and the stream stopped (FC-130). With a list up and a question
         // that isn't about it, a paragraph reporting the list is cut the same way (FC-219).
         const repeat = new RepeatFilter();
-        const tailCut = this.lists.all().length > 0 && !aboutList ? new TailCutFilter(LIST_REPORT) : null;
+        const tailCut = this.lists.all().length > 0 && !aboutList ? new TailCutFilter([...LIST_REPORT, namesListItems(this.lists.all().flatMap((l) => l.items.map((i) => i.text)))]) : null;
         // An answer that will be listened to stops at its first paragraph, unless they asked for steps or a chart (FC-255).
         const oneParagraph = heard && !chart && !STEPS.test(question) ? new FirstParagraphFilter() : null;
         const pass = (text: string) => {
           const listed = tailCut ? tailCut.push(text) : text;
           return oneParagraph ? oneParagraph.push(listed) : listed;
         };
-        const stopped = () => repeat.repeated || tailCut?.cut || oneParagraph?.cut;
+        // A repeat or a list report ends the round, tool calls and all. A heard answer's second paragraph is only
+        // hidden: the model finishes, so a tool call written after the text — a paste after "Here it is." — still
+        // runs (eval-requests --cues lost exactly that card when the cut stopped the stream, 2026-10-03).
+        const stopped = () => repeat.repeated || tailCut?.cut;
         const stop = new AbortController();
         const roundStarted = performance.now();
         let result: StreamResult;
@@ -721,7 +724,7 @@ export class Agent {
           if (!stopped()) throw e;
           result = { text: repeat.text(), toolCalls: [], totalMs: performance.now() - roundStarted };
         }
-        if (!stopped()) {
+        if (!stopped() && !oneParagraph?.cut) {
           const held = pass(filter.end());
           const listTail = tailCut?.end() ?? "";
           const rest = oneParagraph ? oneParagraph.push(listTail) : listTail;
@@ -730,9 +733,11 @@ export class Agent {
         show(repeat.end());
         if (stopped()) {
           if (repeat.repeated) record.repeated = true;
-          if (oneParagraph?.cut) record.paragraphCut = true;
           if (tailCut?.cut) { record.listCut = true; this.deps.log?.("Cut a list report off the end of an answer that wasn't about the list (FC-219)."); }
           result = { ...result, text: repeat.text(), toolCalls: [] };
+        } else if (oneParagraph?.cut) {
+          record.paragraphCut = true;
+          result = { ...result, text: repeat.text() };
         }
         record.rounds.push({
           promptTokens: result.usage?.prompt_tokens, cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens,

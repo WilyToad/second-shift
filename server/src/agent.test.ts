@@ -1155,3 +1155,20 @@ test("FC-261: picking things up ticks a packing list off with no question — th
   await agent.inventoryChanged(9);
   expect(calls.length).toBe(after);
 });
+
+test("FC-255: a heard answer cut at its first paragraph still makes the tool call written after it", async () => {
+  const model: ChatModel & { seen: ChatMessage[][] } = {
+    seen: [],
+    async stream(messages, opts) {
+      model.seen.push(messages);
+      if (model.seen.length > 1) { opts?.onToken?.("Done."); return { text: "Done.", toolCalls: [], totalMs: 1 }; }
+      const text = "Here are the rails.\n\nLet me look for them now.";
+      opts?.onToken?.(text);
+      return { text, toolCalls: [{ id: "c1", type: "function", function: { name: "find_entities", arguments: JSON.stringify({ what: "rails" }) } }], totalMs: 1 };
+    },
+  };
+  const game = fakeGame();
+  const agent = new Agent({ model, game: game.game, system: () => "rules", retriever: () => null, prototypes: () => null, emit: () => {} });
+  await agent.ask("how many rails are near me?", false, true);
+  expect(game.calls.map((c) => c.action)).toContain("find_entities");
+});

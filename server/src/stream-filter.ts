@@ -167,10 +167,10 @@ export class TailCutFilter {
   private judging = false;
   cut = false;
 
-  constructor(private readonly patterns: RegExp[], private readonly peek = 120) {}
+  constructor(private readonly patterns: (RegExp | ((sentence: string) => boolean))[], private readonly peek = 120) {}
 
   private offends(text: string): boolean {
-    return this.patterns.some((p) => p.test(text));
+    return this.patterns.some((p) => (typeof p === "function" ? p(text) : p.test(text)));
   }
 
   /**
@@ -242,6 +242,17 @@ export const LIST_REPORT = [
   /\b(in reach|nearby stock|still 0)\b/i,
   /\bback to the (outpost|list|build)\b/i,
 ];
+
+/**
+ * A sentence that names two or more of the list's own items is a report on the list, however it's worded (FC-219,
+ * again on 2026-10-03: "Back to work when you are: the belt, inserters and chests are still unloaded" got past every
+ * phrase above). Items are matched by the last word of their name, singular or plural ("250 transport-belt" → belt).
+ */
+export function namesListItems(itemTexts: string[]): (sentence: string) => boolean {
+  const heads = [...new Set(itemTexts.map((t) => t.toLowerCase().replace(/^\s*\d[\d,]*\s*(x\s+)?/, "").split(/[-\s]+/).filter(Boolean).at(-1)?.replace(/s$/, "")).filter((h): h is string => Boolean(h) && h!.length > 2))];
+  const res = heads.map((h) => new RegExp(`\\b${h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(e?s)?\\b`, "i"));
+  return (sentence) => res.filter((re) => re.test(sentence)).length >= 2;
+}
 
 /**
  * Lets the first paragraph through and stops at the second (FC-255). For answers that will be listened to: the player

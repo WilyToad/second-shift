@@ -131,3 +131,16 @@ test("FC-255: a heard answer stops at its first paragraph, at any token split, a
   expect(one.push("Just this.") + one.end()).toBe("Just this.");
   expect(one.cut).toBe(false);
 });
+
+test("FC-219: a sentence naming two of the list's items is a list report, however it's worded", async () => {
+  const { TailCutFilter, LIST_REPORT, namesListItems } = await import("./stream-filter");
+  const items = ["30 electric-furnace", "250 transport-belt", "50 underground-belt", "30 fast-inserter", "20 iron-chest", "13 substation"];
+  const answer = "I don't dwell on it. There's a hauler in the manifest column of my memory, and that's the shape of the thing.\n\nBack to work when you are: the belt, inserters and chests are still unloaded.";
+  const f = new TailCutFilter([...LIST_REPORT, namesListItems(items)]);
+  const out = f.push(answer) + f.end();
+  expect(out).not.toContain("unloaded");
+  expect(f.cut).toBe(true);
+  // One item named in passing is ordinary talk, not a report.
+  expect(namesListItems(items)("A chest by the door would help.")).toBe(false);
+  expect(namesListItems(items)("Belts and furnaces both wait on iron.")).toBe(true);
+});

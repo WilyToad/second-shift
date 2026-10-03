@@ -392,6 +392,11 @@ average (polling alone profiles at 0.055 ms/tick). FC-104 tracks the listing tic
 the benchmark's ~0.05 ms run-to-run noise of the earlier result, so public copy says "under 0.1 ms per tick" and
 names the one-time registry scan rather than quoting either number as exact.
 
+**Re-run after FC-261 (2026-10-03, an inventory-change counter in the digest from `on_player_main_inventory_changed`;
+1,800 ticks × 3 runs):** 0.049 ms/tick, worst tick 3.5 ms with and 3.49 ms without (the base game's own). A first pass
+read 0.082 ms/tick with an 18.5 ms tick inside one slow run; the mod without the change read 0.037, and the rerun with it
+didn't reproduce the spike — run-to-run noise, and the handler can't fire in a benchmark, which has no player.
+
 **Re-run after S22 (2026-09-15, mod 0.2.0: build record, player status, surroundings, map id; 1,800 ticks × 5 runs):**
 without 0.627 ms/tick, with 0.682 ms/tick, so **0.055 ms/tick** (an earlier 3-run pass read 0.102, inside the noise; a
 second 5-run pass 0.054). Nothing new runs per tick; the player's own builds now reach one shared, unfiltered

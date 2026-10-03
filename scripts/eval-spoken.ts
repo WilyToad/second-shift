@@ -34,9 +34,9 @@ async function replay(spoken: boolean) {
   for (const q of PLAYTEST) {
     const a = await c.askFull(q, { extra: spoken ? { spoken: true, aloud: true } : {} });
     c.answers[`${spoken ? "spoken" : "typed"}: ${q}`] = a.answer;
-    // An answer stopped at its first paragraph ends the model's stream early, which then reports no count: estimate
-    // those from the text the player got, at the ~4 characters a token these answers run at.
-    const tokens = (a.done as { completionTokens?: number } | null)?.completionTokens || Math.ceil(a.answer.length / 4);
+    // What the player hears, not what the model wrote: a heard answer's second paragraph is generated but hidden, so the
+    // model's own count overstates it. Measured from the visible text at the ~4 characters a token these answers run at.
+    const tokens = Math.ceil(a.answer.length / 4);
     lengths.push(tokens);
     paragraphs.push(a.answer.split(/\n\s*\n/).filter((p) => p.trim()).length);
     // A closer is the last sentence; a clause of his past inside one is allowed by design (FC-182).

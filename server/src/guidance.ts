@@ -106,7 +106,7 @@ export function turnNotes(f: TurnFacts): string[] {
     // ghosts-and-robots pitched to a player with no power (FC-255). Reading tolerates length; listening doesn't.
     f.heard && !f.plain ? (STEPS.test(f.question)
       ? "this answer will be heard, not read: give the steps they asked for, at most four, a few words each, and nothing after them"
-      : "this answer will be heard, not read: answer what they said in one idea — two short sentences, one paragraph — then stop; no closing remark, no second paragraph, and offer nothing unless they could use it right now with what they have") : "",
+      : "this answer will be heard, not read: answer what they said in one idea — two short sentences, one paragraph — then stop; no closing remark, no second paragraph, and offer nothing unless they could use it right now with what they have. That's about what you say, not what you do: if they asked for something, still make the tool call, and write nothing before it") : "",
     f.spoken ? "this question was spoken and turned into text, so a word that makes no sense in Factorio is probably a mis-hear: answer what they plainly meant, and only ask if the wrong word changes the answer" : "",
     // "I can't build belts or place entities for you" for a belt run, then a plan in words anyway (FC-172).
     f.askedBuild ? "the player is asking for something to be built: say what you can actually do — build a blueprint in code for one production row (machines for a single item, with inserters, an input belt, an output belt and poles) and offer to paste it as ghosts where they stand, on a card they confirm — rather than saying you can't place anything" : "",
@@ -118,7 +118,8 @@ export function turnNotes(f: TurnFacts): string[] {
     // Only when the voice will act them, and never on a plain answer (FC-260). Here in the turn, not the system
     // prompt: the cached prefix stays the same whichever voice is chosen.
     f.cues && !f.plain ? cueNote() : "",
-    f.plain || f.throwbackSpent ? "" : "you may let one clause of your own past show in this answer, if it fits the sentence you were already writing; don't add a sentence for it, and don't explain yourself",
+    // Heard, the clause of his past landed as the closing line the player cut in on (FC-255): it waits for a typed turn.
+    f.plain || f.throwbackSpent || f.heard ? "" : "you may let one clause of your own past show in this answer, if it fits the sentence you were already writing; don't add a sentence for it, and don't explain yourself",
     f.askedReady ? "answer with what's still missing and whether the load fits the player's free slots, both from the lines" : "",
     f.packing && f.aboutList ? "the list lines are the truth about the list: don't restate items as done unless they're ticked, and to change a count use the list tool's set, never another line" : "",
     // Asked "do you ever miss flying?", it answered and then added "The list is 0 of 4 done: 1 of 20 furnace…" — the
