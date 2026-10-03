@@ -30,6 +30,9 @@ export const DigestSchema = z.object({
     remote_view: z.boolean().optional(),
     character_surface: z.string().optional(),
     character_position: z.object({ x: z.number(), y: z.number() }).optional(),
+    // FC-261: a counter the mod bumps when the player's own inventory changes; the server re-checks a packing list
+    // when it moves. It restarts at 0 when the game loads, so any change counts, not only an increase.
+    inventory_changes: z.number().optional(),
   }).optional(),
   research: z.object({
     current: z.string().optional(),

@@ -978,6 +978,28 @@ export class Agent {
     }
   }
 
+  private lastInventoryChanges: number | undefined;
+  private refreshing = false;
+
+  /**
+   * The player's inventory changed (the mod's counter moved, FC-261): with a packing list open, count it again so
+   * picking up 46 wood ticks "20 wood" off without a question. One recount at a time; a move while one is running is
+   * picked up by the next digest, two seconds later. Says nothing in the conversation — the list itself updates.
+   */
+  async inventoryChanged(changes: number | undefined): Promise<void> {
+    if (changes === undefined || changes === this.lastInventoryChanges) return;
+    const first = this.lastInventoryChanges === undefined;
+    this.lastInventoryChanges = changes;
+    const list = this.lists.active();
+    if (first || this.refreshing || list?.kind !== "packing") return;
+    this.refreshing = true;
+    try {
+      await this.checkPackingNow(list);
+    } finally {
+      this.refreshing = false;
+    }
+  }
+
   /** The same check, run from the list tool: it fetches the stock itself. */
   private async checkPackingNow(list: Checklist): Promise<string[]> {
     const stock = await this.lookup("stock", { radius: 48 });
@@ -1002,15 +1024,21 @@ export class Agent {
     // Tick off what they already have, and note the rest, so the panel and the answer agree.
     const states = check(needs, stock, status?.craftable ?? []);
     const ticked: string[] = [];
+    let noted = false;
     for (const state of states) {
       const done = state.missing === 0;
       const note = done
         ? `have ${state.have}${state.carried < state.have ? ` (${state.carried} carried)` : ""}`
         : `${state.have} of ${state.need.count} in reach`;
-      if (this.lists.update(list.name, state.need.text, { done, note }) && done) ticked.push(state.need.item);
+      const wasDone = list.items.find((i) => i.text === state.need.text)?.done ?? false;
+      if (this.lists.update(list.name, state.need.text, { done, note })) {
+        noted = true;
+        if (done && !wasDone) ticked.push(state.need.item);
+      }
     }
     if (ticked.length) lines.push(`ticked off now that the player has them: ${ticked.join(", ")}`);
-    if (added.length || ticked.length) this.showLists();
+    // "0 of 20 in reach" becoming "15 of 20" is worth showing too, not only a tick (FC-261).
+    if (added.length || noted) this.showLists();
     // Everything in reach: the deliveries have done their job, so the section goes quiet but stays (FC-168).
     if (states.length && states.every((s) => s.missing === 0) && ticked.length) {
       void this.clearRequests(false);

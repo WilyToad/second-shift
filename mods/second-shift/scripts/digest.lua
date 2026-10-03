@@ -71,6 +71,15 @@ return function(handlers)
 
   util.on_nth_tick(REFRESH_EVERY_TICKS, refresh_step)
 
+  -- How many times the companion player's own inventory has changed (FC-261), so the server re-checks a packing list
+  -- when they pick something up instead of only when they ask. Fired by the engine on change only — no timer, no scan.
+  -- Module-local is safe: it feeds this RCON reply and nothing that goes into storage (CLAUDE.md, desync).
+  local inventory_changes = 0
+  util.on_event(defines.events.on_player_main_inventory_changed, function(e)
+    local player = companion_player()
+    if player and e.player_index == player.index then inventory_changes = inventory_changes + 1 end
+  end)
+
   -- Test tooling: one rate refresh step on demand, so its cost can be profiled over RCON.
   handlers.debug_refresh_rates = function()
     refresh_step()
@@ -144,6 +153,7 @@ return function(handlers)
         remote_view = player.controller_type == defines.controllers.remote,
         character_surface = player.physical_surface.name,
         character_position = { x = math.floor(player.physical_position.x), y = math.floor(player.physical_position.y) },
+        inventory_changes = inventory_changes,
       } or nil,
       research = {
         current = force.current_research and force.current_research.name or nil,

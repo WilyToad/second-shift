@@ -146,8 +146,10 @@ what your game's own data says the build can't run without — fuel for a burner
 electric one, each with its reason next to it. Nothing else gets added: it doesn't guess at a repair pack you didn't
 ask for.
 
-The list then keeps itself current. As items land in your inventory or in a chest you can see, they tick themselves
-off with a note ("have 24, none carried", "0 of 200 in reach"). Ask **"am I ready?"** before you walk out and you
+The list then keeps itself current. As items land in your inventory they tick themselves off within a couple of
+seconds, with a note ("have 24, none carried", "0 of 200 in reach"); chests you can see count too. One gap: items
+that arrive in a chest without passing through your inventory — a bot dropping them off — show up the next time you
+ask about the list. Ask **"am I ready?"** before you walk out and you
 get what's still missing, what you could hand-craft right now, and whether the load even fits — "the load needs
 about 9 slots and you have 120 free".
 

@@ -1119,3 +1119,39 @@ test("FC-257: a wrong recipe in an answer gets the save's own recipe as a correc
   const shown = events.filter((e) => e.type === "token").map((e) => (e as { text: string }).text).join("");
   expect(shown).toContain("Correction: in this save a burner-mining-drill takes 3 iron-plate, 3 iron-gear-wheel, 1 stone-furnace.");
 });
+
+test("FC-261: picking things up ticks a packing list off with no question — the playtest's 46 wood", async () => {
+  const events: ServerMessage[] = [];
+  let wood = 0;
+  const calls: string[] = [];
+  const game: GameActions = {
+    latest: () => undefined,
+    async call(action: ActionName): Promise<any> {
+      calls.push(action);
+      if (action === "stock") return { surface: "nauvis", radius: 48, x: 0, y: 0, free_slots: 60, containers: 0, not_visible: 0, total_kinds: wood ? 1 : 0, items: wood ? [{ name: "wood", count: wood, carried: wood }] : [] };
+      throw new Error(`unexpected ${action}`);
+    },
+  };
+  const protos = PrototypesSchema.parse({ recipes: {}, fluids: {}, technologies: {}, machines: {}, items: { wood: { type: "item", stack_size: 100, fuel_value: 2e6 } } });
+  const model = fakeModel([{ tool: "update_list", args: { list: "packing", kind: "packing", add: ["20 wood"] } }, { text: "On the list." }]);
+  const agent = new Agent({ model, game, system: () => "rules", retriever: () => null, prototypes: () => protos, emit: (m) => events.push(m) });
+  await agent.ask("start a packing list: 20 wood");
+  expect(agent.lists.active()!.items[0]).toMatchObject({ text: "20 wood", done: false, note: "0 of 20 in reach" });
+
+  // The first counter the server sees is only a baseline; nothing is fetched for it.
+  const before = calls.length;
+  await agent.inventoryChanged(5);
+  expect(calls.length).toBe(before);
+  // The player chops trees: the counter moves, the list is counted again and the line ticks off, in the panel too.
+  wood = 46;
+  await agent.inventoryChanged(9);
+  expect(agent.lists.active()!.items[0]).toMatchObject({ done: true, note: "have 46" });
+  const shown = events.filter((e) => e.type === "lists").at(-1) as any;
+  expect(shown.lists[0].items[0]).toMatchObject({ done: true });
+  // Nothing was said in the conversation.
+  expect(model.seen).toHaveLength(2);
+  // The same counter again does nothing.
+  const after = calls.length;
+  await agent.inventoryChanged(9);
+  expect(calls.length).toBe(after);
+});
