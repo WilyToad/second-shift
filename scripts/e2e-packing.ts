@@ -1,5 +1,6 @@
 // FC-166/FC-167 through the real server: the player's own example becomes a packing list with counts, the save's
-// data adds what the build can't run without, the list ticks itself off against what they can reach, and
+// data adds what the build can't run without, the list ticks itself off against what they can reach — including
+// when they pick something up and ask nothing (FC-261) — and
 // "am I ready?" says what's missing and whether the load fits.
 // Usage (server and dev save running, resets the conversation): bun scripts/e2e-packing.ts
 import { openConsole } from "./lib/console";
@@ -51,6 +52,22 @@ try {
   answers["change"] = changed.answer;
   const after = (changed.list?.items ?? []).map((i: any) => i.text.toLowerCase());
   check("the list changes by talking", after.some((t: string) => /30/.test(t)) && !after.some((t: string) => /^\d+ (iron-)?chest/.test(t)), after.join(" | "));
+
+  // FC-261: picked up, never asked about. The playtest's list said "20 wood (0 of 20 in reach)" with 46 wood carried,
+  // because the list was only counted when a question was about it. Hand the player the belts the list still wants
+  // and say nothing: the line has to tick off on its own, and nothing is said in the conversation.
+  const beltLine = (changed.list?.items ?? []).find((i: any) => /belt/i.test(i.text) && !i.done);
+  const beltCount = Number(/^(\d+)/.exec(beltLine?.text ?? "")?.[1] ?? 0);
+  if (beltLine && beltCount) {
+    const from = got.length;
+    await dev.sc(`game.connected_players[1].insert({ name = "transport-belt", count = ${beltCount} }) rcon.print("ok")`);
+    const ticked = await until((m) => m.type === "lists" && (m as any).lists[0]?.items.some((i: any) => i.text === beltLine.text && i.done), 10_000, from);
+    check("picked-up belts tick off with no question asked", Boolean(ticked), `${beltLine.text}: ${ticked ? "ticked" : "still open after 10 s"}`);
+    check("nothing is said in the conversation when it ticks", !got.slice(from).some((m) => m.type === "token" || m.type === "user"));
+    await dev.sc(`game.connected_players[1].remove_item({ name = "transport-belt", count = ${beltCount} }) rcon.print("ok")`);
+  } else {
+    check("picked-up belts tick off with no question asked", false, "the list had no open belt line to tick");
+  }
 } finally {
   ws.close();
   if (chest.name) await dev.destroy([chest]);
