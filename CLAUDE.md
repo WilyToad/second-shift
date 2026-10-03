@@ -43,8 +43,10 @@ No Vite. UI: Preact + signals in `displays/src` (PLAN §4).
   modded (Space Age, maraxsis, Cerys, factorissimo-2, PlanetsLib) and players' saves differ, so vanilla recipe
   knowledge is wrong here: a recipe or tech claim that can't be cited from the dump is a bug. The system prompt
   lists the connected save's own mods (FC-131).
-- **Keep the stable prompt prefix block-aligned.** oMLX caches whole 2,048-token blocks; the server pads the system
-  prompt past the next boundary at startup (`alignToCacheBlock`). Changing rules or tools re-aligns automatically,
+- **Keep the stable prompt prefix block-aligned.** oMLX 0.7.0 caches Flash-Next in whole **8,192-token** blocks (it was
+  2,048 before; FC-262) and its hybrid layers resume only from a block boundary; the server pads the system prompt past
+  the next boundary at startup (`alignToCacheBlock`, block from `engines.ts`, `COMPANION_CACHE_BLOCK` overrides). If
+  every new question shows 0 cached tokens, check oMLX's log for its `block_size` first. Changing rules or tools re-aligns automatically,
   but check `scripts/latency-report.ts` after prompt changes.
 - **Visuals are rendered from data, not drawn by the model.** The agent emits compact component
   specs (PLAN §3, visual component library); code renders them from `prototypes.json` and state.

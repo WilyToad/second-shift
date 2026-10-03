@@ -156,15 +156,16 @@ export const CACHE_BLOCK_TOKENS = 2048;
 const ALIGN_MARGIN_TOKENS = 24;
 
 /**
- * oMLX caches whole 2,048-token blocks, so a stable prefix that ends mid-block gets that block
+ * oMLX caches whole blocks (2,048 tokens until 0.7.0, 8,192 for Flash-Next since: the caller passes the engine's
+ * block, FC-262), so a stable prefix that ends mid-block gets that block
  * re-read on every new question (measured 2.03 s vs 0.80 s first token, S05). Appends reference
  * lines until the measured prefix just crosses the next block boundary. `measure` returns the prompt
  * token count for a system prompt (with tools), so the template's own tokens are included.
  */
-export async function alignToCacheBlock(system: string, referenceLines: string[], measure: (system: string) => Promise<number>, heading = "[save data: recipe categories and what crafts them]"): Promise<{ system: string; tokens: number; target: number }> {
+export async function alignToCacheBlock(system: string, referenceLines: string[], measure: (system: string) => Promise<number>, heading = "[save data: recipe categories and what crafts them]", block = CACHE_BLOCK_TOKENS): Promise<{ system: string; tokens: number; target: number }> {
   const base = await measure(system);
-  const target = Math.ceil(base / CACHE_BLOCK_TOKENS) * CACHE_BLOCK_TOKENS;
-  if (base >= target - CACHE_BLOCK_TOKENS + ALIGN_MARGIN_TOKENS && base <= target - CACHE_BLOCK_TOKENS + ALIGN_MARGIN_TOKENS * 3) return { system, tokens: base, target: target - CACHE_BLOCK_TOKENS }; // already just past a boundary
+  const target = Math.ceil(base / block) * block;
+  if (base >= target - block + ALIGN_MARGIN_TOKENS && base <= target - block + ALIGN_MARGIN_TOKENS * 3) return { system, tokens: base, target: target - block }; // already just past a boundary
   // Start from the system prompt's ratio, then learn the reference lines' own ratio from each measured
   // round: they tokenize differently (S08: ~3.2 vs ~2.0 chars/token), and a fixed ratio left the loop short.
   let charsPerToken = system.length / base;

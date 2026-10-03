@@ -152,3 +152,9 @@ test("FC-258: an assistant turn with nothing in it is left out rather than sent 
   const { messages } = toAnthropicMessages([{ role: "user", content: "a" }, { role: "assistant", content: "" }, { role: "user", content: "b" }]);
   expect(messages).toEqual([{ role: "user", content: "a" }, { role: "user", content: "b" }]);
 });
+
+test("FC-262: oMLX pads past its 8,192-token cache block, another local engine past 2,048, and either can be set", async () => {
+  expect((await makeEngine({ COMPANION_MODEL_URL: "http://127.0.0.1:8000", COMPANION_MODEL: "m" })).cacheBlock).toBe(2048);
+  expect((await makeEngine({ COMPANION_MODEL_URL: "http://127.0.0.1:8000", COMPANION_MODEL: "m", COMPANION_CACHE_BLOCK: "4096" })).cacheBlock).toBe(4096);
+  expect((await makeEngine({ COMPANION_ENGINE: "claude-cli" })).cacheBlock).toBeUndefined();
+});

@@ -52,6 +52,16 @@ test("stable prefix is padded with reference lines until it crosses the next cac
   expect(aligned.system.startsWith(system)).toBe(true);
 });
 
+test("FC-262: with oMLX 0.7.0's 8,192-token blocks, the same prefix is padded past 8,192, not 4,096", async () => {
+  const measure = async (system: string) => Math.ceil(system.length / 3);
+  const system = "x".repeat(3 * 4121); // today's stable prompt, which ended inside oMLX's first 8,192-token block
+  const lines = Array.from({ length: 800 }, (_, i) => `technology tech-${i}: needs a, b | unlocks c`);
+  const aligned = await alignToCacheBlock(system, lines, measure, undefined, 8192);
+  expect(aligned.target).toBe(8192);
+  expect(aligned.tokens).toBeGreaterThanOrEqual(8192 + 24);
+  expect(aligned.tokens).toBeLessThan(8192 + 64);
+});
+
 test("stuck machine lines appear for slowness questions, filtered to the asked-about item", () => {
   const d = DigestSchema.parse({
     tick: 1, research: { progress: 0, queue: {} }, alerts: {}, surfaces: {},

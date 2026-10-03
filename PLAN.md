@@ -284,6 +284,18 @@ stable-first so the cached prefix survives:
 
 Putting volatile state anywhere but last invalidates the whole prefix and costs ~40 s per turn.
 
+**Changed 2026-09-26 with oMLX 0.7.0 — now 8,192 (FC-262).** oMLX widens Flash-Next's prefill step to 8,192 on 64 GB+
+machines and enlarges the cache block to match ("Enlarging paged cache block_size=256 to 8192 for ArraysCache hybrid
+model"); no setting turns it off. The model's hybrid (GDN) layers resume only from a saved snapshot, and oMLX now saves
+one at a block boundary or at the very end of a request ("tail terminal"). Our stable prompt, padded to 4,121 tokens for
+2,048 blocks, ended before the first 8,192 boundary, so every new question re-read it: **0 cached, first token median
+2.40 s** on the grounding eval (2026-09-30), against ~0.7 s on 2026-09-20. Probe (`scripts/probes/block-8192.ts`, six
+never-seen questions each): padded to 4,121, cached 0 every time, server first token median 2.04 s; padded to 8,225,
+cached 8,192 every time, **0.56 s**. The server now pads to the engine's block (8,192 for oMLX, `COMPANION_CACHE_BLOCK`
+overrides); grounding through the server 10/10, every question 8,192 cached, **first token median 0.68 s** (max 0.96 s),
+follow-up 0.89 s. The cost is a cold prefill of ~8k tokens once at startup. 8,192 is a multiple of 2,048, so the padding
+stays aligned if the block shrinks again.
+
 **Verified 2026-09-13 (`scripts/probes/cache.ts`):** oMLX caches in **2,048-token blocks** (every
 measurement is a multiple: 2,048, 4,096, 14,336 = 7×, 22,528 = 11×, 57,344 = 28×). A
 15,214-token prompt: cold 11.5 s to first token; repeated, 14,336 cached and 1.24 s; same prefix

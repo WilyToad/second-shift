@@ -374,7 +374,7 @@ game.onPrototypes((p) => {
       // Static tech tree lines (no researched status, so they don't go stale) as further padding.
       const techTree = Object.entries(p.data.technologies).sort(([a], [b]) => a.localeCompare(b)).map(([name, t]) => `technology ${name}: needs ${t.prerequisites.join(", ") || "-"} | unlocks ${t.unlocks.join(", ") || "-"}`);
       const measure = async (s: string) => (await model.stream(buildMessages(s, [], { role: "user", content: "." }), { tools: TOOLS, maxTokens: 1 })).usage?.prompt_tokens ?? 0;
-      const aligned = await alignToCacheBlock(base, [...categories, ...techTree], measure, "[save data: reference (crafting categories and the technology tree)]");
+      const aligned = await alignToCacheBlock(base, [...categories, ...techTree], measure, "[save data: reference (crafting categories and the technology tree)]", engine.cacheBlock);
       system = aligned.system;
       alignedBase = base;
       console.log(`System prompt aligned to the cache: ${aligned.tokens} tokens (block boundary ${aligned.target}).`);
