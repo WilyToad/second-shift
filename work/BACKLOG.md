@@ -9,6 +9,9 @@ Unscheduled work, grouped by the phase in `PLAN.md` §7. Items move into a sprin
 
 ## Phase 4 — Voice and extras
 
+- [ ] FC-268 Fresh screenshots for the README and website
+  - Notes: player, 2026-10-03, when the copy caught up with the voice work: "We can do screenshots later, just add that as a future todo." `docs/media/talk.png` (README) and `website/src/media/talk.png` show the voice controls from before Eleven v4 cues, Kokoro and **Check echo**; the packing-list shots predate FC-261 and FC-265.
+  - Acceptance: the talk, packing-list and in-game panel shots retaken from the current console and game (dev save or a fresh map), alt text updated, both README and website rebuilt; the site deployed only on the player's word.
 - [x] FC-266 Spike: how voice apps keep their own output out of the microphone
   - Notes: player, 2026-10-03: with a headset, and then with the laptop mic and headphones, the recognizer heard Ballast's own words ("Walled off the" after "Wall's off the list"; "Loud and clear" after "Loud and clear"). The kept clip shows the mic physically picked him up, faintly. FC-242 had retired the echo rule in favour of "headset required", which this disproves. The player: "Surely every other multiplayer game out there handles mic echo somehow?… I feel like we are running around patching workarounds."
   - Acceptance: what games, voice chat and voice assistants actually do (with sources), what of that the browser gives us and how (Chrome's echo cancellation, which audio it uses as the reference, whether `SpeechRecognition` can take an echo-cancelled track, what local Whisper needs), and one recommended design that replaces the workarounds, with how to verify it on the player's own setup.
